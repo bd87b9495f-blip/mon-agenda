@@ -10,6 +10,8 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="visual.css">
+    <link rel="stylesheet" href="clients.css">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -39,12 +41,14 @@
         <button id="todayButton" class="outline-button">Aujourd’hui</button>
       </section>
 
-      <section id="appointments" class="appointments" aria-live="polite"></section>
-      <section id="emptyState" class="empty-state" hidden>
-        <span>✦</span>
-        <h2>Rien de prévu</h2>
-        <p>Profite de ce créneau, ou ajoute un rendez-vous.</p>
+      <section class="view-controls" aria-label="Choisir la vue">
+        <button class="view-button active" data-planner-view="week">Semaine</button>
+        <button class="view-button" data-planner-view="month">Mois</button>
       </section>
+      <section id="weekPlanner" aria-label="Planning de la semaine"></section>
+      <section id="monthPlanner" hidden aria-label="Planning du mois"></section>
+      <section id="appointments" class="appointments" hidden></section>
+      <section id="emptyState" hidden></section>
     </main>
 
     <nav class="bottom-bar" aria-label="Navigation">
@@ -85,5 +89,7 @@
       </form>
     </dialog>
     <script src="app.js"></script>
+    <script src="visual.js"></script>
+    <script src="client-ui.js"></script>
   </body>
 </html>
