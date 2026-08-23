@@ -2,24 +2,25 @@
 
 Application personnelle hors ligne pour gérer des rendez-vous à domicile.
 
-## Ce que fait cette version
+## Cette version
 
-- vue **Semaine** : une journée détaillée avec heures de début et de fin, créneaux libres et résumé de la journée ;
-- vue **Mois** : calendrier mensuel, puis aperçu détaillé de la semaine choisie ;
-- une seule carte **Prochain rendez-vous**, avec raccourci itinéraire discret ;
-- week-ends distincts et jours fériés de France métropolitaine identifiés ;
-- journées indisponibles (congé, formation, repos…) ;
-- fiches clientes avec téléphone, adresse, notes, historique et dernier rendez-vous ;
-- suggestion de clientes dès la saisie du nom et remplissage automatique des coordonnées ;
-- alerte de conflit de créneaux et de marge de trajet, avec choix de modifier ou valider quand même ;
-- statuts de rendez-vous, suivi du paiement et couleur suivant le type de prestation ;
-- création facultative du prochain rendez-vous à 2, 3, 4 ou 5 semaines ;
-- itinéraire du jour dans l'ordre des rendez-vous et raccourcis Waze compacts ;
-- sauvegarde/restauration locale, avec rappel hebdomadaire.
+- planning journalier lisible, vue semaine et aperçu depuis le mois ;
+- week-ends et jours fériés de France métropolitaine identifiés ;
+- créneaux bloqués avec début, fin, motif ou option **Toute la journée** ;
+- horaires de travail modifiables dans Réglages, avec coupure facultative ;
+- fiches clientes, recherche, remplissage automatique, historique et suivi des annulations/absences ;
+- prestations enregistrées : durée, prix et couleur se remplissent automatiquement ;
+- statut de rendez-vous, paiement et date de paiement modifiable ;
+- nouveau rendez-vous marqué **Payé** à la date du jour par défaut ;
+- alerte de conflit, avec possibilité de valider quand même ;
+- raccourcis Waze compacts et itinéraire du jour ;
+- bloc **À faire** pour les rendez-vous à confirmer et paiements à régler ;
+- page **Bilan** filtrable par semaine ou mois : activité, clientes, encaissements et impayés ;
+- sauvegarde/restauration locale.
 
 ## Données
 
-Les rendez-vous sont enregistrés sur l'appareil dans le navigateur. Ils ne sont pas stockés sur GitHub. Fais une sauvegarde régulière depuis l'icône `⇩`. Les jours fériés inclus sont ceux de France métropolitaine.
+Les rendez-vous sont enregistrés sur l'appareil dans le navigateur. Ils ne sont pas stockés sur GitHub. Fais une sauvegarde régulière depuis l'icône `⇩`.
 
 ## Mise à jour GitHub Pages
 
