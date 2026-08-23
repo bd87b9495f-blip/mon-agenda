@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f8f3f5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Mon agenda">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="style.css">
+    <title>Mon agenda</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <p class="eyebrow" id="todayLabel"></p>
+        <div class="topline">
+          <h1>Mon agenda</h1>
+          <button class="icon-button" id="backupButton" aria-label="Sauvegarder mes données" title="Sauvegarder">⇩</button>
+        </div>
+      </header>
+
+      <section class="week-card" aria-label="Semaine en cours">
+        <div class="week-navigation">
+          <button class="quiet-button" id="previousWeek" aria-label="Semaine précédente">‹</button>
+          <strong id="weekRange"></strong>
+          <button class="quiet-button" id="nextWeek" aria-label="Semaine suivante">›</button>
+        </div>
+        <div class="week-days" id="weekDays"></div>
+      </section>
+
+      <section class="day-heading">
+        <div>
+          <p class="section-label">Planning</p>
+          <h2 id="selectedDayTitle"></h2>
+        </div>
+        <button id="todayButton" class="outline-button">Aujourd’hui</button>
+      </section>
+
+      <section id="appointments" class="appointments" aria-live="polite"></section>
+      <section id="emptyState" class="empty-state" hidden>
+        <span>✦</span>
+        <h2>Rien de prévu</h2>
+        <p>Profite de ce créneau, ou ajoute un rendez-vous.</p>
+      </section>
+    </main>
+
+    <nav class="bottom-bar" aria-label="Navigation">
+      <button class="nav-item active" data-view="agenda"><span>▦</span>Agenda</button>
+      <button class="nav-item" data-view="clients"><span>♙</span>Clientes</button>
+      <button class="add-button" id="addAppointment" aria-label="Ajouter un rendez-vous">+</button>
+      <button class="nav-item" data-view="settings"><span>⚙</span>Réglages</button>
+    </nav>
+
+    <dialog id="appointmentDialog">
+      <form method="dialog" id="appointmentForm">
+        <div class="modal-heading"><h2 id="formTitle">Nouveau rendez-vous</h2><button type="button" class="close-button" aria-label="Fermer">×</button></div>
+        <input id="appointmentId" type="hidden">
+        <label>Cliente<input id="clientName" required autocomplete="name" placeholder="Ex. Léa Martin"></label>
+        <label>Téléphone <input id="phone" inputmode="tel" autocomplete="tel" placeholder="Optionnel"></label>
+        <div class="two-columns">
+          <label>Date<input id="date" required type="date"></label>
+          <label>Heure<input id="time" required type="time"></label>
+        </div>
+        <div class="two-columns">
+          <label>Durée<select id="duration"><option value="60">1 h</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label>
+          <label>Prix (€)<input id="price" type="number" min="0" step="1" inputmode="decimal" placeholder="Optionnel"></label>
+        </div>
+        <label>Prestation<input id="service" placeholder="Ex. Pose complète" required></label>
+        <label>Adresse <input id="address" autocomplete="street-address" placeholder="Domicile de la cliente"></label>
+        <label>Notes<textarea id="notes" rows="2" placeholder="Couleur, préférence, détails…"></textarea></label>
+        <div class="form-actions"><button type="button" class="danger-button" id="deleteAppointment" hidden>Supprimer</button><button class="save-button" value="default">Enregistrer</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="settingsDialog">
+      <form method="dialog">
+        <div class="modal-heading"><h2>Mes données</h2><button type="button" class="close-button" aria-label="Fermer">×</button></div>
+        <p class="info-copy">Tout est enregistré sur cet iPhone. Fais une sauvegarde régulière dans Fichiers pour ne rien perdre si tu changes de téléphone.</p>
+        <button type="button" class="wide-button" id="exportData">Sauvegarder dans Fichiers</button>
+        <label class="file-label">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json"></label>
+        <p class="small-copy">La restauration remplacera les rendez-vous actuellement présents dans l’application.</p>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>
