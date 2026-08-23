@@ -10,7 +10,6 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="overrides.css">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -24,6 +23,7 @@
       </header>
 
       <section class="next-card" id="nextAppointment"></section>
+      <button id="backupNotice" class="backup-notice" hidden></button>
 
       <section class="mode-switch" aria-label="Type de vue">
         <button class="mode-button active" data-mode="week">Semaine</button>
@@ -37,6 +37,7 @@
           <button class="round-button" id="nextPeriod" aria-label="Semaine suivante">›</button>
         </div>
         <div class="day-strip" id="dayStrip" aria-label="Choisir un jour"></div>
+        <div id="holidayBanner" hidden></div>
         <div class="selected-day-heading">
           <div>
             <p class="eyebrow">Planning</p>
@@ -44,6 +45,11 @@
           </div>
           <button class="text-button" id="todayButton">Aujourd’hui</button>
         </div>
+        <div class="day-actions">
+          <button class="action-chip" id="routeDay">⌖ Itinéraire du jour</button>
+          <button class="action-chip" id="toggleUnavailable">▧ Indisponible</button>
+        </div>
+        <section id="daySummary" class="day-summary"></section>
         <section id="dayTimeline" class="day-timeline" aria-label="Planning horaire"></section>
       </section>
 
@@ -53,7 +59,7 @@
           <strong id="monthLabel"></strong>
           <button class="round-button" id="nextMonth" aria-label="Mois suivant">›</button>
         </div>
-        <p class="view-help" id="monthHelp">Choisis un jour pour ouvrir le détail de sa semaine.</p>
+        <p class="view-help">Les week-ends et jours fériés sont signalés. Choisis un jour pour afficher le détail de sa semaine.</p>
         <section id="monthGrid" class="month-grid" aria-label="Calendrier mensuel"></section>
         <section id="weekOverview" hidden aria-label="Vue détaillée de la semaine"></section>
       </section>
@@ -96,6 +102,14 @@
           <label class="field">Prestation<input id="service" required placeholder="Ex. Pose complète"></label>
         </div>
         <label class="field">Adresse<input id="address" autocomplete="street-address" placeholder="Domicile de la cliente"></label>
+        <div class="two-columns">
+          <label class="field">Statut<select id="status"><option value="to_confirm">À confirmer</option><option value="confirmed">Confirmé</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option></select></label>
+          <label class="field">Paiement<select id="paymentStatus"><option value="pending">À régler</option><option value="paid">Payé</option></select></label>
+        </div>
+        <div class="two-columns">
+          <label class="field">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label>
+          <label class="field">Prochain RDV<select id="repeatWeeks"><option value="0">Ne pas créer</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
+        </div>
         <label class="field">Notes<textarea id="notes" rows="2" placeholder="Couleur, préférence, détails…"></textarea></label>
         <div id="conflictHint" class="conflict-hint" hidden></div>
         <div class="form-actions"><button type="button" class="danger-button" id="deleteAppointment" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
@@ -113,6 +127,24 @@
       </div>
     </dialog>
 
+    <dialog id="unavailableDialog" class="modal">
+      <form id="unavailableForm">
+        <div class="modal-heading"><h2 id="unavailableTitle">Jour indisponible</h2><button type="button" class="close-button" data-close="unavailableDialog" aria-label="Fermer">×</button></div>
+        <input id="unavailableId" type="hidden">
+        <label class="field">Date<input id="unavailableDate" required type="date"></label>
+        <label class="field">Motif<input id="unavailableReason" placeholder="Ex. Congé, repos, formation"></label>
+        <div class="form-actions"><button class="danger-button" id="deleteUnavailable" type="button" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="routeDialog" class="modal">
+      <div>
+        <div class="modal-heading"><h2>Itinéraire du jour</h2><button type="button" class="close-button" data-close="routeDialog" aria-label="Fermer">×</button></div>
+        <p id="routeDate" class="small-copy"></p>
+        <section id="routeList" class="route-list"></section>
+      </div>
+    </dialog>
+
     <dialog id="clientDialog" class="modal">
       <form id="clientForm">
         <div class="modal-heading"><h2>Fiche cliente</h2><button type="button" class="close-button" data-close="clientDialog" aria-label="Fermer">×</button></div>
@@ -120,21 +152,23 @@
         <label class="field">Nom<input id="profileName" required></label>
         <label class="field">Téléphone<input id="profilePhone" inputmode="tel"></label>
         <label class="field">Adresse<input id="profileAddress"></label>
-        <button class="waze-form-button" type="button" id="profileWaze" hidden>⌖ Ouvrir dans Waze</button>
+        <button class="route-button" type="button" id="profileWaze" hidden><span>⌖</span> Itinéraire</button>
         <label class="field">Notes cliente<textarea id="profileNotes" rows="3" placeholder="Préférences, allergies, informations utiles…"></textarea></label>
-        <section id="lastAppointment" class="last-appointment"></section>
+        <section id="clientHistory" class="client-history"></section>
         <div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div>
       </form>
     </dialog>
 
     <dialog id="settingsDialog" class="modal">
-      <div>
-        <div class="modal-heading"><h2>Mes données</h2><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
-        <p class="info-copy">Les rendez-vous et clientes restent sur cet appareil. Sauvegarde-les régulièrement dans Fichiers.</p>
+      <form id="settingsForm">
+        <div class="modal-heading"><h2>Réglages</h2><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
+        <label class="field">Marge de trajet entre les rendez-vous<select id="travelBuffer"><option value="0">Aucune</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="45">45 minutes</option></select></label>
+        <p class="small-copy">La marge est prise en compte dans les alertes de conflit et apparaît dans le planning.</p>
+        <p class="backup-status" id="backupStatus"></p>
         <button type="button" class="primary-button full-width" id="exportData">Sauvegarder dans Fichiers</button>
         <label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json"></label>
-        <p class="small-copy">Une restauration remplace les rendez-vous et clientes présents dans l’application.</p>
-      </div>
+        <div class="form-actions"><button class="secondary-button" type="button" data-close="settingsDialog">Fermer</button><button class="primary-button" type="submit">Enregistrer</button></div>
+      </form>
     </dialog>
     <script src="app.js"></script>
   </body>
