@@ -1,17 +1,22 @@
-# Mon agenda — application personnelle hors ligne
+# Mon agenda
 
-Petite PWA pour gérer des rendez-vous de prothésiste ongulaire : calendrier semaine, clientes, adresse, prestation, prix et notes. Les données restent dans le navigateur de l'iPhone et l'application fonctionne hors connexion après sa première ouverture.
+Application personnelle hors ligne pour gérer des rendez-vous à domicile.
 
-## Publication gratuite avec GitHub Pages
+## Ce que fait cette version
 
-1. Sur GitHub, crée un dépôt **public** nommé par exemple `mon-agenda`.
-2. Envoie tous les fichiers de ce dossier dans ce dépôt.
-3. Ouvre **Settings** → **Pages** → *Deploy from a branch* → sélectionne `main` et le dossier `/ (root)` → **Save**.
-4. Attends une minute, puis ouvre l'adresse affichée par GitHub sur l'iPhone.
-5. Dans Safari : bouton Partager → **Sur l'écran d'accueil** → **Ajouter**.
+- vue **Semaine** : une journée détaillée à la fois, avec heures de début et de fin lisibles ;
+- vue **Mois** : calendrier mensuel puis aperçu complet de la semaine choisie ;
+- une seule carte **Prochain rendez-vous** ;
+- fiches clientes avec téléphone, adresse, notes et dernier rendez-vous ;
+- suggestion de clientes dès la saisie de leur nom et remplissage automatique des coordonnées ;
+- alerte de conflit de créneaux, avec choix de modifier ou valider quand même ;
+- accès Waze depuis les rendez-vous ayant une adresse ;
+- sauvegarde/restauration locale.
 
-Ouvre l'application une fois avec une connexion, puis elle reste utilisable sans réseau. Fais régulièrement une sauvegarde avec l'icône ⇩ dans l'application : elle télécharge un fichier JSON dans Fichiers.
+## Données
 
-## Limites assumées
+Les rendez-vous sont enregistrés sur l'appareil dans le navigateur. Ils ne sont pas stockés sur GitHub. Fais une sauvegarde régulière depuis l'icône `⇩`.
 
-Les rendez-vous sont stockés localement, sur cet iPhone. GitHub Pages ne connaît ni ne conserve les données clientes. Les alertes même quand l'app est fermée nécessitent le Calendrier iPhone ou une app native ; cette première version ne les envoie pas.
+## Mise à jour GitHub Pages
+
+Avec GitHub Desktop, copie le contenu de ce dossier sur le dépôt cloné, puis crée un commit et utilise **Push origin**. GitHub Pages se met à jour automatiquement.
