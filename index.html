@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=8">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -135,9 +135,10 @@
           <label class="field">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label>
         </div>
         <div class="two-columns">
-          <label class="field">Prochain RDV<select id="repeatWeeks"><option value="0">Ne pas créer</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
-          <label class="field" id="cancellationReasonField" hidden>Motif<input id="cancellationReason" placeholder="Ex. Annulation tardive"></label>
+          <label class="field">Créer le prochain RDV<select id="repeatWeeks"><option value="0">Pas maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
+          <label class="field" id="repeatDateField" hidden>Date ajustable<input id="repeatDate" type="date"><small class="field-help" id="repeatHelp">Date calculée automatiquement.</small></label>
         </div>
+        <label class="field" id="cancellationReasonField" hidden>Motif<input id="cancellationReason" placeholder="Ex. Annulation tardive"></label>
         <label class="field">Notes<textarea id="notes" rows="2" placeholder="Couleur, préférence, détails…"></textarea></label>
         <div id="conflictHint" class="conflict-hint" hidden></div>
         <div class="form-actions"><button type="button" class="danger-button" id="deleteAppointment" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
@@ -213,7 +214,7 @@
       <div>
         <div class="modal-heading"><h2>Réglages</h2><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
         <section class="settings-section">
-          <div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires seront grisés, mais restent possibles exceptionnellement.</p></div><button class="small-action" id="applyWeekdayHours" type="button">Lun–Ven 9h–19h</button></div>
+          <div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires seront grisés, mais restent possibles exceptionnellement.</p></div><button class="small-action" id="applyWeekdayHours" type="button">Préremplir 9h–19h</button></div>
           <div id="workingHoursEditor" class="working-hours-editor"></div>
           <button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer les horaires</button>
         </section>
@@ -224,8 +225,10 @@
         <section class="settings-section backup-section">
           <h3>Sauvegarde</h3>
           <p class="backup-status" id="backupStatus"></p>
+          <p class="small-copy">Les sauvegardes des anciennes versions sont adaptées automatiquement aux nouvelles fonctions lors de la restauration.</p>
           <button type="button" class="primary-button full-width" id="exportData">Sauvegarder dans Fichiers</button>
           <label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json"></label>
+          <button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button>
         </section>
       </div>
     </dialog>
@@ -245,6 +248,6 @@
       </form>
     </dialog>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=8"></script>
   </body>
 </html>

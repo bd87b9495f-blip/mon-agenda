@@ -1,9 +1,9 @@
-const CACHE_NAME = 'mon-agenda-v7';
+const CACHE_NAME = 'mon-agenda-v8';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
+  './style.css?v=8',
+  './app.js?v=8',
   './manifest.webmanifest',
   './icon.svg'
 ];
