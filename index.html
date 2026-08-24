@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=9">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -27,11 +27,12 @@
       <button id="backupNotice" class="backup-notice" hidden></button>
 
       <section class="mode-switch" aria-label="Type de vue">
-        <button class="mode-button active" data-mode="week">Semaine</button>
+        <button class="mode-button active" data-mode="day">Jour</button>
+        <button class="mode-button" data-mode="week">Semaine</button>
         <button class="mode-button" data-mode="month">Mois</button>
       </section>
 
-      <section id="weekView" class="agenda-view">
+      <section id="dayView" class="agenda-view">
         <div class="period-nav">
           <button class="round-button" id="previousPeriod" aria-label="Semaine précédente">‹</button>
           <strong id="periodLabel"></strong>
@@ -52,6 +53,21 @@
         </div>
         <section id="daySummary" class="day-summary"></section>
         <section id="dayTimeline" class="day-timeline" aria-label="Planning horaire"></section>
+      </section>
+
+      <section id="fullWeekView" class="agenda-view" hidden>
+        <div class="period-nav">
+          <button class="round-button" id="previousWeek" aria-label="Semaine précédente">‹</button>
+          <strong id="weekPeriodLabel"></strong>
+          <button class="round-button" id="nextWeek" aria-label="Semaine suivante">›</button>
+        </div>
+        <div class="day-strip" id="weekDayStrip" aria-label="Jours de la semaine"></div>
+        <div class="week-view-heading">
+          <div><p class="eyebrow">Vue complète</p><h2>Rendez-vous de la semaine</h2></div>
+          <button class="text-button" id="currentWeekButton">Cette semaine</button>
+        </div>
+        <section id="weekSummary" class="day-summary"></section>
+        <section id="weekSchedule" class="week-overview-list" aria-label="Rendez-vous de toute la semaine"></section>
       </section>
 
       <section id="monthView" class="agenda-view" hidden>
@@ -134,11 +150,19 @@
           <label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label>
           <label class="field">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label>
         </div>
-        <div class="two-columns">
-          <label class="field">Créer le prochain RDV<select id="repeatWeeks"><option value="0">Pas maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
-          <label class="field" id="repeatDateField" hidden>Date ajustable<input id="repeatDate" type="date"><small class="field-help" id="repeatHelp">Date calculée automatiquement.</small></label>
-        </div>
-        <label class="field" id="cancellationReasonField" hidden>Motif<input id="cancellationReason" placeholder="Ex. Annulation tardive"></label>
+        <section class="form-subsection" id="recurrenceSection" hidden>
+          <p class="form-subsection-title">Planifier le prochain rendez-vous</p>
+          <div id="linkedNextAppointment" class="linked-next" hidden></div>
+          <div id="repeatComposer">
+            <label class="field">Délai habituel<select id="repeatWeeks"><option value="0">Ne pas créer maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
+            <div class="two-columns" id="repeatScheduleFields" hidden>
+              <label class="field">Date du prochain RDV<input id="repeatDate" type="date"></label>
+              <label class="field">Heure du prochain RDV<input id="repeatTime" type="time"></label>
+            </div>
+            <small class="field-help" id="repeatHelp">La date et l’heure seront calculées automatiquement, puis restent modifiables.</small>
+          </div>
+        </section>
+        <label class="field" id="cancellationReasonField" hidden><span id="cancellationReasonLabel">Motif</span><input id="cancellationReason" placeholder="Ex. Annulation tardive, cliente absente…"></label>
         <label class="field">Notes<textarea id="notes" rows="2" placeholder="Couleur, préférence, détails…"></textarea></label>
         <div id="conflictHint" class="conflict-hint" hidden></div>
         <div class="form-actions"><button type="button" class="danger-button" id="deleteAppointment" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
@@ -175,6 +199,8 @@
           </div>
         </div>
         <label class="field">Motif<input id="blockReason" placeholder="Ex. Congé, trajet, formation"></label>
+        <label class="field">Adresse<input id="blockAddress" autocomplete="street-address" placeholder="Optionnel · lieu du déplacement"></label>
+        <label class="field">Commentaire<textarea id="blockNotes" rows="2" placeholder="Optionnel · informations utiles"></textarea></label>
         <div id="blockValidation" class="conflict-hint" hidden></div>
         <div class="form-actions"><button class="danger-button" id="deleteBlock" type="button" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
       </form>
@@ -212,7 +238,7 @@
 
     <dialog id="settingsDialog" class="modal settings-modal">
       <div>
-        <div class="modal-heading"><h2>Réglages</h2><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
+        <div class="modal-heading"><div><h2>Réglages</h2><p class="app-version" id="appVersionLabel"></p></div><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
         <section class="settings-section">
           <div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires seront grisés, mais restent possibles exceptionnellement.</p></div><button class="small-action" id="applyWeekdayHours" type="button">Préremplir 9h–19h</button></div>
           <div id="workingHoursEditor" class="working-hours-editor"></div>
@@ -248,6 +274,6 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
   </body>
 </html>

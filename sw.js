@@ -1,9 +1,9 @@
-const CACHE_NAME = 'mon-agenda-v8';
+const CACHE_NAME = 'mon-agenda-v9';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=8',
-  './app.js?v=8',
+  './style.css?v=9',
+  './app.js?v=9',
   './manifest.webmanifest',
   './icon.svg'
 ];
@@ -16,7 +16,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(names => Promise.all(names.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))))
+      .then(names => Promise.all(names.filter(name => name.startsWith('mon-agenda-') && name !== CACHE_NAME).map(name => caches.delete(name))))
       .then(() => self.clients.claim())
   );
 });
