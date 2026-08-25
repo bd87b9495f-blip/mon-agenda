@@ -1,27 +1,30 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '9.0';
-  const CURRENT_DATA_VERSION = 9;
+  const APP_VERSION = '10.0';
+  const CURRENT_DATA_VERSION = 10;
   const BACKUP_FORMAT_VERSION = 2;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
-  const STATE_KEY = 'nail-planner-state-v9';
+  const STATE_KEY = 'nail-planner-state-v10';
+  const V9_KEY = 'nail-planner-state-v9';
   const V8_KEY = 'nail-planner-state-v8';
   const V7_KEY = 'nail-planner-state-v7';
   const V6_KEY = 'nail-planner-state-v6';
   const V5_KEY = 'nail-planner-state-v5';
   const LEGACY_APPOINTMENTS_KEY = 'nail-planner-v1';
   const LEGACY_PROFILES_KEY = 'nail-client-profiles-v1';
-  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v9';
+  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v10';
+  const V9_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v9';
   const V8_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v8';
   const HOUR_HEIGHT = 68;
+  const WEEK_HOUR_HEIGHT = 52;
   const STATUS = {
     to_confirm: 'À confirmer', confirmed: 'Confirmé', completed: 'Terminé',
     cancelled: 'Annulé', no_show: 'Absente'
   };
   const PAYMENT = { pending: 'À régler', paid: 'Payé' };
   const METHOD = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
-  const COLORS = ['rose', 'purple', 'orange', 'teal'];
+  const COLORS = ['rose', 'purple', 'orange', 'teal', 'blue', 'green', 'amber', 'coral'];
   const DAYS = [
     { key: 1, label: 'Lundi', short: 'Lun' }, { key: 2, label: 'Mardi', short: 'Mar' },
     { key: 3, label: 'Mercredi', short: 'Mer' }, { key: 4, label: 'Jeudi', short: 'Jeu' },
@@ -122,7 +125,8 @@
       { id: 'preset-pose-complete', name: 'Pose complète', duration: 60, price: '', color: 'rose', active: true },
       { id: 'preset-remplissage', name: 'Remplissage', duration: 60, price: '', color: 'purple', active: true },
       { id: 'preset-depose', name: 'Dépose', duration: 30, price: '', color: 'orange', active: true },
-      { id: 'preset-nail-art', name: 'Nail art', duration: 30, price: '', color: 'teal', active: true }
+      { id: 'preset-renfort', name: 'Renfort', duration: 60, price: '', color: 'teal', active: true },
+      { id: 'preset-semi-permanent', name: 'Semi-permanent', duration: 45, price: '', color: 'blue', active: true }
     ];
   }
 
@@ -153,6 +157,12 @@
         color: COLORS.includes(item.color) ? item.color : COLORS[index % COLORS.length], active: item.active !== false
       };
       services.push(service); byId.set(service.id, service); if (!suppliedId) legacyNames.add(nameKey);
+    });
+    defaultServices().forEach(preset => {
+      if (services.some(service => normaliseName(service.name) === normaliseName(preset.name))) return;
+      const id = byId.has(preset.id) ? `${preset.id}-${uuid()}` : preset.id;
+      const service = { ...preset, id };
+      services.push(service); byId.set(id, service);
     });
     return services;
   }
@@ -227,33 +237,49 @@
     }
     const appointments = rawAppointments.filter(validAppointment).map(raw => {
       const requestedClientId = String(raw.clientId || '').trim(), legacyName = String(raw.name || raw.client || raw.clientName || '').trim();
+      const appointmentClient = {
+        id: requestedClientId, name: legacyName || 'Cliente sans nom', phone: raw.phone, address: raw.address,
+        notes: raw.clientNotes || '', createdAt: raw.clientCreatedAt, updatedAt: raw.clientUpdatedAt
+      };
       let client = requestedClientId ? clientsById.get(requestedClientId) : null;
-      if (!client && requestedClientId) client = addClient({ ...raw, id: requestedClientId }, { fallbackName: legacyName || 'Cliente sans nom' });
-      client ||= firstClientByName.get(normaliseName(legacyName)) || addClient(raw, { dedupeByName: true }) || addClient({ name: 'Cliente sans nom' }, { dedupeByName: true });
+      if (!client && requestedClientId) client = addClient(appointmentClient, { fallbackName: legacyName || 'Cliente sans nom' });
+      client ||= firstClientByName.get(normaliseName(legacyName)) || addClient(appointmentClient, { dedupeByName: true }) || addClient({ name: 'Cliente sans nom' }, { dedupeByName: true });
       let service = raw.serviceId ? services.find(item => item.id === raw.serviceId) : null;
       service ||= serviceByName(raw.service || 'Prestation') || ensureService(raw.service || 'Prestation', raw.duration, raw.price, raw.serviceColor);
       const paymentStatus = raw.paymentStatus === 'paid' ? 'paid' : 'pending';
-      const paymentDate = paymentStatus === 'paid' ? (pickDate(raw.paymentDate) || pickDate(raw.paidAt) || raw.date) : '';
+      const suppliedPaymentDate = pickDate(raw.paymentDate) || pickDate(raw.paidAt);
+      const suppliedReminderDate = pickDate(raw.paymentReminderDate) || pickDate(raw.paymentDueDate) || pickDate(raw.reminderDate);
+      if (strict && raw.paymentDate && !validDate(pickDate(raw.paymentDate))) throw new Error('INVALID_PAYMENT_DATE');
+      if (strict && (raw.paymentReminderDate || raw.paymentDueDate || raw.reminderDate) && !validDate(suppliedReminderDate)) throw new Error('INVALID_PAYMENT_REMINDER');
+      const paymentDate = paymentStatus === 'paid' ? (validDate(suppliedPaymentDate) ? suppliedPaymentDate : raw.date) : '';
+      const paymentReminderDate = paymentStatus === 'pending' ? (validDate(suppliedReminderDate) ? suppliedReminderDate : raw.date) : '';
       return {
         id: String(raw.id || uuid()), clientId: client.id, date: raw.date, time: raw.time, duration: Math.max(15, Number(raw.duration) || 60),
         price: raw.price === '' || raw.price === null || raw.price === undefined ? '' : String(raw.price), service: String(raw.service || service.name || 'Prestation').trim(),
         serviceId: service.id, serviceColor: COLORS.includes(raw.serviceColor) ? raw.serviceColor : service.color,
         notes: String(raw.notes || '').trim(), status: STATUS[raw.status] ? raw.status : 'confirmed', paymentStatus,
-        paymentDate, paymentMethod: METHOD[raw.paymentMethod] ? raw.paymentMethod : '', cancellationReason: String(raw.cancellationReason || raw.statusReason || raw.reason || '').trim(),
+        paymentDate, paymentReminderDate, paymentMethod: METHOD[raw.paymentMethod] ? raw.paymentMethod : '', cancellationReason: String(raw.cancellationReason || raw.statusReason || raw.reason || '').trim(),
         recurrenceId: String(raw.recurrenceId || '').trim(), parentAppointmentId: String(raw.parentAppointmentId || raw.sourceAppointmentId || '').trim(),
         createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || new Date().toISOString()
       };
     });
-    const rawBlocks = Array.isArray(data.blocks) ? data.blocks : Array.isArray(data.blockedSlots) ? data.blockedSlots : Array.isArray(data.unavailableDays) ? data.unavailableDays : [];
+    const seenBlocks = new Set();
+    const rawBlocks = [data.blocks, data.blockedSlots, data.unavailableDays].filter(Array.isArray).flat().filter(raw => {
+      const key = String(raw?.id || '') || JSON.stringify(raw);
+      if (seenBlocks.has(key)) return false;
+      seenBlocks.add(key); return true;
+    });
     if (strict && rawBlocks.some(raw => !normaliseBlock(raw))) throw new Error('INVALID_BLOCK');
     const blocks = rawBlocks.map(normaliseBlock).filter(Boolean);
-    const settings = { lastBackupAt: rawSettings.lastBackupAt || null, workingHours: normaliseHours(rawSettings.workingHours || rawSettings.workHours), services };
+    const settings = { ...rawSettings, lastBackupAt: rawSettings.lastBackupAt || null, workingHours: normaliseHours(rawSettings.workingHours || rawSettings.workHours), services };
     return { version: CURRENT_DATA_VERSION, clients, appointments, blocks, settings };
   }
 
   function loadState() {
     const current = safeJson(STATE_KEY, null);
     if (Number(current?.version) === CURRENT_DATA_VERSION) return migrateState(current);
+    const v9 = safeJson(V9_KEY, null);
+    if (v9?.clients || v9?.appointments || v9?.blocks || v9?.settings) return migrateState(v9);
     const v8 = safeJson(V8_KEY, null);
     if (v8?.clients || v8?.appointments || v8?.blocks || v8?.settings) return migrateState(v8);
     const v7 = safeJson(V7_KEY, null);
@@ -271,7 +297,8 @@
       screen: 'agenda', mode: 'day', selectedDate: startOfDay(new Date()), weekStart: mondayOf(new Date()),
       monthDate: localDate(new Date().getFullYear(), new Date().getMonth(), 1), overviewWeekStart: null,
       editingAppointmentId: null, editingBlockId: null, pendingDraft: null, formClientId: null, formServiceColor: 'rose', repeatDateEdited: false, repeatTimeEdited: false,
-      reportMode: 'week', reportTab: 'activity', reportDate: startOfDay(new Date())
+      reportMode: 'week', reportTab: 'activity', reportDate: startOfDay(new Date()),
+      reviewDate: startOfDay(new Date()), reviewPendingId: null
     }
   };
   const cloneState = state => JSON.parse(JSON.stringify(state));
@@ -372,7 +399,7 @@
       $('#nextAppointment').className = 'next-card';
       $('#nextAppointment').innerHTML = `<button class="next-main" data-edit="${escapeHtml(next.id)}"><span class="next-title">Prochain rendez-vous</span><span class="next-time">${format(parseDate(next.date), { weekday: 'long', day: 'numeric', month: 'long' })} · ${next.time}</span><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(next.service)} · ${Number(next.duration)} min</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ''}</button>${client.address ? `<button class="route-icon" data-waze="${encodeURIComponent(client.address)}" aria-label="Itinéraire Waze">⌖</button>` : ''}`;
     }
-    renderTodos();
+    renderPaymentReminders(); renderTodos();
     const last = app.state.settings.lastBackupAt ? new Date(app.state.settings.lastBackupAt) : null, lastTime = last?.getTime();
     const late = !Number.isFinite(lastTime) || Date.now() - lastTime > 7 * 24 * 60 * 60 * 1000;
     $('#backupNotice').hidden = !late;
@@ -386,14 +413,24 @@
 
   function pendingPayments() {
     const today = todayKey();
-    return sortedAppointments().filter(appointment => activeAppointment(appointment) && appointment.paymentStatus === 'pending' && appointment.date <= today);
+    return sortedAppointments()
+      .filter(appointment => activeAppointment(appointment) && appointment.paymentStatus === 'pending' && validDate(appointment.paymentReminderDate) && appointment.paymentReminderDate <= today)
+      .sort((one, two) => one.paymentReminderDate.localeCompare(two.paymentReminderDate) || appointmentTimestamp(one) - appointmentTimestamp(two));
+  }
+
+  function renderPaymentReminders() {
+    const reminders = pendingPayments(), target = $('#paymentReminderCard');
+    target.hidden = !reminders.length;
+    if (!reminders.length) { target.innerHTML = ''; return; }
+    const first = reminders[0], client = clientFor(first), remaining = reminders.length - 1;
+    target.innerHTML = `<button data-todo="payments"><span class="reminder-icon">!</span><span><small>Relance paiement</small><strong>Relancer « ${escapeHtml(client.name)} » pour le paiement</strong><em>${first.paymentReminderDate < todayKey() ? 'Relance en retard' : 'À relancer aujourd’hui'}${first.price !== '' ? ` · ${money(first.price)}` : ''}${remaining ? ` · +${remaining} autre${remaining > 1 ? 's' : ''}` : ''}</em></span><b>Voir ›</b></button>`;
   }
 
   function renderTodos() {
-    const confirmations = pendingConfirmations(), payments = pendingPayments(), target = $('#todoCard');
-    target.hidden = !confirmations.length && !payments.length;
+    const confirmations = pendingConfirmations(), target = $('#todoCard');
+    target.hidden = !confirmations.length;
     if (target.hidden) { target.innerHTML = ''; return; }
-    target.innerHTML = `<div><p class="next-title">À faire</p><strong>${confirmations.length + payments.length} action${confirmations.length + payments.length > 1 ? 's' : ''}</strong></div><div class="todo-actions">${confirmations.length ? `<button data-todo="confirm"><b>${confirmations.length}</b> à confirmer</button>` : ''}${payments.length ? `<button data-todo="payments"><b>${payments.length}</b> à régler</button>` : ''}</div>`;
+    target.innerHTML = `<div><p class="next-title">À faire</p><strong>${confirmations.length} rendez-vous à confirmer</strong></div><div class="todo-actions"><button data-todo="confirm"><b>${confirmations.length}</b> ouvrir</button></div>`;
   }
 
   function renderAgenda() {
@@ -427,9 +464,67 @@
     const appointments = dates.flatMap(date => activeAppointmentsForDate(dateKey(date)));
     const blocks = [...new Map(dates.flatMap(date => blocksOnDate(date)).map(block => [block.id, block])).values()];
     const minutes = appointments.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0), planned = appointments.reduce((sum, appointment) => sum + (Number(appointment.price) || 0), 0);
-    $('#weekPeriodLabel').textContent = weekLabel(app.ui.weekStart); $('#weekDayStrip').innerHTML = dayStripHtml('data-open-day');
+    $('#weekPeriodLabel').textContent = weekLabel(app.ui.weekStart);
     $('#weekSummary').innerHTML = `<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${blocks.length ? `<span class="block-summary">⊘ ${blocks.length} bloqué${blocks.length > 1 ? 's' : ''}</span>` : ''}`;
-    $('#weekSchedule').innerHTML = buildWeekCards(app.ui.weekStart);
+    $('#weekSchedule').innerHTML = buildWeekTimeline(dates);
+  }
+
+  function weekHorizontalStyle(layout = { column: 0, columns: 1 }) {
+    if (layout.columns <= 1) return 'left:2px;right:2px';
+    const width = 100 / layout.columns, rightColumns = layout.columns - layout.column - 1;
+    return `left:calc(${layout.column * width}% + 1px);right:calc(${rightColumns * width}% + 1px)`;
+  }
+
+  function weekWorkShading(hours, firstHour, lastHour) {
+    const rangeStart = firstHour * 60, rangeEnd = lastHour * 60;
+    const shade = (start, end, label) => {
+      const visibleStart = Math.max(start, rangeStart), visibleEnd = Math.min(end, rangeEnd);
+      if (visibleEnd <= visibleStart) return '';
+      const top = ((visibleStart - rangeStart) / 60) * WEEK_HOUR_HEIGHT, height = ((visibleEnd - visibleStart) / 60) * WEEK_HOUR_HEIGHT;
+      return `<span class="week-work-shade" style="top:${top}px;height:${height}px" title="${label}"></span>`;
+    };
+    if (!hours.enabled) return shade(rangeStart, rangeEnd, 'Jour non travaillé');
+    const pieces = [shade(rangeStart, toMinutes(hours.start), 'Hors horaires'), shade(toMinutes(hours.end), rangeEnd, 'Hors horaires')];
+    if (hours.breakStart && hours.breakEnd) pieces.push(shade(toMinutes(hours.breakStart), toMinutes(hours.breakEnd), 'Coupure'));
+    return pieces.join('');
+  }
+
+  function buildWeekTimeline(dates) {
+    const timedSegments = dates.flatMap(date => blocksOnDate(date).filter(block => !block.allDay).map(block => ({ date, block, segment: blockSegment(block, date) })));
+    const allAppointments = dates.flatMap(date => appointmentsForDate(dateKey(date)));
+    const starts = allAppointments.map(appointment => toMinutes(appointment.time)).concat(timedSegments.map(item => item.segment.startMinutes));
+    const ends = allAppointments.map(appointment => toMinutes(appointment.time) + Number(appointment.duration || 0)).concat(timedSegments.map(item => item.segment.endMinutes));
+    const firstHour = Math.max(0, Math.floor(Math.min(8 * 60, ...starts) / 60));
+    const lastHour = Math.min(24, Math.ceil(Math.max(20 * 60, ...ends) / 60));
+    const totalHours = Math.max(1, lastHour - firstHour), height = totalHours * WEEK_HOUR_HEIGHT;
+    const header = dates.map(date => {
+      const meta = dateMeta(date);
+      return `<button class="week-day-header ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''} ${sameDay(date, new Date()) ? 'today' : ''}" data-open-day="${dateKey(date)}"><span>${format(date, { weekday: 'short' }).slice(0, 3)}</span><strong>${date.getDate()}</strong>${meta.holiday ? '<small>Férié</small>' : ''}</button>`;
+    }).join('');
+    const allDay = dates.map(date => {
+      const meta = dateMeta(date), blocks = blocksOnDate(date).filter(block => block.allDay);
+      const content = `${meta.holiday ? `<span class="week-holiday-chip" title="${escapeHtml(meta.holiday.label)}">${escapeHtml(meta.holiday.label)}</span>` : ''}${blocks.map(block => `<button class="week-all-day-block" data-edit-block="${escapeHtml(block.id)}" title="${escapeHtml(block.reason)}">⊘ ${escapeHtml(block.reason)}</button>`).join('')}`;
+      return `<div class="week-all-day-cell ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}">${content}</div>`;
+    }).join('');
+    const hourLabels = Array.from({ length: totalHours + 1 }, (_, index) => `<span style="top:${index * WEEK_HOUR_HEIGHT}px">${pad(firstHour + index)}h</span>`).join('');
+    const lanes = dates.map(date => {
+      const key = dateKey(date), meta = dateMeta(date), dayAppointments = appointmentsForDate(key), layouts = appointmentLayouts(dayAppointments);
+      const slots = Array.from({ length: totalHours }, (_, index) => `<button class="week-empty-slot" data-create-date="${key}" data-create-time="${pad(firstHour + index)}:00" style="top:${index * WEEK_HOUR_HEIGHT}px;height:${WEEK_HOUR_HEIGHT}px" aria-label="Ajouter un rendez-vous ${format(date, { weekday: 'long', day: 'numeric' })} à ${pad(firstHour + index)} heures"></button>`).join('');
+      const blockHtml = blocksOnDate(date).filter(block => !block.allDay).map(block => {
+        const segment = blockSegment(block, date), start = Math.max(firstHour * 60, segment.startMinutes), end = Math.min(lastHour * 60, segment.endMinutes);
+        if (end <= start) return '';
+        const top = ((start - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT, blockHeight = Math.max(20, ((end - start) / 60) * WEEK_HOUR_HEIGHT - 2);
+        return `<button class="week-blocked-block" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${blockHeight}px" title="${escapeHtml(block.reason)}">⊘</button>`;
+      }).join('');
+      const appointmentHtml = dayAppointments.map(appointment => {
+        const client = clientFor(appointment), firstName = client.name.trim().split(/\s+/)[0] || client.name;
+        const top = ((toMinutes(appointment.time) - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT;
+        const appointmentHeight = Math.max(24, (Number(appointment.duration || 0) / 60) * WEEK_HOUR_HEIGHT - 2), layout = layouts.get(appointment.id);
+        return `<button class="week-appointment ${serviceTheme(appointment)} ${!activeAppointment(appointment) ? 'inactive' : ''} ${hasAppointmentConflict(appointment) ? 'conflicted' : ''}" data-edit="${escapeHtml(appointment.id)}" style="top:${top}px;height:${appointmentHeight}px;${weekHorizontalStyle(layout)}" aria-label="${appointment.time}, ${escapeHtml(client.name)}, ${escapeHtml(appointment.service)}"><span>${appointment.time}</span><strong>${escapeHtml(firstName)}</strong></button>`;
+      }).join('');
+      return `<div class="week-day-lane ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}" style="height:${height}px">${weekWorkShading(workHoursFor(date), firstHour, lastHour)}${slots}${blockHtml}${appointmentHtml}</div>`;
+    }).join('');
+    return `<div class="week-grid"><div class="week-grid-header"><span class="week-corner"></span>${header}</div><div class="week-all-day-row"><span class="week-all-day-label">Jour<br>entier</span><div class="week-all-day-cells">${allDay}</div></div><div class="week-time-row"><div class="week-hour-labels" style="height:${height}px">${hourLabels}</div><div class="week-day-lanes" style="height:${height}px">${lanes}</div></div></div>`;
   }
 
   function blockDisplayLabel(block) {
@@ -449,6 +544,9 @@
     if (blocks.length) parts.push(`<strong>⊘ ${blocks.length} créneau${blocks.length > 1 ? 'x' : ''} bloqué${blocks.length > 1 ? 's' : ''}</strong> · ${escapeHtml(blocks[0].reason)}`);
     $('#holidayBanner').hidden = !parts.length;
     $('#holidayBanner').innerHTML = parts.length ? `<div class="calendar-banner ${blocks.length ? 'blocked' : ''}">${parts.join(' &nbsp; · &nbsp; ')}</div>` : '';
+    const allDay = blocks.filter(block => block.allDay), target = $('#dayAllDayBlocks');
+    target.hidden = !allDay.length;
+    target.innerHTML = allDay.map(block => `<button data-edit-block="${escapeHtml(block.id)}"><span>Journée entière</span><strong>⊘ ${escapeHtml(block.reason)}</strong>${block.address ? `<small>${escapeHtml(block.address)}</small>` : ''}</button>`).join('');
   }
 
   function renderDaySummary() {
@@ -456,7 +554,9 @@
     const minutes = appointments.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     const planned = appointments.reduce((sum, appointment) => sum + (Number(appointment.price) || 0), 0);
     const paid = appointments.filter(appointment => appointment.paymentStatus === 'paid').reduce((sum, appointment) => sum + (Number(appointment.price) || 0), 0);
-    $('#daySummary').innerHTML = `<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${paid ? `<span><strong>${money(paid)}</strong> encaissé</span>` : ''}${blocks.length ? `<span class="block-summary">⊘ ${blocks.length} bloqué${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
+    const first = appointments[0], last = [...appointments].sort((one, two) => appointmentEnd(two) - appointmentEnd(one))[0];
+    const clientSpan = first && last ? `<span class="client-hours-summary"><strong>${first.time}</strong> début clientes</span><span class="client-hours-summary"><strong>${endTime(last)}</strong> fin clientes</span>` : '';
+    $('#daySummary').innerHTML = `${clientSpan}<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${paid ? `<span><strong>${money(paid)}</strong> encaissé</span>` : ''}${blocks.length ? `<span class="block-summary">⊘ ${blocks.length} bloqué${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
   }
 
   function routeRow(client) {
@@ -510,17 +610,17 @@
 
   function renderDayTimeline() {
     const date = app.ui.selectedDate, appointments = appointmentsForDate(dateKey(date)), blocks = blocksOnDate(date);
-    if (!appointments.length && !blocks.length) {
-      $('#dayTimeline').innerHTML = '<button class="timeline-empty-state" data-create-time="10:00"><span>✦</span><p>Aucun rendez-vous ni créneau bloqué. Touche ici pour ajouter un rendez-vous.</p></button>';
+    const timedBlocks = blocks.map(block => ({ block, segment: blockSegment(block, date) })).filter(item => item.segment && !item.block.allDay);
+    if (!appointments.length && !timedBlocks.length) {
+      $('#dayTimeline').innerHTML = '<button class="timeline-empty-state" data-create-time="10:00"><span>✦</span><p>Aucun rendez-vous horaire. Touche ici pour en ajouter un.</p></button>';
       return;
     }
-    const timedBlocks = blocks.map(block => ({ block, segment: blockSegment(block, date) })).filter(item => item.segment && !item.block.allDay);
     const itemStarts = appointments.map(appointment => toMinutes(appointment.time)).concat(timedBlocks.map(item => item.segment.startMinutes));
     const itemEnds = appointments.map(appointment => toMinutes(appointment.time) + Number(appointment.duration || 0)).concat(timedBlocks.map(item => item.segment.endMinutes));
     const firstHour = Math.floor(Math.min(8 * 60, ...itemStarts) / 60), lastHour = Math.ceil(Math.max(20 * 60, ...itemEnds) / 60), totalHours = Math.max(1, lastHour - firstHour);
     const lines = Array.from({ length: totalHours + 1 }, (_, index) => `<span class="timeline-hour" style="top:${index * HOUR_HEIGHT}px">${pad(firstHour + index)}:00</span><i class="timeline-line" style="top:${index * HOUR_HEIGHT}px"></i>`).join('');
     const empty = Array.from({ length: totalHours }, (_, index) => `<button class="timeline-empty" data-create-time="${pad(firstHour + index)}:00" style="top:${index * HOUR_HEIGHT}px;height:${HOUR_HEIGHT}px" aria-label="Ajouter un rendez-vous à ${pad(firstHour + index)} h"></button>`).join('');
-    const blockHtml = blocks.map(block => {
+    const blockHtml = blocks.filter(block => !block.allDay).map(block => {
       const segment = blockSegment(block, date); if (!segment) return '';
       const start = Math.max(firstHour * 60, segment.startMinutes), end = Math.min(lastHour * 60, segment.endMinutes), top = ((start - firstHour * 60) / 60) * HOUR_HEIGHT, height = Math.max(28, ((end - start) / 60) * HOUR_HEIGHT - 2);
       return `<button class="blocked-block ${block.allDay ? 'all-day-block' : ''}" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${height}px"><span>⊘ ${escapeHtml(block.reason)}</span><small>${escapeHtml(blockDetailsLabel(block))}</small></button>`;
@@ -611,9 +711,10 @@
     const newClients = [...clientIds].filter(clientId => { const first = clientFirstVisit(clientId); return first && inRange(first); }).length;
     const cancelled = appointments.filter(appointment => appointment.status === 'cancelled').length, noShows = appointments.filter(appointment => appointment.status === 'no_show').length;
     const services = new Map();
+    const workedMinutes = active.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     active.forEach(appointment => { const row = services.get(appointment.service) || { count: 0, total: 0, color: appointment.serviceColor || 'rose' }; row.count += 1; row.total += Number(appointment.price) || 0; services.set(appointment.service, row); });
     const serviceRows = [...services.entries()].sort((a, b) => b[1].count - a[1].count).map(([name, row]) => `<article class="report-row"><span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}"></span><span><strong>${escapeHtml(name)}</strong><small>${row.count} prestation${row.count > 1 ? 's' : ''}${row.total ? ` · ${money(row.total)}` : ''}</small></span></article>`).join('') || '<p class="empty-report">Aucune prestation sur cette période.</p>';
-    $('#reportContent').innerHTML = `<section class="metrics-grid"><article><span>Rendez-vous</span><strong>${active.length}</strong><small>${appointments.filter(appointment => appointment.status === 'completed').length} terminé${appointments.filter(appointment => appointment.status === 'completed').length > 1 ? 's' : ''}</small></article><article><span>Clientes</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article class="metric-alert"><span>Annulées</span><strong>${cancelled}</strong><small>${noShows} absence${noShows > 1 ? 's' : ''}</small></article></section><section class="report-panel"><h2>Prestations prévues</h2>${serviceRows}</section>`;
+    $('#reportContent').innerHTML = `<section class="metrics-grid"><article><span>Rendez-vous</span><strong>${active.length}</strong><small>${appointments.filter(appointment => appointment.status === 'completed').length} terminé${appointments.filter(appointment => appointment.status === 'completed').length > 1 ? 's' : ''}</small></article><article><span>Clientes</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>Heures travaillées</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article class="metric-alert"><span>Annulées</span><strong>${cancelled}</strong><small>${noShows} absence${noShows > 1 ? 's' : ''}</small></article></section><section class="report-panel"><h2>Prestations prévues</h2>${serviceRows}</section>`;
   }
 
   function renderPaymentsReport(inRange, start, end) {
@@ -645,15 +746,17 @@
   }
 
   function syncPaymentFields() {
-    const paid = $('#paymentStatus').value === 'paid';
-    $('#paymentDateField').hidden = !paid; $('#paymentDate').disabled = !paid;
-    if (paid && !$('#paymentDate').value) $('#paymentDate').value = todayKey();
+    const editing = Boolean(app.ui.editingAppointmentId), paid = $('#paymentStatus').value === 'paid';
+    $('#paymentDateField').hidden = !paid; $('#paymentDate').disabled = !editing || !paid;
+    $('#paymentMethod').disabled = !editing;
+    $('#paymentReminderField').hidden = paid; $('#paymentReminderDate').disabled = !editing || paid; $('#paymentReminderDate').required = editing && !paid;
+    if (paid && !$('#paymentDate').value) $('#paymentDate').value = $('#date').value || todayKey();
   }
 
-  function populateStatusSelect(editing, selected = 'to_confirm') {
+  function populateStatusSelect(editing, selected = 'confirmed') {
     const allowed = editing ? Object.keys(STATUS) : ['to_confirm', 'confirmed'];
     $('#status').innerHTML = allowed.map(value => `<option value="${value}">${STATUS[value]}</option>`).join('');
-    $('#status').value = allowed.includes(selected) ? selected : 'to_confirm';
+    $('#status').value = allowed.includes(selected) ? selected : 'confirmed';
   }
 
   function syncStatusFields() {
@@ -683,21 +786,22 @@
 
   function syncAppointmentFormMode() {
     const editing = Boolean(app.ui.editingAppointmentId), linked = editing ? app.state.appointments.find(item => item.parentAppointmentId === app.ui.editingAppointmentId && activeAppointment(item)) : null;
-    $('#recurrenceSection').hidden = !editing; $('#repeatWeeks').disabled = !editing || Boolean(linked); $('#repeatComposer').hidden = Boolean(linked);
+    $('#appointmentEditFields').hidden = !editing; $('#recurrenceSection').hidden = !editing; $('#repeatWeeks').disabled = !editing || Boolean(linked); $('#repeatComposer').hidden = Boolean(linked);
+    $('#paymentStatus').disabled = !editing; $('#paymentDate').disabled = !editing; $('#paymentMethod').disabled = !editing; $('#paymentReminderDate').disabled = !editing;
     $('#linkedNextAppointment').hidden = !linked;
     if (linked) {
       $('#repeatWeeks').value = '0';
       $('#linkedNextAppointment').innerHTML = `<button type="button" data-edit-linked="${escapeHtml(linked.id)}"><span><strong>Prochain RDV déjà créé</strong><small>${format(parseDate(linked.date), { weekday: 'long', day: 'numeric', month: 'long' })} à ${linked.time}</small></span><b>Ouvrir ›</b></button>`;
     } else $('#linkedNextAppointment').innerHTML = '';
     if (!editing) { $('#repeatWeeks').value = '0'; app.ui.repeatDateEdited = false; app.ui.repeatTimeEdited = false; }
-    syncStatusFields(); syncRepeatDate(true);
+    syncStatusFields(); syncRepeatDate(true); syncPaymentFields();
   }
 
   function resetAppointmentForm() {
     $('#appointmentForm').reset(); $('#appointmentId').value = ''; populateServiceSelect();
-    $('#date').value = dateKey(app.ui.selectedDate); $('#time').value = '10:00'; $('#duration').value = '60'; populateStatusSelect(false);
-    $('#paymentStatus').value = 'paid'; $('#paymentDate').value = todayKey(); $('#paymentMethod').value = ''; $('#repeatWeeks').value = '0'; $('#repeatDate').value = ''; $('#repeatTime').value = '';
-    $('#clientSuggestions').hidden = true; $('#conflictHint').hidden = true; app.ui.editingAppointmentId = null; app.ui.formClientId = null; app.ui.formServiceColor = 'rose'; app.ui.repeatDateEdited = false; app.ui.repeatTimeEdited = false;
+    $('#date').value = dateKey(app.ui.selectedDate); $('#time').value = '10:00'; $('#duration').value = '60'; populateStatusSelect(false, 'confirmed');
+    $('#paymentStatus').value = 'paid'; $('#paymentDate').value = dateKey(app.ui.selectedDate); $('#paymentReminderDate').value = ''; $('#paymentMethod').value = ''; $('#repeatWeeks').value = '0'; $('#repeatDate').value = ''; $('#repeatTime').value = '';
+    $('#clientSuggestions').hidden = true; $('#selectedClientInfo').hidden = true; $('#selectedClientInfo').innerHTML = ''; $('#conflictHint').hidden = true; app.ui.editingAppointmentId = null; app.ui.formClientId = null; app.ui.formServiceColor = 'rose'; app.ui.repeatDateEdited = false; app.ui.repeatTimeEdited = false;
     syncPaymentFields(); syncAppointmentFormMode();
   }
 
@@ -706,21 +810,28 @@
     $('#appointmentFormTitle').textContent = appointment ? 'Modifier le rendez-vous' : 'Nouveau rendez-vous'; $('#deleteAppointment').hidden = !appointment;
     if (appointment) {
       const client = clientFor(appointment); app.ui.editingAppointmentId = appointment.id; app.ui.formClientId = client.id; app.ui.formServiceColor = appointment.serviceColor || 'rose';
-      populateStatusSelect(true, appointment.status); $('#appointmentId').value = appointment.id; $('#clientName').value = client.name; $('#phone').value = client.phone; $('#date').value = appointment.date; $('#time').value = appointment.time; $('#duration').value = String(appointment.duration); $('#price').value = appointment.price; populateServiceSelect(appointment.serviceId, appointment.service); $('#service').value = appointment.service; $('#address').value = client.address; $('#paymentStatus').value = appointment.paymentStatus; $('#paymentDate').value = appointment.paymentDate || ''; $('#paymentMethod').value = appointment.paymentMethod; $('#notes').value = appointment.notes; $('#cancellationReason').value = appointment.cancellationReason || '';
+      populateStatusSelect(true, appointment.status); $('#appointmentId').value = appointment.id; $('#clientName').value = client.name; $('#phone').value = client.phone; $('#date').value = appointment.date; $('#time').value = appointment.time; $('#duration').value = String(appointment.duration); $('#price').value = appointment.price; populateServiceSelect(appointment.serviceId, appointment.service); $('#service').value = appointment.service; $('#address').value = client.address; $('#paymentStatus').value = appointment.paymentStatus; $('#paymentDate').value = appointment.paymentDate || ''; $('#paymentReminderDate').value = appointment.paymentReminderDate || ''; $('#paymentMethod').value = appointment.paymentMethod; $('#notes').value = appointment.notes; $('#cancellationReason').value = appointment.cancellationReason || ''; renderSelectedClientInfo(client);
     } else if (defaults.from) {
       const prior = defaults.from, client = clientFor(prior); app.ui.formClientId = client.id; app.ui.formServiceColor = prior.serviceColor || 'rose';
-      $('#clientName').value = client.name; $('#phone').value = client.phone; $('#address').value = client.address; $('#duration').value = String(prior.duration); $('#price').value = prior.price; populateServiceSelect(prior.serviceId, prior.service); $('#service').value = prior.service; $('#date').value = defaults.date || dateKey(app.ui.selectedDate); $('#time').value = defaults.time || prior.time;
+      $('#clientName').value = client.name; $('#phone').value = client.phone; $('#address').value = client.address; $('#duration').value = String(prior.duration); $('#price').value = prior.price; populateServiceSelect(prior.serviceId, prior.service); $('#service').value = prior.service; $('#date').value = defaults.date || dateKey(app.ui.selectedDate); $('#time').value = defaults.time || prior.time; renderSelectedClientInfo(client);
     } else { $('#date').value = defaults.date || dateKey(app.ui.selectedDate); $('#time').value = defaults.time || '10:00'; }
-    syncPaymentFields(); syncAppointmentFormMode(); updateConflictHint(); $('#appointmentDialog').showModal(); setTimeout(() => $('#clientName').focus(), 30);
+    syncAppointmentFormMode(); updateConflictHint(); $('#appointmentDialog').showModal(); if (!appointment) setTimeout(() => $('#clientName').focus(), 30);
+  }
+
+  function renderSelectedClientInfo(client) {
+    const target = $('#selectedClientInfo');
+    if (!client?.id) { target.hidden = true; target.innerHTML = ''; return; }
+    target.hidden = false;
+    target.innerHTML = `<span>Informations de la fiche cliente</span><strong>Notes cliente</strong><p>${client.notes ? escapeHtml(client.notes) : 'Aucune note cliente enregistrée.'}</p>`;
   }
 
   function fillFromClient(client) {
-    app.ui.formClientId = client.id; $('#clientName').value = client.name; $('#phone').value = client.phone || ''; $('#address').value = client.address || ''; $('#clientSuggestions').hidden = true; updateConflictHint();
+    app.ui.formClientId = client.id; $('#clientName').value = client.name; $('#phone').value = client.phone || ''; $('#address').value = client.address || ''; $('#clientSuggestions').hidden = true; renderSelectedClientInfo(client); updateConflictHint();
   }
 
   function renderSuggestions() {
     const term = normaliseName($('#clientName').value), target = $('#clientSuggestions');
-    const matches = term ? app.state.clients.filter(client => normaliseName(client.name).includes(term)).slice(0, 6) : [];
+    const matches = term.length >= 2 ? app.state.clients.filter(client => normaliseName(client.name).includes(term)).slice(0, 6) : [];
     if (!matches.length) { target.hidden = true; return; }
     target.hidden = false;
     target.innerHTML = matches.map(client => `<button type="button" class="client-suggestion" data-suggestion="${escapeHtml(client.id)}"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.phone || 'Sans téléphone')}${client.address ? ` · ${escapeHtml(client.address)}` : ''}</span></button>`).join('');
@@ -739,7 +850,8 @@
   function getDraft() {
     const preset = serviceById($('#serviceSelect').value), service = preset?.name || $('#service').value.trim();
     const editing = Boolean(app.ui.editingAppointmentId), recurring = editing ? Number($('#repeatWeeks').value) : 0;
-    return { id: app.ui.editingAppointmentId || $('#appointmentId').value || uuid(), clientId: app.ui.formClientId, clientName: $('#clientName').value.trim(), phone: $('#phone').value.trim(), address: $('#address').value.trim(), date: $('#date').value, time: $('#time').value, duration: Number($('#duration').value), price: $('#price').value.trim(), service, serviceId: preset?.id || '', serviceColor: preset?.color || app.ui.formServiceColor || 'rose', status: $('#status').value, paymentStatus: $('#paymentStatus').value, paymentDate: $('#paymentStatus').value === 'paid' ? ($('#paymentDate').value || todayKey()) : '', paymentMethod: $('#paymentMethod').value, notes: $('#notes').value.trim(), cancellationReason: editing && ['cancelled', 'no_show'].includes($('#status').value) ? $('#cancellationReason').value.trim() : '', repeatWeeks: recurring, repeatDate: recurring ? $('#repeatDate').value : '', repeatTime: recurring ? $('#repeatTime').value : '' };
+    const paymentStatus = editing ? $('#paymentStatus').value : 'paid';
+    return { id: app.ui.editingAppointmentId || $('#appointmentId').value || uuid(), clientId: app.ui.formClientId, clientName: $('#clientName').value.trim(), phone: $('#phone').value.trim(), address: $('#address').value.trim(), date: $('#date').value, time: $('#time').value, duration: Number($('#duration').value), price: $('#price').value.trim(), service, serviceId: preset?.id || '', serviceColor: preset?.color || app.ui.formServiceColor || 'rose', status: $('#status').value, paymentStatus, paymentDate: paymentStatus === 'paid' ? (editing ? ($('#paymentDate').value || $('#date').value) : $('#date').value) : '', paymentReminderDate: paymentStatus === 'pending' ? $('#paymentReminderDate').value : '', paymentMethod: editing ? $('#paymentMethod').value : '', notes: $('#notes').value.trim(), cancellationReason: editing && ['cancelled', 'no_show'].includes($('#status').value) ? $('#cancellationReason').value.trim() : '', repeatWeeks: recurring, repeatDate: recurring ? $('#repeatDate').value : '', repeatTime: recurring ? $('#repeatTime').value : '' };
   }
 
   function updateConflictHint() {
@@ -766,7 +878,7 @@
     const alreadyExists = app.state.appointments.some(item => item.parentAppointmentId === appointment.id && activeAppointment(item));
     if (alreadyExists) return 'Ce prochain RDV existe déjà : aucun doublon n’a été créé.';
     const recurrenceId = appointment.recurrenceId || uuid(); appointment.recurrenceId = recurrenceId;
-    const repeated = { ...appointment, id: uuid(), date: requestedDate, time: requestedTime, status: 'to_confirm', paymentStatus: 'pending', paymentDate: '', paymentMethod: '', cancellationReason: '', recurrenceId, parentAppointmentId: appointment.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const repeated = { ...appointment, id: uuid(), date: requestedDate, time: requestedTime, status: 'to_confirm', paymentStatus: 'pending', paymentDate: '', paymentReminderDate: requestedDate, paymentMethod: '', cancellationReason: '', recurrenceId, parentAppointmentId: appointment.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     const conflicts = findConflicts(repeated);
     if (conflicts.length && !window.confirm(`Le prochain RDV du ${format(date, { day: 'numeric', month: 'long' })} à ${repeated.time} chevauche un rendez-vous ou un créneau bloqué. Le créer quand même ?`)) return 'Le rendez-vous principal est enregistré. Le prochain RDV n’a pas été créé afin que tu puisses choisir un autre jour.';
     app.state.appointments.push(repeated); return `Le prochain RDV a été créé le ${format(date, { day: 'numeric', month: 'long' })}, à confirmer.`;
@@ -775,7 +887,7 @@
   function commitDraft(draft) {
     const previousState = cloneState(app.state);
     const client = ensureClient(draft), existing = app.state.appointments.find(item => item.id === draft.id);
-    const appointment = { id: draft.id, clientId: client.id, date: draft.date, time: draft.time, duration: draft.duration, price: draft.price, service: draft.service, serviceId: draft.serviceId, serviceColor: draft.serviceColor, status: draft.status, paymentStatus: draft.paymentStatus, paymentDate: draft.paymentStatus === 'paid' ? draft.paymentDate : '', paymentMethod: draft.paymentMethod, notes: draft.notes, cancellationReason: draft.cancellationReason, recurrenceId: existing?.recurrenceId || '', parentAppointmentId: existing?.parentAppointmentId || '', createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const appointment = { id: draft.id, clientId: client.id, date: draft.date, time: draft.time, duration: draft.duration, price: draft.price, service: draft.service, serviceId: draft.serviceId, serviceColor: draft.serviceColor, status: draft.status, paymentStatus: draft.paymentStatus, paymentDate: draft.paymentStatus === 'paid' ? draft.paymentDate : '', paymentReminderDate: draft.paymentStatus === 'pending' ? draft.paymentReminderDate : '', paymentMethod: draft.paymentMethod, notes: draft.notes, cancellationReason: draft.cancellationReason, recurrenceId: existing?.recurrenceId || '', parentAppointmentId: existing?.parentAppointmentId || '', createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
     const index = app.state.appointments.findIndex(item => item.id === appointment.id); if (index === -1) app.state.appointments.push(appointment); else app.state.appointments[index] = appointment;
     const recurrenceMessage = createRecurringAppointment(appointment, draft.repeatWeeks, draft.repeatDate, draft.repeatTime);
     app.ui.selectedDate = parseDate(appointment.date) || app.ui.selectedDate; app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.monthDate = localDate(app.ui.selectedDate.getFullYear(), app.ui.selectedDate.getMonth(), 1);
@@ -849,9 +961,47 @@
 
   function openTodo(type) {
     const items = type === 'confirm' ? pendingConfirmations() : pendingPayments();
-    $('#todoTitle').textContent = type === 'confirm' ? 'Rendez-vous à confirmer' : 'Paiements à régler';
-    $('#todoList').innerHTML = items.length ? items.map(appointment => { const client = clientFor(appointment); return `<button class="todo-item" data-edit="${escapeHtml(appointment.id)}"><span><strong>${escapeHtml(client.name)}</strong><small>${format(parseDate(appointment.date), { weekday: 'short', day: 'numeric', month: 'short' })} · ${appointment.time} · ${escapeHtml(appointment.service)}</small></span><b>${type === 'payments' ? money(appointment.price) || 'À définir' : '›'}</b></button>`; }).join('') : '<p class="empty-route">Rien à faire pour le moment.</p>';
-    $('#todoDialog').showModal();
+    $('#todoTitle').textContent = type === 'confirm' ? 'Rendez-vous à confirmer' : 'Paiements à relancer';
+    $('#todoList').innerHTML = items.length ? items.map(appointment => {
+      const client = clientFor(appointment), details = `${format(parseDate(appointment.date), { weekday: 'short', day: 'numeric', month: 'short' })} · ${appointment.time} · ${escapeHtml(appointment.service)}`;
+      if (type === 'payments') return `<article class="todo-payment-item"><button class="todo-item-main" data-edit="${escapeHtml(appointment.id)}"><span><strong>Relancer « ${escapeHtml(client.name)} »</strong><small>${details} · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}</small></span><b>${money(appointment.price) || 'À définir'}</b></button><button class="todo-paid-button" data-reminder-paid="${escapeHtml(appointment.id)}">✓ Payé aujourd’hui</button></article>`;
+      return `<button class="todo-item" data-edit="${escapeHtml(appointment.id)}"><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>›</b></button>`;
+    }).join('') : '<p class="empty-route">Rien à faire pour le moment.</p>';
+    if (!$('#todoDialog').open) $('#todoDialog').showModal();
+  }
+
+  function openDayReview(date = app.ui.selectedDate) {
+    app.ui.reviewDate = startOfDay(date); app.ui.reviewPendingId = null;
+    renderDayReview(); $('#dayReviewDialog').showModal();
+  }
+
+  function renderDayReview() {
+    const key = dateKey(app.ui.reviewDate), appointments = appointmentsForDate(key), active = appointments.filter(activeAppointment);
+    $('#reviewDateLabel').textContent = format(app.ui.reviewDate, { weekday: 'long', day: 'numeric', month: 'long' });
+    const paidCount = active.filter(appointment => appointment.paymentStatus === 'paid').length;
+    $('#reviewDaySummary').innerHTML = `<span><strong>${active.length}</strong> RDV actif${active.length > 1 ? 's' : ''}</span><span><strong>${paidCount}</strong> payé${paidCount > 1 ? 's' : ''}</span><span><strong>${active.length - paidCount}</strong> à régler</span>`;
+    $('#reviewAppointmentList').innerHTML = appointments.length ? appointments.map(appointment => {
+      const client = clientFor(appointment), inactive = !activeAppointment(appointment), chooseReminder = !inactive && (appointment.paymentStatus === 'pending' || app.ui.reviewPendingId === appointment.id);
+      const paymentControls = inactive ? `<span class="review-inactive">${STATUS[appointment.status]}</span>` : `<div class="review-payment-actions"><button class="${appointment.paymentStatus === 'paid' ? 'active' : ''}" data-review-paid="${escapeHtml(appointment.id)}">✓ Payé</button><button class="${appointment.paymentStatus === 'pending' ? 'active' : ''}" data-review-pending="${escapeHtml(appointment.id)}">À régler</button></div>${chooseReminder ? `<div class="review-reminder-editor"><label>Date de relance<input type="date" data-review-reminder="${escapeHtml(appointment.id)}" value="${escapeHtml(appointment.paymentReminderDate || '')}"></label><button data-review-save="${escapeHtml(appointment.id)}">Enregistrer la relance</button></div>` : ''}`;
+      return `<article class="review-appointment ${inactive ? 'inactive' : ''}"><div class="review-appointment-heading"><button data-edit="${escapeHtml(appointment.id)}"><span>${appointment.time} – ${endTime(appointment)}</span><strong>${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)}${appointment.price !== '' ? ` · ${money(appointment.price)}` : ''}</small></button><span class="service-dot ${appointment.serviceColor || 'rose'}"></span></div>${paymentControls}</article>`;
+    }).join('') : '<section class="empty-message"><h2>Aucun rendez-vous</h2><p>Il n’y a rien à vérifier pour cette journée.</p></section>';
+  }
+
+  function markAppointmentPaid(appointmentId, paymentDate) {
+    const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
+    const previousState = cloneState(app.state); appointment.paymentStatus = 'paid'; appointment.paymentDate = paymentDate; appointment.paymentReminderDate = ''; appointment.updatedAt = new Date().toISOString();
+    if (!saveState()) { app.state = previousState; return; }
+    app.ui.reviewPendingId = null; render();
+    if ($('#dayReviewDialog').open) renderDayReview();
+    if ($('#todoDialog').open) openTodo('payments');
+  }
+
+  function savePaymentReminder(appointmentId, reminderDate) {
+    if (!validDate(reminderDate)) { window.alert('Choisis une date de relance valide.'); return; }
+    const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
+    const previousState = cloneState(app.state); appointment.paymentStatus = 'pending'; appointment.paymentDate = ''; appointment.paymentReminderDate = reminderDate; appointment.updatedAt = new Date().toISOString();
+    if (!saveState()) { app.state = previousState; return; }
+    app.ui.reviewPendingId = null; render(); renderDayReview();
   }
 
   function clientStats(clientId) {
@@ -864,7 +1014,7 @@
     $('#profileKey').value = client.id; $('#profileName').value = client.name; $('#profilePhone').value = client.phone; $('#profileAddress').value = client.address; $('#profileNotes').value = client.notes; $('#profileWaze').hidden = !client.address;
     const stats = clientStats(client.id), history = clientHistory(client.id).slice(0, 12);
     $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.paid ? `<article><strong>${money(stats.paid)}</strong><span>encaissé</span></article>` : ''}`;
-    $('#clientHistory').innerHTML = `<p class="history-label">Historique</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointment.price !== '' ? ` · ${money(appointment.price)}` : ''}${appointment.paymentStatus === 'pending' && activeAppointment(appointment) ? ' · À régler' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}`;
+    $('#clientHistory').innerHTML = `<p class="history-label">Historique</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointment.price !== '' ? ` · ${money(appointment.price)}` : ''}${appointment.paymentStatus === 'pending' && activeAppointment(appointment) ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}`;
     $('#clientDialog').showModal();
   }
 
@@ -892,7 +1042,7 @@
     const last = app.state.settings.lastBackupAt ? new Date(app.state.settings.lastBackupAt) : null;
     $('#backupStatus').textContent = last && !Number.isNaN(last.getTime()) ? `Dernier export lancé : ${format(last, { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Aucune sauvegarde exportée.';
     $('#appVersionLabel').textContent = `Mon agenda · version ${APP_VERSION}`;
-    $('#undoRestore').hidden = !safeJson(RESTORE_SAFETY_KEY, null) && !safeJson(V8_RESTORE_SAFETY_KEY, null);
+    $('#undoRestore').hidden = !safeJson(RESTORE_SAFETY_KEY, null) && !safeJson(V9_RESTORE_SAFETY_KEY, null) && !safeJson(V8_RESTORE_SAFETY_KEY, null);
     $('#settingsDialog').showModal();
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.screen === 'settings'));
   }
@@ -991,12 +1141,12 @@
   }
 
   function undoLastRestore() {
-    const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
+    const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V9_RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
     if (!backup || !window.confirm('Revenir aux données présentes juste avant la dernière restauration ?')) return;
     try {
       const restored = migrateState(backup.state || backup, backup.clientProfiles || {}, { strict: true });
       if (!saveState(restored)) return;
-      app.state = restored; try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); window.alert('Les données d’avant la restauration ont été récupérées.');
+      app.state = restored; try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V9_RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); window.alert('Les données d’avant la restauration ont été récupérées.');
     } catch { window.alert('La copie de secours locale n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); }
   }
 
@@ -1029,6 +1179,9 @@
     if (target.id === 'previousReport') { app.ui.reportDate = app.ui.reportMode === 'week' ? addDays(app.ui.reportDate, -7) : localDate(app.ui.reportDate.getFullYear(), app.ui.reportDate.getMonth() - 1, 1); renderReport(); return; }
     if (target.id === 'nextReport') { app.ui.reportDate = app.ui.reportMode === 'week' ? addDays(app.ui.reportDate, 7) : localDate(app.ui.reportDate.getFullYear(), app.ui.reportDate.getMonth() + 1, 1); renderReport(); return; }
     if (target.id === 'routeDay') { openRouteDay(); return; }
+    if (target.id === 'dayReview') { openDayReview(app.ui.selectedDate); return; }
+    if (target.id === 'previousReviewDay') { app.ui.reviewDate = addDays(app.ui.reviewDate, -1); app.ui.reviewPendingId = null; renderDayReview(); return; }
+    if (target.id === 'nextReviewDay') { app.ui.reviewDate = addDays(app.ui.reviewDate, 1); app.ui.reviewPendingId = null; renderDayReview(); return; }
     if (target.id === 'blockTime') { openBlock(); return; }
     if (target.id === 'deleteAppointment') { if (app.ui.editingAppointmentId && window.confirm('Supprimer ce rendez-vous ?')) { const previous = app.state.appointments; app.state.appointments = app.state.appointments.filter(appointment => appointment.id !== app.ui.editingAppointmentId); if (!saveState()) app.state.appointments = previous; else { $('#appointmentDialog').close(); render(); } } return; }
     if (target.id === 'deleteBlock') { const id = $('#blockId').value; if (id && window.confirm('Supprimer ce créneau bloqué ?')) { const previous = app.state.blocks; app.state.blocks = app.state.blocks.filter(block => block.id !== id); if (!saveState()) app.state.blocks = previous; else { $('#blockDialog').close(); render(); } } return; }
@@ -1044,15 +1197,19 @@
     if (target.dataset.openDay) { app.ui.selectedDate = parseDate(target.dataset.openDay); app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.mode = 'day'; renderAgenda(); return; }
     if (target.dataset.selectWeek) { const date = parseDate(target.dataset.selectWeek); app.ui.overviewWeekStart = mondayOf(date); app.ui.weekStart = mondayOf(date); app.ui.selectedDate = date; renderAgenda(); return; }
     if (target.dataset.closeOverview !== undefined) { app.ui.overviewWeekStart = null; renderAgenda(); return; }
-    if (target.dataset.edit) { const appointment = app.state.appointments.find(item => item.id === target.dataset.edit); if (appointment) { $('#todoDialog').close(); openAppointment(appointment); } return; }
+    if (target.dataset.edit) { const appointment = app.state.appointments.find(item => item.id === target.dataset.edit); if (appointment) { if ($('#todoDialog').open) $('#todoDialog').close(); if ($('#dayReviewDialog').open) $('#dayReviewDialog').close(); openAppointment(appointment); } return; }
     if (target.dataset.editBlock) { const block = app.state.blocks.find(item => item.id === target.dataset.editBlock); if (block) openBlock(block); return; }
     if (target.dataset.editService) { const service = serviceById(target.dataset.editService); if (service) openService(service); return; }
     if (target.dataset.editLinked) { const appointment = app.state.appointments.find(item => item.id === target.dataset.editLinked); if (appointment) { $('#appointmentDialog').close(); openAppointment(appointment); } return; }
     if (target.dataset.repeatFrom) { const appointment = app.state.appointments.find(item => item.id === target.dataset.repeatFrom); if (appointment) { $('#clientDialog').close(); openAppointment(null, { from: appointment }); } return; }
     if (target.dataset.waze) { openWaze(decodeURIComponent(target.dataset.waze)); return; }
-    if (target.dataset.createTime) { openAppointment(null, { date: dateKey(app.ui.selectedDate), time: target.dataset.createTime }); return; }
+    if (target.dataset.createTime) { const requestedDate = target.dataset.createDate || dateKey(app.ui.selectedDate); app.ui.selectedDate = parseDate(requestedDate) || app.ui.selectedDate; openAppointment(null, { date: requestedDate, time: target.dataset.createTime }); return; }
     if (target.dataset.suggestion) { const client = clientById(target.dataset.suggestion); if (client) fillFromClient(client); return; }
     if (target.dataset.todo) { openTodo(target.dataset.todo); return; }
+    if (target.dataset.reviewPaid) { const appointment = app.state.appointments.find(item => item.id === target.dataset.reviewPaid); if (appointment) markAppointmentPaid(appointment.id, appointment.date); return; }
+    if (target.dataset.reviewPending) { app.ui.reviewPendingId = target.dataset.reviewPending; renderDayReview(); return; }
+    if (target.dataset.reviewSave) { const input = $$('[data-review-reminder]').find(item => item.dataset.reviewReminder === target.dataset.reviewSave); savePaymentReminder(target.dataset.reviewSave, input?.value || ''); return; }
+    if (target.dataset.reminderPaid) { markAppointmentPaid(target.dataset.reminderPaid, todayKey()); return; }
     if (target.dataset.client) { openClient(target.dataset.client); }
   });
 
@@ -1060,6 +1217,7 @@
     event.preventDefault(); if (!$('#appointmentForm').reportValidity()) return;
     const draft = getDraft(); if (!draft.clientName || !draft.service || !draft.date || !draft.time) { window.alert('Renseigne la cliente et la prestation.'); return; }
     if (!validDate(draft.date) || !validTime(draft.time) || !Number.isFinite(draft.duration) || draft.duration < 15) { window.alert('Vérifie la date, l’heure et la durée du rendez-vous.'); return; }
+    if (app.ui.editingAppointmentId && draft.paymentStatus === 'pending' && !validDate(draft.paymentReminderDate)) { window.alert('Choisis la date à laquelle tu veux relancer la cliente pour le paiement.'); $('#paymentReminderDate').focus(); return; }
     if (draft.repeatWeeks && (!validDate(draft.repeatDate) || dateTimeMs(draft.repeatDate, '00:00') <= dateTimeMs(draft.date, '00:00'))) { window.alert('Choisis une date du prochain RDV après le rendez-vous actuel.'); $('#repeatDate').focus(); return; }
     if (draft.repeatWeeks && !validTime(draft.repeatTime)) { window.alert('Choisis une heure valide pour le prochain rendez-vous.'); $('#repeatTime').focus(); return; }
     const conflicts = findConflicts(draft); if (conflicts.length) openConflictDialog(draft, conflicts); else commitDraft(draft);
@@ -1075,14 +1233,14 @@
   $('#serviceForm').addEventListener('submit', event => { event.preventDefault(); saveService(); });
   $('#clientName').addEventListener('input', event => {
     const exact = app.state.clients.filter(client => normaliseName(client.name) === normaliseName(event.target.value));
-    if (exact.length === 1) fillFromClient(exact[0]); else { app.ui.formClientId = null; renderSuggestions(); }
+    if (exact.length === 1) fillFromClient(exact[0]);
+    else { app.ui.formClientId = null; renderSelectedClientInfo(null); renderSuggestions(); }
   });
-  $('#clientName').addEventListener('focus', renderSuggestions);
   $('#clientName').addEventListener('blur', () => setTimeout(() => { $('#clientSuggestions').hidden = true; }, 150));
   $('#serviceSelect').addEventListener('change', applyServicePreset);
   $('#paymentStatus').addEventListener('change', syncPaymentFields);
   $('#status').addEventListener('change', () => { syncStatusFields(); updateConflictHint(); });
-  $('#date').addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); });
+  $('#date').addEventListener('input', () => { if (!app.ui.editingAppointmentId && validDate($('#date').value)) $('#paymentDate').value = $('#date').value; updateConflictHint(); syncRepeatDate(false); });
   ['#time', '#duration'].forEach(selector => $(selector).addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); }));
   $('#repeatWeeks').addEventListener('change', () => { app.ui.repeatDateEdited = false; app.ui.repeatTimeEdited = false; syncRepeatDate(true); });
   $('#repeatDate').addEventListener('input', () => { app.ui.repeatDateEdited = true; syncRepeatDate(false); });
@@ -1094,6 +1252,6 @@
   $('#clientSearch').addEventListener('input', renderClients);
   $('#importData').addEventListener('change', event => importData(event.target.files[0]));
 
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=9', { updateViaCache: 'none' }).catch(() => {});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?v=10', { updateViaCache: 'none' }).catch(() => {});
   render();
 })();

@@ -1,33 +1,40 @@
-# Mon agenda — version 9
+# Mon agenda — version 10
 
-Application personnelle hors ligne pour gérer des rendez-vous à domicile.
+Application personnelle et gratuite, utilisable hors ligne sur iPhone, pour gérer des rendez-vous de prothésiste ongulaire à domicile.
 
-## Cette version
+## Nouveautés de la version 10
 
-- trois vues d’agenda : **Jour** avec planning horaire détaillé, **Semaine** avec tous les rendez-vous des 7 jours, et **Mois** ;
-- week-ends et jours fériés de France métropolitaine identifiés ;
-- créneaux bloqués avec début, fin, motif, adresse, commentaire ou option **Toute la journée** ;
-- horaires de travail modifiables dans Réglages, avec coupure facultative ;
-- fiches clientes, recherche, remplissage automatique, historique et suivi des annulations/absences ;
-- prestations enregistrées : durée, prix et couleur se remplissent automatiquement ;
-- statut de rendez-vous, paiement et date de paiement modifiable ;
-- nouveau rendez-vous marqué **Payé** à la date du jour par défaut ;
-- prochain rendez-vous proposé uniquement depuis un rendez-vous existant, calculé à 2, 3, 4 ou 5 semaines, avec date **et heure** modifiables ;
-- motif d’annulation ou d’absence affiché uniquement lors de la modification d’un rendez-vous concerné ;
-- numéro de version visible dans **Réglages** ;
-- alerte de conflit, avec possibilité de valider quand même ;
-- raccourcis Waze compacts et itinéraire du jour ;
-- bloc **À faire** pour les rendez-vous à confirmer et paiements à régler ;
-- page **Bilan** filtrable par semaine ou mois : activité, clientes, encaissements et impayés ;
-- sauvegarde versionnée : les anciennes sauvegardes sont migrées automatiquement ;
-- contrôle complet avant restauration, refus des sauvegardes trop récentes et copie de secours locale permettant d’annuler la dernière restauration.
+- vue **Jour** avec heures de début de la première cliente et de fin de la dernière cliente ;
+- vue **Semaine** sous forme de vraie grille horaire sur 7 colonnes, avec petits blocs colorés, conflits côte à côte, week-ends, jours fériés et indisponibilités « journée entière » ;
+- formulaire de création simplifié et réordonné : cliente, téléphone, prestation, prix, date, heure, durée, statut, adresse et notes du rendez-vous ;
+- nouveau rendez-vous **Confirmé** par défaut ;
+- paiement, date et moyen de paiement, prochain rendez-vous et motif d’annulation visibles uniquement lors de la modification d’un rendez-vous ;
+- notes de la fiche cliente clairement séparées des notes du rendez-vous ;
+- suggestions de clientes à partir de 2 lettres, sans liste gênante à l’ouverture d’un rendez-vous existant ;
+- correction du zoom automatique de Safari lors de la saisie sur iPhone ;
+- bouton **Suivi de journée** : vérification des rendez-vous d’un jour, navigation dans les jours précédents, validation des paiements ou choix d’une date de relance ;
+- rappel visible sur l’accueil à la date choisie : `Relancer « cliente » pour le paiement` ;
+- paiement validé depuis le suivi daté au jour du rendez-vous, ou daté au jour réel lorsqu’il est validé depuis une relance ;
+- prestations par défaut : Pose complète, Remplissage, Dépose, Renfort et Semi-permanent ; les prestations et réglages existants sont conservés ;
+- huit couleurs de prestations ;
+- indicateur **Heures travaillées** dans le bilan semaine/mois, hors annulations et absences ;
+- sauvegarde complète et versionnée des clientes, deux types de notes, rendez-vous, paiements, relances, indisponibilités, horaires, prestations, couleurs et réglages.
 
-## Données
+Les fonctions déjà présentes restent disponibles : conflits avec validation forcée, créneaux bloqués avec dates/heures/adresse/commentaire, horaires modifiables, fiches clientes et historique, prochain rendez-vous récurrent avec date et heure ajustables, Waze, bilan et restauration sécurisée.
 
-Les rendez-vous sont enregistrés sur l'appareil dans le navigateur. Ils ne sont pas stockés sur GitHub. Fais une sauvegarde régulière depuis l'icône `⇩`, puis vérifie que le fichier JSON apparaît bien dans l’app **Fichiers** de l’iPhone.
+## Données et mise à jour
 
-Une sauvegarde contient les données, pas l’ancien code de l’application. Après une mise à jour, restaurer un ancien fichier remet donc les clientes, rendez-vous, prestations, paiements, blocages et réglages dans la nouvelle version. La migration est automatique et la restauration est annulée entièrement si une donnée est abîmée.
+Les données restent dans le navigateur de l’iPhone et ne sont pas envoyées sur GitHub. Avant une mise à jour, lance **Sauvegarder dans Fichiers** depuis Réglages.
 
-## Mise à jour GitHub Pages
+Une sauvegarde contient toutes les données et tous les réglages, mais pas l’ancien code. La version 10 migre automatiquement les données de la version 9. Restaurer une ancienne sauvegarde remet donc son contenu dans la nouvelle application sans revenir à l’ancienne interface. Une restauration invalide est annulée entièrement et une copie locale permet d’annuler la dernière restauration.
 
-Avec GitHub Desktop, copie le contenu de ce dossier sur le dépôt cloné, puis crée un commit et utilise **Push origin**. GitHub Pages se met à jour automatiquement. Pour forcer l’ouverture de cette version après le déploiement, utilise `https://bd87b9495f-blip.github.io/mon-agenda/?v=9`.
+## Publication avec GitHub Desktop
+
+1. Ouvre le dossier local du dépôt `mon-agenda` avec **Show in Explorer**.
+2. Remplace les sept fichiers de l’application par ceux de cette archive.
+3. Dans GitHub Desktop, saisis par exemple `Version 10` puis clique sur **Commit to main**.
+4. Clique sur **Push origin**.
+5. Après une à deux minutes, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=10` sur l’iPhone.
+6. Vérifie dans **Réglages** que `Mon agenda · version 10.0` est affiché.
+
+Après la première ouverture en ligne, l’application continue de fonctionner hors connexion. Si l’ancienne interface reste visible, ferme complètement l’application Safari/PWA puis rouvre l’adresse avec `?v=10`.

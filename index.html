@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -23,6 +23,7 @@
       </header>
 
       <section class="next-card" id="nextAppointment"></section>
+      <section class="payment-reminder-card" id="paymentReminderCard" hidden></section>
       <section class="todo-card" id="todoCard" hidden></section>
       <button id="backupNotice" class="backup-notice" hidden></button>
 
@@ -48,10 +49,12 @@
           <button class="text-button" id="todayButton">Aujourd’hui</button>
         </div>
         <div class="day-actions">
+          <button class="action-chip action-chip-review" id="dayReview">✓ Suivi de journée</button>
           <button class="action-chip" id="routeDay">⌖ Itinéraire du jour</button>
           <button class="action-chip action-chip-block" id="blockTime">⊘ Bloquer un créneau</button>
         </div>
         <section id="daySummary" class="day-summary"></section>
+        <section id="dayAllDayBlocks" class="day-all-day-blocks" hidden></section>
         <section id="dayTimeline" class="day-timeline" aria-label="Planning horaire"></section>
       </section>
 
@@ -61,13 +64,12 @@
           <strong id="weekPeriodLabel"></strong>
           <button class="round-button" id="nextWeek" aria-label="Semaine suivante">›</button>
         </div>
-        <div class="day-strip" id="weekDayStrip" aria-label="Jours de la semaine"></div>
         <div class="week-view-heading">
-          <div><p class="eyebrow">Vue complète</p><h2>Rendez-vous de la semaine</h2></div>
+          <div><p class="eyebrow">Planning horaire</p><h2>Ma semaine</h2></div>
           <button class="text-button" id="currentWeekButton">Cette semaine</button>
         </div>
         <section id="weekSummary" class="day-summary"></section>
-        <section id="weekSchedule" class="week-overview-list" aria-label="Rendez-vous de toute la semaine"></section>
+        <section id="weekSchedule" class="week-schedule" aria-label="Planning horaire de toute la semaine"></section>
       </section>
 
       <section id="monthView" class="agenda-view" hidden>
@@ -124,46 +126,52 @@
       <form id="appointmentForm" novalidate>
         <div class="modal-heading"><h2 id="appointmentFormTitle">Nouveau rendez-vous</h2><button type="button" class="close-button" data-close="appointmentDialog" aria-label="Fermer">×</button></div>
         <input id="appointmentId" type="hidden">
-        <label class="field client-field">Cliente
-          <input id="clientName" required autocomplete="off" placeholder="Écris un nom">
+        <div class="field client-field">
+          <label for="clientName">Cliente</label>
+          <input id="clientName" required autocomplete="off" placeholder="Écris au moins 2 lettres">
           <div id="clientSuggestions" class="client-suggestions" hidden></div>
-        </label>
-        <div class="two-columns">
-          <label class="field">Téléphone<input id="phone" inputmode="tel" autocomplete="tel" placeholder="Optionnel"></label>
+        </div>
+        <label class="field">Téléphone<input id="phone" inputmode="tel" autocomplete="tel" placeholder="Optionnel"></label>
+        <aside id="selectedClientInfo" class="selected-client-info" hidden></aside>
+        <div class="two-columns service-price-row">
+          <label class="field">Prestation<select id="serviceSelect" required></select></label>
           <label class="field">Prix (€)<input id="price" type="number" min="0" step="1" inputmode="decimal" placeholder="Optionnel"></label>
         </div>
+        <label class="field" id="customServiceField" hidden>Nom de la prestation<input id="service" placeholder="Ex. Pose complète"></label>
         <div class="two-columns">
           <label class="field">Date<input id="date" required type="date"></label>
           <label class="field">Heure<input id="time" required type="time"></label>
         </div>
         <div class="two-columns">
           <label class="field">Durée<select id="duration"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="75">1 h 15</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label>
-          <label class="field">Prestation<select id="serviceSelect" required></select></label>
+          <label class="field">Statut<select id="status"><option value="confirmed">Confirmé</option><option value="to_confirm">À confirmer</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option><option value="no_show">Absente</option></select></label>
         </div>
-        <label class="field" id="customServiceField" hidden>Nom de la prestation<input id="service" placeholder="Ex. Pose complète"></label>
         <label class="field">Adresse<input id="address" autocomplete="street-address" placeholder="Domicile de la cliente"></label>
-        <div class="two-columns">
-          <label class="field">Statut<select id="status"><option value="to_confirm">À confirmer</option><option value="confirmed">Confirmé</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option><option value="no_show">Absente</option></select></label>
-          <label class="field">Paiement<select id="paymentStatus"><option value="paid">Payé</option><option value="pending">À régler</option></select></label>
-        </div>
-        <div class="two-columns">
-          <label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label>
-          <label class="field">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label>
-        </div>
-        <section class="form-subsection" id="recurrenceSection" hidden>
-          <p class="form-subsection-title">Planifier le prochain rendez-vous</p>
-          <div id="linkedNextAppointment" class="linked-next" hidden></div>
-          <div id="repeatComposer">
-            <label class="field">Délai habituel<select id="repeatWeeks"><option value="0">Ne pas créer maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
-            <div class="two-columns" id="repeatScheduleFields" hidden>
-              <label class="field">Date du prochain RDV<input id="repeatDate" type="date"></label>
-              <label class="field">Heure du prochain RDV<input id="repeatTime" type="time"></label>
+        <label class="field">Notes du rendez-vous<textarea id="notes" rows="2" placeholder="Couleur, prestation particulière, détails de ce rendez-vous…"></textarea></label>
+        <section id="appointmentEditFields" class="edit-only-fields" hidden>
+          <section class="form-subsection payment-section">
+            <p class="form-subsection-title">Paiement</p>
+            <label class="field">État du paiement<select id="paymentStatus"><option value="paid">Payé</option><option value="pending">À régler</option></select></label>
+            <div class="two-columns">
+              <label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label>
+              <label class="field" id="paymentMethodField">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label>
             </div>
-            <small class="field-help" id="repeatHelp">La date et l’heure seront calculées automatiquement, puis restent modifiables.</small>
-          </div>
+            <label class="field" id="paymentReminderField" hidden>Date de relance<input id="paymentReminderDate" type="date"></label>
+          </section>
+          <section class="form-subsection" id="recurrenceSection">
+            <p class="form-subsection-title">Planifier le prochain rendez-vous</p>
+            <div id="linkedNextAppointment" class="linked-next" hidden></div>
+            <div id="repeatComposer">
+              <label class="field">Délai habituel<select id="repeatWeeks"><option value="0">Ne pas créer maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
+              <div class="two-columns" id="repeatScheduleFields" hidden>
+                <label class="field">Date du prochain RDV<input id="repeatDate" type="date"></label>
+                <label class="field">Heure du prochain RDV<input id="repeatTime" type="time"></label>
+              </div>
+              <small class="field-help" id="repeatHelp">La date et l’heure seront calculées automatiquement, puis restent modifiables.</small>
+            </div>
+          </section>
+          <label class="field" id="cancellationReasonField" hidden><span id="cancellationReasonLabel">Motif</span><input id="cancellationReason" placeholder="Ex. Annulation tardive, cliente absente…"></label>
         </section>
-        <label class="field" id="cancellationReasonField" hidden><span id="cancellationReasonLabel">Motif</span><input id="cancellationReason" placeholder="Ex. Annulation tardive, cliente absente…"></label>
-        <label class="field">Notes<textarea id="notes" rows="2" placeholder="Couleur, préférence, détails…"></textarea></label>
         <div id="conflictHint" class="conflict-hint" hidden></div>
         <div class="form-actions"><button type="button" class="danger-button" id="deleteAppointment" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
       </form>
@@ -221,6 +229,19 @@
       </div>
     </dialog>
 
+    <dialog id="dayReviewDialog" class="modal day-review-modal">
+      <div>
+        <div class="modal-heading"><div><p class="eyebrow">Encaissements</p><h2>Suivi de journée</h2></div><button type="button" class="close-button" data-close="dayReviewDialog" aria-label="Fermer">×</button></div>
+        <div class="period-nav review-nav">
+          <button class="round-button" id="previousReviewDay" aria-label="Jour précédent">‹</button>
+          <strong id="reviewDateLabel"></strong>
+          <button class="round-button" id="nextReviewDay" aria-label="Jour suivant">›</button>
+        </div>
+        <section id="reviewDaySummary" class="day-summary"></section>
+        <section id="reviewAppointmentList" class="review-appointment-list"></section>
+      </div>
+    </dialog>
+
     <dialog id="clientDialog" class="modal">
       <form id="clientForm">
         <div class="modal-heading"><h2>Fiche cliente</h2><button type="button" class="close-button" data-close="clientDialog" aria-label="Fermer">×</button></div>
@@ -268,12 +289,12 @@
           <label class="field">Durée<select id="serviceDuration"><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="75">1 h 15</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label>
           <label class="field">Prix (€)<input id="servicePrice" type="number" min="0" step="1" inputmode="decimal" placeholder="Optionnel"></label>
         </div>
-        <label class="field">Couleur<select id="serviceColor"><option value="rose">Rose</option><option value="purple">Violet</option><option value="orange">Orange</option><option value="teal">Vert d’eau</option></select></label>
+        <label class="field">Couleur<select id="serviceColor"><option value="rose">Rose</option><option value="purple">Violet</option><option value="orange">Orange</option><option value="teal">Vert d’eau</option><option value="blue">Bleu</option><option value="green">Vert</option><option value="amber">Jaune</option><option value="coral">Corail</option></select></label>
         <label class="check-field"><input id="serviceActive" type="checkbox" checked> <span><strong>Disponible à la création</strong><small>Décoche pour masquer sans perdre l’historique.</small></span></label>
         <div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div>
       </form>
     </dialog>
 
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
   </body>
 </html>
