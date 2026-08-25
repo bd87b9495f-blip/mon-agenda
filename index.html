@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=11">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -17,11 +17,20 @@
       <header class="app-header">
         <p class="eyebrow" id="todayLabel"></p>
         <div class="header-row">
-          <h1>Mon agenda</h1>
-          <button class="icon-button" id="backupButton" aria-label="Sauvegarder mes données" title="Sauvegarder">⇩</button>
+          <div class="app-title"><h1>Mon agenda</h1><span class="beta-pill">Bêta</span></div>
+          <div class="header-actions">
+            <button class="icon-button assistant-open-button" id="assistantButton" aria-label="Ouvrir l’assistant" title="Assistant">✦</button>
+            <button class="icon-button" id="backupButton" aria-label="Sauvegarder mes données" title="Sauvegarder">⇩</button>
+          </div>
         </div>
       </header>
 
+      <button id="updateNotice" class="update-notice" hidden>Nouvelle version disponible <strong>Mettre à jour</strong></button>
+      <section id="draftNotice" class="draft-notice" hidden>
+        <button id="resumeDraft"><span><strong>Rendez-vous en cours</strong><small id="draftNoticeText"></small></span><b>Continuer ›</b></button>
+        <button id="discardDraft" aria-label="Supprimer le brouillon">×</button>
+      </section>
+      <button id="unclosedDayNotice" class="unclosed-day-notice" hidden></button>
       <section class="next-card" id="nextAppointment"></section>
       <section class="payment-reminder-card" id="paymentReminderCard" hidden></section>
       <section class="todo-card" id="todoCard" hidden></section>
@@ -46,14 +55,16 @@
             <p class="eyebrow">Planning</p>
             <h2 id="selectedDayTitle"></h2>
           </div>
-          <button class="text-button" id="todayButton">Aujourd’hui</button>
-        </div>
-        <div class="day-actions">
-          <button class="action-chip action-chip-review" id="dayReview">✓ Suivi de journée</button>
-          <button class="action-chip" id="routeDay">⌖ Itinéraire du jour</button>
-          <button class="action-chip action-chip-block" id="blockTime">⊘ Bloquer un créneau</button>
+          <div class="day-heading-actions">
+            <button class="text-button route-day-button" id="routeDay" hidden>⌖ Ma tournée</button>
+            <button class="text-button" id="todayButton">Aujourd’hui</button>
+          </div>
         </div>
         <section id="daySummary" class="day-summary"></section>
+        <section id="dayClosureCard" class="day-closure-card" hidden>
+          <div><p class="eyebrow">Journée à clôturer</p><strong id="dayClosureText"></strong><small>Vérifie les paiements de cette journée.</small></div>
+          <button class="primary-button" id="dayReview">Clôturer ma journée</button>
+        </section>
         <section id="dayAllDayBlocks" class="day-all-day-blocks" hidden></section>
         <section id="dayTimeline" class="day-timeline" aria-label="Planning horaire"></section>
       </section>
@@ -117,7 +128,7 @@
     <nav class="bottom-bar" aria-label="Navigation">
       <button class="nav-item active" data-screen="agenda"><span>▦</span>Agenda</button>
       <button class="nav-item" data-screen="clients"><span>♙</span>Clientes</button>
-      <button class="add-button" id="addAppointment" aria-label="Ajouter un rendez-vous">+</button>
+      <button class="add-button" id="addAppointment" aria-label="Ajouter">+</button>
       <button class="nav-item" data-screen="report"><span>◫</span>Bilan</button>
       <button class="nav-item" data-screen="settings"><span>⚙</span>Réglages</button>
     </nav>
@@ -147,11 +158,12 @@
           <label class="field">Statut<select id="status"><option value="confirmed">Confirmé</option><option value="to_confirm">À confirmer</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option><option value="no_show">Absente</option></select></label>
         </div>
         <label class="field">Adresse<input id="address" autocomplete="street-address" placeholder="Domicile de la cliente"></label>
+        <button class="route-button" type="button" id="appointmentWaze" hidden><span>⌖</span> Ouvrir cette adresse dans Waze</button>
         <label class="field">Notes du rendez-vous<textarea id="notes" rows="2" placeholder="Couleur, prestation particulière, détails de ce rendez-vous…"></textarea></label>
         <section id="appointmentEditFields" class="edit-only-fields" hidden>
           <section class="form-subsection payment-section">
             <p class="form-subsection-title">Paiement</p>
-            <label class="field">État du paiement<select id="paymentStatus"><option value="paid">Payé</option><option value="pending">À régler</option></select></label>
+            <label class="field">État du paiement<select id="paymentStatus"><option value="unreviewed">À vérifier</option><option value="paid">Payé</option><option value="pending">À régler</option></select></label>
             <div class="two-columns">
               <label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label>
               <label class="field" id="paymentMethodField">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label>
@@ -188,9 +200,23 @@
       </div>
     </dialog>
 
+    <dialog id="duplicateClientDialog" class="modal conflict-modal">
+      <div class="conflict-dialog-content">
+        <span class="warning-symbol">?</span>
+        <h2>Cliente peut-être déjà enregistrée</h2>
+        <p id="duplicateClientText"></p>
+        <div class="duplicate-client-card" id="duplicateClientDetails"></div>
+        <div class="duplicate-actions">
+          <button class="secondary-button" id="changeDuplicate" type="button">Modifier la saisie</button>
+          <button class="secondary-button" id="createDuplicate" type="button">Créer quand même</button>
+          <button class="primary-button" id="useDuplicate" type="button">Utiliser cette fiche</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="blockDialog" class="modal">
       <form id="blockForm">
-        <div class="modal-heading"><h2 id="blockFormTitle">Bloquer un créneau</h2><button type="button" class="close-button" data-close="blockDialog" aria-label="Fermer">×</button></div>
+        <div class="modal-heading"><h2 id="blockFormTitle">Ajouter une indisponibilité</h2><button type="button" class="close-button" data-close="blockDialog" aria-label="Fermer">×</button></div>
         <input id="blockId" type="hidden">
         <label class="check-field"><input id="blockAllDay" type="checkbox"> <span><strong>Toute la journée</strong><small>Congé, repos, formation…</small></span></label>
         <label class="field" id="blockAllDayDateField" hidden>Jour<input id="blockAllDayDate" type="date"></label>
@@ -214,9 +240,20 @@
       </form>
     </dialog>
 
+    <dialog id="quickAddDialog" class="modal quick-add-modal">
+      <div>
+        <div class="modal-heading"><div><p class="eyebrow">Nouvel élément</p><h2>Que veux-tu ajouter ?</h2></div><button type="button" class="close-button" data-close="quickAddDialog" aria-label="Fermer">×</button></div>
+        <p id="quickAddWhen" class="quick-add-when"></p>
+        <div class="quick-add-actions">
+          <button type="button" class="quick-add-choice primary" id="quickAddAppointment"><span>＋</span><span><strong>Nouveau rendez-vous</strong><small>Cliente, prestation et paiement</small></span></button>
+          <button type="button" class="quick-add-choice" id="quickAddBlock"><span>⊘</span><span><strong>Ajouter une indisponibilité</strong><small>Repos, congé, déplacement ou formation</small></span></button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="routeDialog" class="modal">
       <div>
-        <div class="modal-heading"><h2>Itinéraire du jour</h2><button type="button" class="close-button" data-close="routeDialog" aria-label="Fermer">×</button></div>
+        <div class="modal-heading"><div><p class="eyebrow">Adresses du jour</p><h2>Ma tournée</h2></div><button type="button" class="close-button" data-close="routeDialog" aria-label="Fermer">×</button></div>
         <p id="routeDate" class="small-copy"></p>
         <section id="routeList" class="route-list"></section>
       </div>
@@ -231,7 +268,7 @@
 
     <dialog id="dayReviewDialog" class="modal day-review-modal">
       <div>
-        <div class="modal-heading"><div><p class="eyebrow">Encaissements</p><h2>Suivi de journée</h2></div><button type="button" class="close-button" data-close="dayReviewDialog" aria-label="Fermer">×</button></div>
+        <div class="modal-heading"><div><p class="eyebrow">Encaissements</p><h2>Clôture de journée</h2></div><button type="button" class="close-button" data-close="dayReviewDialog" aria-label="Fermer">×</button></div>
         <div class="period-nav review-nav">
           <button class="round-button" id="previousReviewDay" aria-label="Jour précédent">‹</button>
           <strong id="reviewDateLabel"></strong>
@@ -276,7 +313,32 @@
           <button type="button" class="primary-button full-width" id="exportData">Sauvegarder dans Fichiers</button>
           <label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json"></label>
           <button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button>
+          <button type="button" class="secondary-button full-width" id="undoMigration" hidden>Récupérer les données d’avant la mise à jour</button>
         </section>
+      </div>
+    </dialog>
+
+    <dialog id="assistantDialog" class="modal assistant-modal">
+      <div>
+        <div class="modal-heading"><div><p class="eyebrow">Assistant local</p><h2>Que puis-je faire ?</h2></div><button type="button" class="close-button" data-close="assistantDialog" aria-label="Fermer">×</button></div>
+        <section id="assistantMessages" class="assistant-messages" aria-live="polite">
+          <div class="assistant-message assistant">Écris ta demande ou appuie sur le micro. Je te montrerai toujours un résumé avant de modifier l’agenda.</div>
+        </section>
+        <section id="assistantPreview" class="assistant-preview" hidden>
+          <p class="eyebrow">À confirmer</p>
+          <div id="assistantPreviewText"></div>
+          <div class="assistant-preview-actions"><button type="button" class="secondary-button" id="assistantCancel">Annuler</button><button type="button" class="primary-button" id="assistantConfirm">Confirmer</button></div>
+        </section>
+        <form id="assistantForm" class="assistant-form">
+          <label for="assistantInput">Ta demande</label>
+          <textarea id="assistantInput" rows="2" placeholder="Ex. Ajoute Sarah vendredi à 14 h pour un remplissage"></textarea>
+          <div class="assistant-controls">
+            <button type="button" class="voice-button" id="assistantMic" aria-pressed="false">🎙 Parler</button>
+            <button type="submit" class="primary-button">Envoyer</button>
+          </div>
+          <label class="voice-reply-setting"><input id="assistantVoiceReplies" type="checkbox"> Lire les réponses à voix haute</label>
+          <p id="assistantVoiceStatus" class="small-copy">Le micro reste désactivé tant que tu n’appuies pas sur « Parler ».</p>
+        </form>
       </div>
     </dialog>
 
@@ -295,6 +357,9 @@
       </form>
     </dialog>
 
-    <script src="app.js?v=10"></script>
+    <section id="undoToast" class="undo-toast" role="status" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
+
+    <script src="assistant.js?v=11"></script>
+    <script src="app.js?v=11"></script>
   </body>
 </html>

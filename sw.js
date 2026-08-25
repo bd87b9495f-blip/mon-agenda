@@ -1,16 +1,20 @@
-const CACHE_NAME = 'mon-agenda-v10';
+const CACHE_NAME = 'mon-agenda-v11-beta-1';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=10',
-  './app.js?v=10',
+  './style.css?v=11',
+  './assistant.js?v=11',
+  './app.js?v=11',
   './manifest.webmanifest',
   './icon.svg'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+});
+
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
