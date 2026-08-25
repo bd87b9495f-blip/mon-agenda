@@ -1,4 +1,4 @@
-# Mon agenda — version 11.0 bêta
+# Mon agenda — version 11.1 bêta
 
 Application personnelle et gratuite pour gérer sur iPhone les rendez-vous, clientes, indisponibilités, paiements et bilans d’une prothésiste ongulaire à domicile. Après la première ouverture en ligne, l’agenda et les données restent utilisables hors connexion.
 
@@ -33,7 +33,7 @@ La mention **bêta** est volontaire : cette version contient une refonte importa
 
 ## Assistant local écrit et vocal
 
-Le bouton **✦** ouvre un assistant gratuit capable notamment de :
+Le bouton rose **Assistant** ouvre un assistant gratuit capable notamment de :
 
 - préparer un rendez-vous en français naturel ;
 - chercher des créneaux disponibles ;
@@ -41,7 +41,7 @@ Le bouton **✦** ouvre un assistant gratuit capable notamment de :
 - déplacer ou annuler un rendez-vous ;
 - ouvrir la clôture ou les relances de paiement.
 
-Toute écriture affiche d’abord un résumé et demande une confirmation. Le micro est en mode **appuyer pour parler** : il n’écoute jamais en permanence. L’analyse des demandes est locale et aucune API payante n’est utilisée. La reconnaissance et la lecture vocales dépendent toutefois des fonctions disponibles dans Safari/iOS et peuvent nécessiter l’autorisation du micro ou une connexion ; le mode écrit reste disponible hors ligne.
+La version 11.1 sait poursuivre une demande sur plusieurs messages : elle redemande seulement les informations manquantes et comprend les corrections avant validation. Toute écriture affiche d’abord un résumé et demande une confirmation. Le micro est en mode **appuyer pour parler** : il n’écoute jamais en permanence. Après une demande au micro, la réponse est lue automatiquement ; une demande écrite reste silencieuse. L’analyse des demandes est locale et aucune API payante n’est utilisée. La reconnaissance et la lecture vocales dépendent toutefois des fonctions disponibles dans Safari/iOS et peuvent nécessiter l’autorisation du micro ou une connexion ; le mode écrit reste disponible hors ligne.
 
 ## Données, sauvegarde et restauration
 
@@ -58,10 +58,10 @@ Même si la migration est automatique, fais régulièrement **Réglages → Sauv
 1. Fais d’abord une sauvegarde depuis la version actuellement installée sur l’iPhone.
 2. Ouvre le dépôt local `mon-agenda` avec **Show in Explorer**.
 3. Remplace les fichiers de l’application par les huit fichiers de cette archive.
-4. Dans GitHub Desktop, saisis par exemple `Version 11 beta` puis clique sur **Commit to main**.
+4. Dans GitHub Desktop, saisis par exemple `Version 11.1 beta` puis clique sur **Commit to main**.
 5. Clique sur **Push origin**.
-6. Après une à deux minutes, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=11` sur l’iPhone.
+6. Après une à deux minutes, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=11.1` sur l’iPhone.
 7. Si le bandeau **Nouvelle version disponible** apparaît, touche **Mettre à jour**.
-8. Vérifie dans **Réglages** que `Mon agenda · version 11.0 bêta` est affiché.
+8. Vérifie dans **Réglages** que `Mon agenda · version 11.1 bêta` est affiché.
 
-Si l’ancienne interface reste visible, ferme complètement l’application ajoutée à l’écran d’accueil, ouvre une fois l’adresse avec `?v=11` dans Safari, accepte la mise à jour, puis relance l’application.
+Si l’ancienne interface reste visible, ferme complètement l’application ajoutée à l’écran d’accueil, ouvre une fois l’adresse avec `?v=11.1` dans Safari, accepte la mise à jour, puis relance l’application.

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '11.0 bêta';
+  const APP_VERSION = '11.1 bêta';
   const CURRENT_DATA_VERSION = 11;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
@@ -1426,6 +1426,7 @@
   let localAssistant = null;
   let assistantVoice = null;
   let assistantConfirmationId = '';
+  let assistantVoiceConversation = false;
 
   function assistantNavigate(navigation) {
     const date = parseDate(navigation?.date) || app.ui.selectedDate;
@@ -1471,8 +1472,8 @@
     $('#assistantPreviewText').textContent = response.message;
   }
 
-  function speakAssistant(response) {
-    if (!$('#assistantVoiceReplies').checked || !response?.spoken) return;
+  function speakAssistant(response, enabled = false) {
+    if (!enabled || !response?.spoken) return;
     assistantVoice?.speak(response.spoken, { enabled: true, lang: 'fr-FR' });
   }
 
@@ -1490,12 +1491,12 @@
     return { ...response, message: `${response.message}${extra}`, spoken: `${response.spoken || response.message}${extra}` };
   }
 
-  async function handleAssistantResponse(response) {
+  async function handleAssistantResponse(response, options = {}) {
     if (!response) return;
     const enriched = enrichAssistantPreview(response);
     appendAssistantMessage(enriched.message, 'assistant', enriched.choices || []);
     setAssistantPreview(enriched.kind === 'preview' ? enriched : null);
-    speakAssistant(enriched);
+    speakAssistant(enriched, options.speak === true);
   }
 
   function initializeAssistant() {
@@ -1505,42 +1506,46 @@
     assistantVoice = module.createVoiceController({
       lang: 'fr-FR',
       onInterim: text => { $('#assistantInput').value = text; $('#assistantVoiceStatus').textContent = 'Je t’écoute…'; },
-      onTranscript: text => { $('#assistantInput').value = text; submitAssistantText(text); },
+      onTranscript: text => { $('#assistantInput').value = text; submitAssistantText(text, 'voice'); },
       onState: state => {
         const listening = state === 'listening'; $('#assistantMic').setAttribute('aria-pressed', String(listening));
         $('#assistantMic').textContent = listening ? '■ Arrêter' : '🎙 Parler';
-        $('#assistantVoiceStatus').textContent = listening ? 'Je t’écoute… parle naturellement.' : 'Le micro est arrêté. Il ne s’active que lorsque tu appuies sur « Parler ».';
+        $('#assistantVoiceStatus').textContent = listening ? 'Je t’écoute… parle naturellement.' : state === 'speaking' ? 'Je te réponds…' : 'Le micro est arrêté. Il ne s’active que lorsque tu appuies sur « Parler ».';
       },
       onError: () => { $('#assistantVoiceStatus').textContent = 'La dictée vocale n’est pas disponible ici. Tu peux toujours écrire ta demande.'; }
     });
-    const voiceEnabled = app.state.settings.voiceReplies === true;
-    $('#assistantVoiceReplies').checked = voiceEnabled;
+    $('#assistantVoiceReplies').checked = true;
     if (!assistantVoice.supported) { $('#assistantMic').disabled = true; $('#assistantVoiceStatus').textContent = 'La dictée vocale n’est pas prise en charge par ce navigateur. Le mode écrit reste disponible.'; }
     return true;
   }
 
   function openAssistant() {
     if (!initializeAssistant()) { window.alert('L’assistant local n’a pas pu démarrer. Recharge l’application.'); return; }
-    $('#assistantDialog').showModal(); setTimeout(() => $('#assistantInput').focus(), 30);
+    $('#assistantDialog').showModal();
   }
 
-  async function submitAssistantText(forcedText = '') {
+  async function submitAssistantText(forcedText = '', inputMode = 'text') {
     if (!initializeAssistant()) return;
     const input = $('#assistantInput'), text = String(forcedText || input.value).trim(); if (!text) return;
+    assistantVoiceConversation = inputMode === 'voice' || (inputMode === 'choice' && assistantVoiceConversation);
     appendAssistantMessage(text, 'user'); input.value = '';
-    try { await handleAssistantResponse(await localAssistant.submit(text)); }
-    catch { appendAssistantMessage('Je n’ai pas pu traiter cette demande. Rien n’a été modifié.', 'assistant'); }
+    try { await handleAssistantResponse(await localAssistant.submit(text), { speak: assistantVoiceConversation }); }
+    catch {
+      const message = 'Je n’ai pas pu traiter cette demande. Rien n’a été modifié.';
+      appendAssistantMessage(message, 'assistant');
+      if (assistantVoiceConversation) assistantVoice?.speak(message, { enabled: true, lang: 'fr-FR' });
+    }
   }
 
   async function confirmAssistantAction() {
     if (!localAssistant || !assistantConfirmationId) return;
     const id = assistantConfirmationId; setAssistantPreview(null);
-    await handleAssistantResponse(await localAssistant.confirm(id));
+    await handleAssistantResponse(await localAssistant.confirm(id), { speak: assistantVoiceConversation });
   }
 
   function cancelAssistantAction() {
     if (!localAssistant || !assistantConfirmationId) return;
-    const response = localAssistant.reject(assistantConfirmationId); setAssistantPreview(null); handleAssistantResponse(response);
+    const response = localAssistant.reject(assistantConfirmationId); setAssistantPreview(null); handleAssistantResponse(response, { speak: assistantVoiceConversation });
   }
 
   function showUpdateNotice(registration) {
@@ -1560,7 +1565,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=11', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=11.1', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -1586,7 +1591,7 @@
       if (target.dataset.close === 'settingsDialog') renderScreen();
       if (target.dataset.close === 'conflictDialog') { app.ui.pendingDraft = null; setAppointmentSaving(false); }
       if (target.dataset.close === 'duplicateClientDialog') { app.ui.pendingDuplicate = null; setAppointmentSaving(false); }
-      if (target.dataset.close === 'assistantDialog') { assistantVoice?.abort(); assistantVoice?.stopSpeaking(); }
+      if (target.dataset.close === 'assistantDialog') { assistantVoice?.abort(); assistantVoice?.stopSpeaking(); assistantVoiceConversation = false; }
       return;
     }
     if (target.dataset.mode) { setMode(target.dataset.mode); return; }
@@ -1670,7 +1675,7 @@
     if (target.dataset.repeatFrom) { const appointment = app.state.appointments.find(item => item.id === target.dataset.repeatFrom); if (appointment) { $('#clientDialog').close(); openAppointment(null, { from: appointment }); } return; }
     if (target.dataset.waze) { openWaze(decodeURIComponent(target.dataset.waze)); return; }
     if (target.dataset.createTime) { const requestedDate = target.dataset.createDate || dateKey(app.ui.selectedDate); app.ui.selectedDate = parseDate(requestedDate) || app.ui.selectedDate; openQuickAdd(requestedDate, target.dataset.createTime); return; }
-    if (target.dataset.assistantChoice) { $('#assistantInput').value = target.dataset.assistantChoice; $('#assistantInput').focus(); return; }
+    if (target.dataset.assistantChoice) { submitAssistantText(target.dataset.assistantChoice, 'choice'); return; }
     if (target.dataset.suggestion) { const client = clientById(target.dataset.suggestion); if (client) fillFromClient(client); return; }
     if (target.dataset.todo) { openTodo(target.dataset.todo); return; }
     if (target.dataset.reviewPaid) { const appointment = app.state.appointments.find(item => item.id === target.dataset.reviewPaid); if (appointment) markAppointmentPaid(appointment.id, appointment.date); return; }
@@ -1724,15 +1729,9 @@
   $('#clientSearch').addEventListener('input', renderClients);
   $('#importData').addEventListener('change', event => importData(event.target.files[0]));
   $('#assistantForm').addEventListener('submit', event => { event.preventDefault(); submitAssistantText(); });
-  $('#assistantVoiceReplies').addEventListener('change', event => {
-    const previous = app.state.settings.voiceReplies, enabled = Boolean(event.target.checked);
-    app.state.settings.voiceReplies = enabled;
-    if (!saveState()) { app.state.settings.voiceReplies = previous; event.target.checked = previous === true; return; }
-    try { localStorage.setItem(VOICE_SETTING_KEY, JSON.stringify(enabled)); } catch {}
-  });
   $('#conflictDialog').addEventListener('cancel', () => { app.ui.pendingDraft = null; setAppointmentSaving(false); });
   $('#duplicateClientDialog').addEventListener('cancel', () => { app.ui.pendingDuplicate = null; setAppointmentSaving(false); });
-  $('#assistantDialog').addEventListener('cancel', () => { assistantVoice?.abort(); assistantVoice?.stopSpeaking(); });
+  $('#assistantDialog').addEventListener('cancel', () => { assistantVoice?.abort(); assistantVoice?.stopSpeaking(); assistantVoiceConversation = false; });
   let draftTimer = null;
   $('#appointmentForm').addEventListener('input', () => { if (app.ui.editingAppointmentId) return; clearTimeout(draftTimer); draftTimer = setTimeout(saveAppointmentDraft, 250); });
   $('#appointmentForm').addEventListener('change', () => { if (app.ui.editingAppointmentId) return; clearTimeout(draftTimer); draftTimer = setTimeout(saveAppointmentDraft, 100); });

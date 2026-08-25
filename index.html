@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=11.1">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -19,7 +19,10 @@
         <div class="header-row">
           <div class="app-title"><h1>Mon agenda</h1><span class="beta-pill">Bêta</span></div>
           <div class="header-actions">
-            <button class="icon-button assistant-open-button" id="assistantButton" aria-label="Ouvrir l’assistant" title="Assistant">✦</button>
+            <button type="button" class="assistant-open-button" id="assistantButton" aria-label="Ouvrir l’assistant, parler ou écrire" aria-haspopup="dialog" aria-controls="assistantDialog">
+              <span class="assistant-open-icon" aria-hidden="true">✦</span>
+              <span class="assistant-open-copy"><strong>Assistant</strong><small>Parler ou écrire</small></span>
+            </button>
             <button class="icon-button" id="backupButton" aria-label="Sauvegarder mes données" title="Sauvegarder">⇩</button>
           </div>
         </div>
@@ -318,26 +321,39 @@
       </div>
     </dialog>
 
-    <dialog id="assistantDialog" class="modal assistant-modal">
-      <div>
-        <div class="modal-heading"><div><p class="eyebrow">Assistant local</p><h2>Que puis-je faire ?</h2></div><button type="button" class="close-button" data-close="assistantDialog" aria-label="Fermer">×</button></div>
-        <section id="assistantMessages" class="assistant-messages" aria-live="polite">
-          <div class="assistant-message assistant">Écris ta demande ou appuie sur le micro. Je te montrerai toujours un résumé avant de modifier l’agenda.</div>
+    <dialog id="assistantDialog" class="modal assistant-modal" aria-labelledby="assistantDialogTitle" aria-describedby="assistantDialogHelp">
+      <div class="assistant-dialog-body">
+        <div class="modal-heading assistant-heading">
+          <div class="assistant-heading-title">
+            <span class="assistant-avatar" aria-hidden="true">✦</span>
+            <div><p class="eyebrow">Assistant personnel</p><h2 id="assistantDialogTitle">Que veux-tu faire ?</h2></div>
+          </div>
+          <button type="button" class="close-button" data-close="assistantDialog" aria-label="Fermer l’assistant">×</button>
+        </div>
+        <p id="assistantDialogHelp" class="assistant-help">Demande-moi un rendez-vous, un créneau libre ou le résumé de ta journée. Je te fais toujours confirmer avant de modifier l’agenda.</p>
+        <section id="assistantMessages" class="assistant-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation avec l’assistant">
+          <div class="assistant-message assistant">Bonjour ! Tu peux me parler ou m’écrire. Que puis-je faire pour toi ?</div>
         </section>
+        <div class="assistant-starters" aria-label="Exemples de demandes">
+          <button type="button" data-assistant-choice="Résume ma journée d’aujourd’hui">Ma journée</button>
+          <button type="button" data-assistant-choice="Trouve un créneau libre demain">Créneau libre</button>
+          <button type="button" data-assistant-choice="Affiche mes paiements à relancer">Mes relances</button>
+        </div>
         <section id="assistantPreview" class="assistant-preview" hidden>
           <p class="eyebrow">À confirmer</p>
           <div id="assistantPreviewText"></div>
           <div class="assistant-preview-actions"><button type="button" class="secondary-button" id="assistantCancel">Annuler</button><button type="button" class="primary-button" id="assistantConfirm">Confirmer</button></div>
         </section>
         <form id="assistantForm" class="assistant-form">
-          <label for="assistantInput">Ta demande</label>
-          <textarea id="assistantInput" rows="2" placeholder="Ex. Ajoute Sarah vendredi à 14 h pour un remplissage"></textarea>
+          <label for="assistantInput">Écrire une demande</label>
+          <textarea id="assistantInput" rows="2" autocapitalize="sentences" enterkeyhint="send" placeholder="Ex. Ajoute Sarah vendredi à 14 h pour un remplissage"></textarea>
           <div class="assistant-controls">
-            <button type="button" class="voice-button" id="assistantMic" aria-pressed="false">🎙 Parler</button>
+            <button type="button" class="voice-button" id="assistantMic" aria-pressed="false" aria-describedby="assistantVoiceStatus">🎙 Parler</button>
             <button type="submit" class="primary-button">Envoyer</button>
           </div>
-          <label class="voice-reply-setting"><input id="assistantVoiceReplies" type="checkbox"> Lire les réponses à voix haute</label>
-          <p id="assistantVoiceStatus" class="small-copy">Le micro reste désactivé tant que tu n’appuies pas sur « Parler ».</p>
+          <input id="assistantVoiceReplies" type="checkbox" hidden tabindex="-1" aria-hidden="true">
+          <p class="assistant-speaking-note"><span aria-hidden="true">◉</span><span><strong>Réponse adaptée</strong> Au micro, je réponds à voix haute. Au clavier, je reste silencieux.</span></p>
+          <p id="assistantVoiceStatus" class="small-copy" role="status" aria-live="polite">Le micro reste désactivé tant que tu n’appuies pas sur « Parler ».</p>
         </form>
       </div>
     </dialog>
@@ -359,7 +375,7 @@
 
     <section id="undoToast" class="undo-toast" role="status" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
 
-    <script src="assistant.js?v=11"></script>
-    <script src="app.js?v=11"></script>
+    <script src="assistant.js?v=11.1"></script>
+    <script src="app.js?v=11.1"></script>
   </body>
 </html>
