@@ -7,9 +7,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
-    <link rel="manifest" href="manifest.webmanifest">
-    <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="style.css?v=11.1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+    <link rel="manifest" href="manifest.webmanifest?v=12.0">
+    <link rel="apple-touch-icon" href="icon-180.png">
+    <link rel="stylesheet" href="style.css?v=12.0">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -18,19 +19,13 @@
         <p class="eyebrow" id="todayLabel"></p>
         <div class="header-row">
           <div class="app-title"><h1>Mon agenda</h1><span class="beta-pill">Bêta</span></div>
-          <div class="header-actions">
-            <button type="button" class="assistant-open-button" id="assistantButton" aria-label="Ouvrir l’assistant, parler ou écrire" aria-haspopup="dialog" aria-controls="assistantDialog">
-              <span class="assistant-open-icon" aria-hidden="true">✦</span>
-              <span class="assistant-open-copy"><strong>Assistant</strong><small>Parler ou écrire</small></span>
-            </button>
-            <button class="icon-button" id="backupButton" aria-label="Sauvegarder mes données" title="Sauvegarder">⇩</button>
-          </div>
+          <button class="icon-button" id="backupButton" aria-label="Sauvegarder mes données" title="Sauvegarder">⇩</button>
         </div>
       </header>
 
       <button id="updateNotice" class="update-notice" hidden>Nouvelle version disponible <strong>Mettre à jour</strong></button>
       <section id="draftNotice" class="draft-notice" hidden>
-        <button id="resumeDraft"><span><strong>Rendez-vous en cours</strong><small id="draftNoticeText"></small></span><b>Continuer ›</b></button>
+        <button id="resumeDraft"><span><strong id="draftNoticeTitle">Saisie en cours</strong><small id="draftNoticeText"></small></span><b>Continuer ›</b></button>
         <button id="discardDraft" aria-label="Supprimer le brouillon">×</button>
       </section>
       <button id="unclosedDayNotice" class="unclosed-day-notice" hidden></button>
@@ -53,329 +48,115 @@
         </div>
         <div class="day-strip" id="dayStrip" aria-label="Choisir un jour"></div>
         <div id="holidayBanner" hidden></div>
-        <div class="selected-day-heading">
-          <div>
-            <p class="eyebrow">Planning</p>
-            <h2 id="selectedDayTitle"></h2>
-          </div>
-          <div class="day-heading-actions">
-            <button class="text-button route-day-button" id="routeDay" hidden>⌖ Ma tournée</button>
-            <button class="text-button" id="todayButton">Aujourd’hui</button>
-          </div>
-        </div>
+        <div class="selected-day-heading"><div><p class="eyebrow">Planning</p><h2 id="selectedDayTitle"></h2></div><button class="text-button" id="todayButton">Aujourd’hui</button></div>
         <section id="daySummary" class="day-summary"></section>
-        <section id="dayClosureCard" class="day-closure-card" hidden>
-          <div><p class="eyebrow">Journée à clôturer</p><strong id="dayClosureText"></strong><small>Vérifie les paiements de cette journée.</small></div>
-          <button class="primary-button" id="dayReview">Clôturer ma journée</button>
+        <section class="day-tools" aria-label="Outils de la journée">
+          <button id="dayReview" class="day-tool"><span>✓</span><strong>Fin de journée</strong><small>Vérifier les paiements</small></button>
+          <button id="addBlockShortcut" class="day-tool"><span>⊘</span><strong>Bloquer un créneau</strong><small>Repos ou indisponibilité</small></button>
+          <button id="routeDay" class="day-tool"><span>⌖</span><strong>Ma tournée</strong><small>Ouvrir les itinéraires</small></button>
         </section>
+        <section id="dayClosureCard" class="day-closure-card" hidden><div><p class="eyebrow">Journée à clôturer</p><strong id="dayClosureText"></strong><small>Vérifie les paiements de cette journée.</small></div></section>
         <section id="dayAllDayBlocks" class="day-all-day-blocks" hidden></section>
         <section id="dayTimeline" class="day-timeline" aria-label="Planning horaire"></section>
       </section>
 
       <section id="fullWeekView" class="agenda-view" hidden>
-        <div class="period-nav">
-          <button class="round-button" id="previousWeek" aria-label="Semaine précédente">‹</button>
-          <strong id="weekPeriodLabel"></strong>
-          <button class="round-button" id="nextWeek" aria-label="Semaine suivante">›</button>
-        </div>
-        <div class="week-view-heading">
-          <div><p class="eyebrow">Planning horaire</p><h2>Ma semaine</h2></div>
-          <button class="text-button" id="currentWeekButton">Cette semaine</button>
-        </div>
+        <div class="period-nav"><button class="round-button" id="previousWeek" aria-label="Semaine précédente">‹</button><strong id="weekPeriodLabel"></strong><button class="round-button" id="nextWeek" aria-label="Semaine suivante">›</button></div>
+        <div class="week-view-heading"><div><p class="eyebrow">Planning horaire</p><h2>Ma semaine</h2></div><button class="text-button" id="currentWeekButton">Cette semaine</button></div>
         <section id="weekSummary" class="day-summary"></section>
         <section id="weekSchedule" class="week-schedule" aria-label="Planning horaire de toute la semaine"></section>
       </section>
 
       <section id="monthView" class="agenda-view" hidden>
-        <div class="period-nav">
-          <button class="round-button" id="previousMonth" aria-label="Mois précédent">‹</button>
-          <strong id="monthLabel"></strong>
-          <button class="round-button" id="nextMonth" aria-label="Mois suivant">›</button>
-        </div>
-        <p class="view-help">Les week-ends, jours fériés et journées contenant un créneau bloqué sont signalés. Choisis un jour pour afficher toute sa semaine.</p>
+        <div class="period-nav"><button class="round-button" id="previousMonth" aria-label="Mois précédent">‹</button><strong id="monthLabel"></strong><button class="round-button" id="nextMonth" aria-label="Mois suivant">›</button></div>
+        <p class="view-help">Les week-ends, jours fériés et indisponibilités sont signalés. Choisis un jour pour afficher sa semaine.</p>
         <section id="monthGrid" class="month-grid" aria-label="Calendrier mensuel"></section>
         <section id="weekOverview" hidden aria-label="Vue détaillée de la semaine"></section>
       </section>
     </main>
 
     <main class="client-screen" id="clientsScreen" hidden>
-      <header class="app-header">
-        <p class="eyebrow">Ma base</p>
-        <div class="header-row"><h1>Mes clientes</h1><button class="text-button" id="backToAgenda">Agenda</button></div>
-      </header>
+      <header class="app-header"><p class="eyebrow">Ma base</p><div class="header-row"><h1>Mes clientes</h1><button class="text-button" id="backToAgenda">Agenda</button></div></header>
       <label class="search-field"><span>⌕</span><input id="clientSearch" type="search" placeholder="Rechercher une cliente"></label>
+      <label class="filter-field">Filtrer<select id="clientFilter"><option value="all">Toutes les clientes</option><option value="badge">Avec un repère</option><option value="late">Annulations tardives</option><option value="pending">Paiement en attente</option><option value="inactive90">Aucun RDV depuis 90 jours</option><option value="inactive180">Aucun RDV depuis 180 jours</option></select></label>
       <section id="clientList" class="client-list"></section>
     </main>
 
     <main class="report-screen" id="reportScreen" hidden>
-      <header class="app-header">
-        <p class="eyebrow">Mes chiffres</p>
-        <div class="header-row"><h1>Bilan</h1><button class="text-button" id="reportToday">Aujourd’hui</button></div>
-      </header>
-      <section class="report-switch" aria-label="Période du bilan">
-        <button class="report-period-button active" data-report-period="week">Semaine</button>
-        <button class="report-period-button" data-report-period="month">Mois</button>
-      </section>
-      <div class="period-nav report-nav">
-        <button class="round-button" id="previousReport" aria-label="Période précédente">‹</button>
-        <strong id="reportPeriodLabel"></strong>
-        <button class="round-button" id="nextReport" aria-label="Période suivante">›</button>
-      </div>
-      <section class="report-tabs" aria-label="Type de bilan">
-        <button class="report-tab active" data-report-tab="activity">Activité</button>
-        <button class="report-tab" data-report-tab="payments">Paiements</button>
-      </section>
+      <header class="app-header"><p class="eyebrow">Mes chiffres</p><div class="header-row"><h1>Bilan</h1><button class="text-button" id="reportToday">Aujourd’hui</button></div></header>
+      <section class="report-switch" aria-label="Période du bilan"><button class="report-period-button active" data-report-period="week">Semaine</button><button class="report-period-button" data-report-period="month">Mois</button><button class="report-period-button" data-report-period="year">Année</button></section>
+      <div class="period-nav report-nav"><button class="round-button" id="previousReport" aria-label="Période précédente">‹</button><strong id="reportPeriodLabel"></strong><button class="round-button" id="nextReport" aria-label="Période suivante">›</button></div>
+      <div class="report-heading-actions"><section class="report-tabs" aria-label="Type de bilan"><button class="report-tab active" data-report-tab="activity">Activité</button><button class="report-tab" data-report-tab="payments">Paiements</button></section><button id="exportReportCsv" class="secondary-button">Exporter CSV</button></div>
       <section id="reportContent" class="report-content"></section>
     </main>
 
-    <nav class="bottom-bar" aria-label="Navigation">
-      <button class="nav-item active" data-screen="agenda"><span>▦</span>Agenda</button>
-      <button class="nav-item" data-screen="clients"><span>♙</span>Clientes</button>
-      <button class="add-button" id="addAppointment" aria-label="Ajouter">+</button>
-      <button class="nav-item" data-screen="report"><span>◫</span>Bilan</button>
-      <button class="nav-item" data-screen="settings"><span>⚙</span>Réglages</button>
-    </nav>
+    <nav class="bottom-bar" aria-label="Navigation"><button class="nav-item active" data-screen="agenda"><span>▦</span>Agenda</button><button class="nav-item" data-screen="clients"><span>♙</span>Clientes</button><button class="add-button" id="addAppointment" aria-label="Ajouter">+</button><button class="nav-item" data-screen="report"><span>◫</span>Bilan</button><button class="nav-item" data-screen="settings"><span>⚙</span>Réglages</button></nav>
 
     <dialog id="appointmentDialog" class="modal">
       <form id="appointmentForm" novalidate>
         <div class="modal-heading"><h2 id="appointmentFormTitle">Nouveau rendez-vous</h2><button type="button" class="close-button" data-close="appointmentDialog" aria-label="Fermer">×</button></div>
         <input id="appointmentId" type="hidden">
-        <div class="field client-field">
-          <label for="clientName">Cliente</label>
-          <input id="clientName" required autocomplete="off" placeholder="Écris au moins 2 lettres">
-          <div id="clientSuggestions" class="client-suggestions" hidden></div>
-        </div>
-        <label class="field">Téléphone<input id="phone" inputmode="tel" autocomplete="tel" placeholder="Optionnel"></label>
+        <div class="field client-field"><label for="clientName">Cliente</label><input id="clientName" required autocomplete="off" maxlength="200" placeholder="Écris au moins 2 lettres"><div id="clientSuggestions" class="client-suggestions" hidden></div></div>
         <aside id="selectedClientInfo" class="selected-client-info" hidden></aside>
-        <div class="two-columns service-price-row">
-          <label class="field">Prestation<select id="serviceSelect" required></select></label>
-          <label class="field">Prix (€)<input id="price" type="number" min="0" step="1" inputmode="decimal" placeholder="Optionnel"></label>
-        </div>
-        <label class="field" id="customServiceField" hidden>Nom de la prestation<input id="service" placeholder="Ex. Pose complète"></label>
-        <div class="two-columns">
-          <label class="field">Date<input id="date" required type="date"></label>
-          <label class="field">Heure<input id="time" required type="time"></label>
-        </div>
-        <div class="two-columns">
-          <label class="field">Durée<select id="duration"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="75">1 h 15</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label>
-          <label class="field">Statut<select id="status"><option value="confirmed">Confirmé</option><option value="to_confirm">À confirmer</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option><option value="no_show">Absente</option></select></label>
-        </div>
-        <label class="field">Adresse<input id="address" autocomplete="street-address" placeholder="Domicile de la cliente"></label>
+        <div class="two-columns contact-row"><label class="field">Téléphone<input id="phone" maxlength="80" inputmode="tel" autocomplete="tel" placeholder="Optionnel"></label><label class="field">Contact via<select id="contactVia"><option value="">Non précisé</option><option value="instagram">Instagram</option><option value="messenger">Facebook / Messenger</option><option value="phone">Téléphone / SMS</option><option value="whatsapp">WhatsApp</option><option value="other">Autre</option></select></label></div>
+        <div class="two-columns service-price-row"><label class="field">Prestation<select id="serviceSelect" required></select></label><label class="field">Prix de base (€)<input id="price" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" placeholder="Optionnel"></label></div>
+        <label class="field" id="customServiceField" hidden>Nom de la prestation<input id="service" maxlength="200" placeholder="Ex. Pose complète"></label>
+        <section class="supplement-composer"><div class="subsection-heading"><div><strong>Suppléments</strong><small>Décoration, déplacement ou autre</small></div><button type="button" class="small-action" id="addSupplement">+ Ajouter</button></div><div id="supplementRows"></div><div id="appointmentTotal" class="appointment-total">Total : 0 €</div></section>
+        <div class="two-columns"><label class="field">Date<input id="date" required type="date"></label><label class="field">Heure<div class="time-picker"><select id="timeHour" aria-label="Heure"></select><span>:</span><select id="timeMinute" aria-label="Minutes"></select></div><input id="time" required type="time" step="300" hidden></label></div>
+        <div class="two-columns"><label class="field">Durée<select id="duration"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="75">1 h 15</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label><label class="field">Statut<select id="status"><option value="confirmed">Confirmé</option><option value="to_confirm">À confirmer</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option><option value="no_show">Absente</option></select></label></div>
+        <label class="field">Adresse<input id="address" autocomplete="street-address" maxlength="200" placeholder="Domicile de la cliente"></label>
+        <p id="addressHint" class="field-warning" hidden></p>
         <button class="route-button" type="button" id="appointmentWaze" hidden><span>⌖</span> Ouvrir cette adresse dans Waze</button>
-        <label class="field">Notes du rendez-vous<textarea id="notes" rows="2" placeholder="Couleur, prestation particulière, détails de ce rendez-vous…"></textarea></label>
+        <label class="field">Notes du rendez-vous<textarea id="notes" maxlength="5000" rows="2" placeholder="Couleur, détails de ce rendez-vous…"></textarea></label>
         <section id="appointmentEditFields" class="edit-only-fields" hidden>
-          <section class="form-subsection payment-section">
-            <p class="form-subsection-title">Paiement</p>
-            <label class="field">État du paiement<select id="paymentStatus"><option value="unreviewed">À vérifier</option><option value="paid">Payé</option><option value="pending">À régler</option></select></label>
-            <div class="two-columns">
-              <label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label>
-              <label class="field" id="paymentMethodField">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label>
-            </div>
-            <label class="field" id="paymentReminderField" hidden>Date de relance<input id="paymentReminderDate" type="date"></label>
-          </section>
-          <section class="form-subsection" id="recurrenceSection">
-            <p class="form-subsection-title">Planifier le prochain rendez-vous</p>
-            <div id="linkedNextAppointment" class="linked-next" hidden></div>
-            <div id="repeatComposer">
-              <label class="field">Délai habituel<select id="repeatWeeks"><option value="0">Ne pas créer maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label>
-              <div class="two-columns" id="repeatScheduleFields" hidden>
-                <label class="field">Date du prochain RDV<input id="repeatDate" type="date"></label>
-                <label class="field">Heure du prochain RDV<input id="repeatTime" type="time"></label>
-              </div>
-              <small class="field-help" id="repeatHelp">La date et l’heure seront calculées automatiquement, puis restent modifiables.</small>
-            </div>
-          </section>
-          <label class="field" id="cancellationReasonField" hidden><span id="cancellationReasonLabel">Motif</span><input id="cancellationReason" placeholder="Ex. Annulation tardive, cliente absente…"></label>
+          <section class="form-subsection payment-section"><p class="form-subsection-title">Paiement</p><label class="field">État du paiement<select id="paymentStatus"><option value="unreviewed">À vérifier</option><option value="paid">Payé</option><option value="pending">À régler</option></select></label><div class="two-columns"><label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label><label class="field" id="paymentMethodField">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label></div><label class="field" id="paymentReminderField" hidden>Date de relance<input id="paymentReminderDate" type="date"></label></section>
+          <section class="form-subsection" id="recurrenceSection"><p class="form-subsection-title">Planifier le prochain rendez-vous</p><div id="linkedNextAppointment" class="linked-next" hidden></div><div id="repeatComposer"><label class="field">Délai habituel<select id="repeatWeeks"><option value="0">Ne pas créer maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label><div class="two-columns" id="repeatScheduleFields" hidden><label class="field">Date du prochain RDV<input id="repeatDate" type="date"></label><label class="field">Heure du prochain RDV<div class="time-picker"><select id="repeatTimeHour" aria-label="Heure du prochain rendez-vous"></select><span>:</span><select id="repeatTimeMinute" aria-label="Minutes du prochain rendez-vous"></select></div><input id="repeatTime" type="time" step="300" hidden></label></div><small class="field-help" id="repeatHelp">La date et l’heure restent modifiables.</small></div></section>
+          <label class="field" id="cancellationReasonField" hidden><span id="cancellationReasonLabel">Motif</span><input id="cancellationReason" maxlength="200" placeholder="Ex. Empêchement…"></label>
+          <label class="check-field" id="lateCancellationField" hidden><input id="lateCancellation" type="checkbox"><span><strong>Annulation tardive</strong><small>Comptabiliser cette annulation dans la fiche cliente.</small></span></label>
+          <section class="form-subsection"><p class="form-subsection-title">Historique des modifications</p><div id="appointmentHistory" class="appointment-history"></div></section>
         </section>
         <div id="conflictHint" class="conflict-hint" hidden></div>
         <div class="form-actions"><button type="button" class="danger-button" id="deleteAppointment" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
       </form>
     </dialog>
 
-    <dialog id="conflictDialog" class="modal conflict-modal">
-      <div class="conflict-dialog-content">
-        <span class="warning-symbol">!</span>
-        <h2>Créneau indisponible</h2>
-        <p>Ce rendez-vous chevauche :</p>
-        <div id="conflictList" class="conflict-list"></div>
-        <p class="small-copy">Tu peux revenir modifier le créneau ou l’enregistrer quand même.</p>
-        <div class="form-actions"><button class="secondary-button" id="changeConflict" type="button">Modifier</button><button class="primary-button" id="confirmConflict" type="button">Valider quand même</button></div>
-      </div>
-    </dialog>
+    <dialog id="conflictDialog" class="modal conflict-modal"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2>Conflit de planning</h2><p>Ce créneau chevauche :</p><div id="conflictList" class="conflict-list"></div><p class="small-copy">Tu peux modifier le créneau ou l’enregistrer volontairement.</p><div class="form-actions"><button class="secondary-button" id="changeConflict" type="button">Modifier le créneau</button><button class="primary-button" id="confirmConflict" type="button">Valider quand même</button></div></div></dialog>
+    <dialog id="duplicateClientDialog" class="modal conflict-modal"><div class="conflict-dialog-content"><span class="warning-symbol">?</span><h2>Cliente peut-être déjà enregistrée</h2><p id="duplicateClientText"></p><div class="duplicate-client-card" id="duplicateClientDetails"></div><div class="duplicate-actions"><button class="secondary-button" id="changeDuplicate" type="button">Modifier la saisie</button><button class="secondary-button" id="createDuplicate" type="button">Créer quand même</button><button class="primary-button" id="useDuplicate" type="button">Utiliser cette fiche</button></div></div></dialog>
+    <dialog id="blockDialog" class="modal"><form id="blockForm"><div class="modal-heading"><h2 id="blockFormTitle">Bloquer un créneau</h2><button type="button" class="close-button" data-close="blockDialog" aria-label="Fermer">×</button></div><input id="blockId" type="hidden"><label class="check-field"><input id="blockAllDay" type="checkbox"><span><strong>Toute la journée</strong><small>Congé, repos, formation…</small></span></label><label class="field" id="blockAllDayDateField" hidden>Jour<input id="blockAllDayDate" type="date"></label><div id="blockTimeFields"><p class="section-hint">Début</p><div class="two-columns"><label class="field">Jour<input id="blockStartDate" required type="date"></label><label class="field">Heure<input id="blockStartTime" required type="time" step="300"></label></div><p class="section-hint">Fin</p><div class="two-columns"><label class="field">Jour<input id="blockEndDate" required type="date"></label><label class="field">Heure<input id="blockEndTime" required type="time" step="300"></label></div></div><label class="field">Motif<input id="blockReason" maxlength="200" placeholder="Ex. Congé, trajet, formation"></label><label class="field">Adresse<input id="blockAddress" maxlength="200" autocomplete="street-address" placeholder="Optionnel · lieu du déplacement"></label><label class="field">Commentaire<textarea id="blockNotes" maxlength="5000" rows="2" placeholder="Optionnel · informations utiles"></textarea></label><div id="blockValidation" class="conflict-hint" hidden></div><div class="form-actions"><button class="danger-button" id="deleteBlock" type="button" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
+    <dialog id="quickAddDialog" class="modal quick-add-modal"><div><div class="modal-heading"><div><p class="eyebrow">Nouvel élément</p><h2>Que veux-tu ajouter ?</h2></div><button type="button" class="close-button" data-close="quickAddDialog" aria-label="Fermer">×</button></div><p id="quickAddWhen" class="quick-add-when"></p><div class="quick-add-actions"><button type="button" class="quick-add-choice primary" id="quickAddAppointment"><span>＋</span><span><strong>Nouveau rendez-vous</strong><small>Cliente et prestation</small></span></button><button type="button" class="quick-add-choice" id="quickAddBlock"><span>⊘</span><span><strong>Bloquer un créneau</strong><small>Repos, congé ou formation</small></span></button></div></div></dialog>
+    <dialog id="routeDialog" class="modal"><div><div class="modal-heading"><div><p class="eyebrow">Adresses du jour</p><h2>Ma tournée</h2></div><button type="button" class="close-button" data-close="routeDialog" aria-label="Fermer">×</button></div><p id="routeDate" class="small-copy"></p><section id="routeList" class="route-list"></section></div></dialog>
+    <dialog id="todoDialog" class="modal"><div><div class="modal-heading"><h2 id="todoTitle">À faire</h2><button type="button" class="close-button" data-close="todoDialog" aria-label="Fermer">×</button></div><section id="todoList" class="todo-list"></section></div></dialog>
+    <dialog id="dayReviewDialog" class="modal day-review-modal"><div><div class="modal-heading"><div><p class="eyebrow">Encaissements</p><h2>Fin de journée</h2></div><button type="button" class="close-button" data-close="dayReviewDialog" aria-label="Fermer">×</button></div><div class="period-nav review-nav"><button class="round-button" id="previousReviewDay" aria-label="Jour précédent">‹</button><strong id="reviewDateLabel"></strong><button class="round-button" id="nextReviewDay" aria-label="Jour suivant">›</button></div><section id="reviewDaySummary" class="day-summary"></section><section id="reviewAppointmentList" class="review-appointment-list"></section></div></dialog>
 
-    <dialog id="duplicateClientDialog" class="modal conflict-modal">
-      <div class="conflict-dialog-content">
-        <span class="warning-symbol">?</span>
-        <h2>Cliente peut-être déjà enregistrée</h2>
-        <p id="duplicateClientText"></p>
-        <div class="duplicate-client-card" id="duplicateClientDetails"></div>
-        <div class="duplicate-actions">
-          <button class="secondary-button" id="changeDuplicate" type="button">Modifier la saisie</button>
-          <button class="secondary-button" id="createDuplicate" type="button">Créer quand même</button>
-          <button class="primary-button" id="useDuplicate" type="button">Utiliser cette fiche</button>
-        </div>
-      </div>
-    </dialog>
+    <dialog id="clientDialog" class="modal"><form id="clientForm"><div class="modal-heading"><h2>Fiche cliente</h2><button type="button" class="close-button" data-close="clientDialog" aria-label="Fermer">×</button></div><input id="profileKey" type="hidden"><label class="field">Nom<input id="profileName" maxlength="200" required></label><div class="two-columns"><label class="field">Téléphone<input id="profilePhone" maxlength="80" inputmode="tel"></label><label class="field">Contact via<select id="profileContactVia"><option value="">Non précisé</option><option value="instagram">Instagram</option><option value="messenger">Facebook / Messenger</option><option value="phone">Téléphone / SMS</option><option value="whatsapp">WhatsApp</option><option value="other">Autre</option></select></label></div><label class="field">Repère<select id="profileBadge"><option value="">Aucun repère</option></select></label><label class="field">Adresse<input id="profileAddress" maxlength="200"></label><button class="route-button" type="button" id="profileWaze" hidden><span>⌖</span> Itinéraire</button><label class="field">Notes cliente<textarea id="profileNotes" maxlength="5000" rows="3" placeholder="Préférences, allergies, informations utiles…"></textarea></label><section id="clientStats" class="client-stats"></section><section id="clientHistory" class="client-history"></section><div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
 
-    <dialog id="blockDialog" class="modal">
-      <form id="blockForm">
-        <div class="modal-heading"><h2 id="blockFormTitle">Ajouter une indisponibilité</h2><button type="button" class="close-button" data-close="blockDialog" aria-label="Fermer">×</button></div>
-        <input id="blockId" type="hidden">
-        <label class="check-field"><input id="blockAllDay" type="checkbox"> <span><strong>Toute la journée</strong><small>Congé, repos, formation…</small></span></label>
-        <label class="field" id="blockAllDayDateField" hidden>Jour<input id="blockAllDayDate" type="date"></label>
-        <div id="blockTimeFields">
-          <p class="section-hint">Début</p>
-          <div class="two-columns">
-            <label class="field">Jour<input id="blockStartDate" required type="date"></label>
-            <label class="field">Heure<input id="blockStartTime" required type="time"></label>
-          </div>
-          <p class="section-hint">Fin</p>
-          <div class="two-columns">
-            <label class="field">Jour<input id="blockEndDate" required type="date"></label>
-            <label class="field">Heure<input id="blockEndTime" required type="time"></label>
-          </div>
-        </div>
-        <label class="field">Motif<input id="blockReason" placeholder="Ex. Congé, trajet, formation"></label>
-        <label class="field">Adresse<input id="blockAddress" autocomplete="street-address" placeholder="Optionnel · lieu du déplacement"></label>
-        <label class="field">Commentaire<textarea id="blockNotes" rows="2" placeholder="Optionnel · informations utiles"></textarea></label>
-        <div id="blockValidation" class="conflict-hint" hidden></div>
-        <div class="form-actions"><button class="danger-button" id="deleteBlock" type="button" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div>
-      </form>
-    </dialog>
+    <dialog id="settingsDialog" class="modal settings-modal"><div><div class="modal-heading"><button type="button" class="settings-back" id="settingsBack" hidden>‹ Retour</button><div><h2 id="settingsTitle">Réglages</h2><p class="app-version" id="appVersionLabel"></p></div><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
+      <section id="settingsHome" class="settings-home">
+        <button data-settings-page="agenda"><span>◷</span><span><strong>Agenda et horaires</strong><small id="settingsAgendaSummary"></small></span><b>›</b></button>
+        <button data-settings-page="services"><span>✦</span><span><strong>Prestations et tarifs</strong><small id="settingsServicesSummary"></small></span><b>›</b></button>
+        <button data-settings-page="supplements"><span>＋</span><span><strong>Suppléments</strong><small id="settingsSupplementsSummary"></small></span><b>›</b></button>
+        <button data-settings-page="clients"><span>♥</span><span><strong>Clientes et repères</strong><small id="settingsClientsSummary"></small></span><b>›</b></button>
+        <button data-settings-page="payments"><span>€</span><span><strong>Paiements et bilans</strong><small>Suivi et export CSV</small></span><b>›</b></button>
+        <button data-settings-page="reminders"><span>!</span><span><strong>Rappels</strong><small id="settingsRemindersSummary"></small></span><b>›</b></button>
+        <button data-settings-page="data"><span>⇩</span><span><strong>Données et sauvegardes</strong><small id="settingsDataSummary"></small></span><b>›</b></button>
+        <button data-settings-page="about"><span>i</span><span><strong>À propos</strong><small>Version et confidentialité</small></span><b>›</b></button>
+      </section>
+      <section class="settings-page" data-settings-content="agenda" hidden><div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires sont signalés mais restent possibles.</p></div><button class="small-action" id="applyWeekdayHours" type="button">9 h–19 h</button></div><div id="workingHoursEditor" class="working-hours-editor"></div><button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer les horaires</button></section>
+      <section class="settings-page" data-settings-content="services" hidden><div class="settings-heading"><div><h3>Prestations</h3><p>Les anciens rendez-vous conservent leur tarif.</p></div><button class="small-action" id="addService" type="button">+ Ajouter</button></div><div id="settingsServiceList" class="settings-service-list"></div></section>
+      <section class="settings-page" data-settings-content="supplements" hidden><div class="settings-heading"><div><h3>Natures de supplément</h3><p>La nature et le montant sont figés dans chaque rendez-vous.</p></div><button class="small-action" id="addSupplementType" type="button">+ Ajouter</button></div><div id="settingsSupplementList" class="settings-service-list"></div></section>
+      <section class="settings-page" data-settings-content="clients" hidden><div class="settings-heading"><div><h3>Repères clientes</h3><p>Un symbole et une couleur, visibles dans l’agenda.</p></div><button class="small-action" id="addBadge" type="button">+ Ajouter</button></div><div id="settingsBadgeList" class="settings-service-list"></div><div class="settings-card"><h3>Annulations tardives</h3><label class="field">Proposer un repère après<input id="lateCancellationThreshold" type="number" min="1" max="20" inputmode="numeric"></label><label class="check-field"><input id="lateCancellationPromptEnabled" type="checkbox"><span><strong>Afficher la proposition</strong><small>Le repère ne sera jamais appliqué automatiquement.</small></span></label><button id="saveClientSettings" class="primary-button full-width" type="button">Enregistrer</button></div></section>
+      <section class="settings-page" data-settings-content="payments" hidden><div class="settings-card"><h3>Paiements</h3><p>Un nouveau rendez-vous reste « À vérifier ». La fin de journée permet de le passer à Payé ou À régler avec une date de relance.</p></div><div class="settings-card"><h3>Bilans</h3><p>Les vues semaine, mois et année additionnent le prix de base et tous les suppléments. Le CSV s’ouvre dans Excel.</p><button id="settingsOpenReport" class="secondary-button full-width" type="button">Ouvrir le bilan</button></div></section>
+      <section class="settings-page" data-settings-content="reminders" hidden><div class="settings-card"><h3>Rappel de sauvegarde</h3><label class="field">Me le rappeler après<select id="backupReminderDays"><option value="3">3 jours</option><option value="7">7 jours</option><option value="14">14 jours</option><option value="30">30 jours</option></select></label><button id="saveReminderSettings" class="primary-button full-width" type="button">Enregistrer</button></div></section>
+      <section class="settings-page backup-section" data-settings-content="data" hidden><h3>Sauvegarde locale</h3><p class="backup-status" id="backupStatus"></p><p class="small-copy">Tout est inclus : clientes, rendez-vous, paiements, suppléments, repères, indisponibilités et réglages. Ne place jamais ce fichier dans ton dépôt GitHub public.</p><button type="button" class="primary-button full-width" id="exportData">Sauvegarder dans Fichiers</button><label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json,.json"></label><button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button><button type="button" class="secondary-button full-width" id="undoMigration" hidden>Récupérer les données d’avant la mise à jour</button><div class="storage-status" id="storageStatus"></div></section>
+      <section class="settings-page" data-settings-content="about" hidden><div class="settings-card"><h3>Mon agenda</h3><p id="aboutVersion"></p><p>Application personnelle hors ligne. Les données métier restent dans le navigateur de cet appareil et ne sont pas envoyées à GitHub.</p><p class="small-copy">Le verrouillage de l’iPhone protège l’accès. Aucun mot de passe supplémentaire n’est ajouté dans l’application.</p></div></section>
+    </div></dialog>
 
-    <dialog id="quickAddDialog" class="modal quick-add-modal">
-      <div>
-        <div class="modal-heading"><div><p class="eyebrow">Nouvel élément</p><h2>Que veux-tu ajouter ?</h2></div><button type="button" class="close-button" data-close="quickAddDialog" aria-label="Fermer">×</button></div>
-        <p id="quickAddWhen" class="quick-add-when"></p>
-        <div class="quick-add-actions">
-          <button type="button" class="quick-add-choice primary" id="quickAddAppointment"><span>＋</span><span><strong>Nouveau rendez-vous</strong><small>Cliente, prestation et paiement</small></span></button>
-          <button type="button" class="quick-add-choice" id="quickAddBlock"><span>⊘</span><span><strong>Ajouter une indisponibilité</strong><small>Repos, congé, déplacement ou formation</small></span></button>
-        </div>
-      </div>
-    </dialog>
-
-    <dialog id="routeDialog" class="modal">
-      <div>
-        <div class="modal-heading"><div><p class="eyebrow">Adresses du jour</p><h2>Ma tournée</h2></div><button type="button" class="close-button" data-close="routeDialog" aria-label="Fermer">×</button></div>
-        <p id="routeDate" class="small-copy"></p>
-        <section id="routeList" class="route-list"></section>
-      </div>
-    </dialog>
-
-    <dialog id="todoDialog" class="modal">
-      <div>
-        <div class="modal-heading"><h2 id="todoTitle">À faire</h2><button type="button" class="close-button" data-close="todoDialog" aria-label="Fermer">×</button></div>
-        <section id="todoList" class="todo-list"></section>
-      </div>
-    </dialog>
-
-    <dialog id="dayReviewDialog" class="modal day-review-modal">
-      <div>
-        <div class="modal-heading"><div><p class="eyebrow">Encaissements</p><h2>Clôture de journée</h2></div><button type="button" class="close-button" data-close="dayReviewDialog" aria-label="Fermer">×</button></div>
-        <div class="period-nav review-nav">
-          <button class="round-button" id="previousReviewDay" aria-label="Jour précédent">‹</button>
-          <strong id="reviewDateLabel"></strong>
-          <button class="round-button" id="nextReviewDay" aria-label="Jour suivant">›</button>
-        </div>
-        <section id="reviewDaySummary" class="day-summary"></section>
-        <section id="reviewAppointmentList" class="review-appointment-list"></section>
-      </div>
-    </dialog>
-
-    <dialog id="clientDialog" class="modal">
-      <form id="clientForm">
-        <div class="modal-heading"><h2>Fiche cliente</h2><button type="button" class="close-button" data-close="clientDialog" aria-label="Fermer">×</button></div>
-        <input id="profileKey" type="hidden">
-        <label class="field">Nom<input id="profileName" required></label>
-        <label class="field">Téléphone<input id="profilePhone" inputmode="tel"></label>
-        <label class="field">Adresse<input id="profileAddress"></label>
-        <button class="route-button" type="button" id="profileWaze" hidden><span>⌖</span> Itinéraire</button>
-        <label class="field">Notes cliente<textarea id="profileNotes" rows="3" placeholder="Préférences, allergies, informations utiles…"></textarea></label>
-        <section id="clientStats" class="client-stats"></section>
-        <section id="clientHistory" class="client-history"></section>
-        <div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div>
-      </form>
-    </dialog>
-
-    <dialog id="settingsDialog" class="modal settings-modal">
-      <div>
-        <div class="modal-heading"><div><h2>Réglages</h2><p class="app-version" id="appVersionLabel"></p></div><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
-        <section class="settings-section">
-          <div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires seront grisés, mais restent possibles exceptionnellement.</p></div><button class="small-action" id="applyWeekdayHours" type="button">Préremplir 9h–19h</button></div>
-          <div id="workingHoursEditor" class="working-hours-editor"></div>
-          <button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer les horaires</button>
-        </section>
-        <section class="settings-section">
-          <div class="settings-heading"><div><h3>Prestations</h3><p>Le prix et la durée se remplissent automatiquement lors d’un rendez-vous.</p></div><button class="small-action" id="addService" type="button">+ Ajouter</button></div>
-          <div id="settingsServiceList" class="settings-service-list"></div>
-        </section>
-        <section class="settings-section backup-section">
-          <h3>Sauvegarde</h3>
-          <p class="backup-status" id="backupStatus"></p>
-          <p class="small-copy">Les sauvegardes des anciennes versions sont adaptées automatiquement aux nouvelles fonctions lors de la restauration.</p>
-          <button type="button" class="primary-button full-width" id="exportData">Sauvegarder dans Fichiers</button>
-          <label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json"></label>
-          <button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button>
-          <button type="button" class="secondary-button full-width" id="undoMigration" hidden>Récupérer les données d’avant la mise à jour</button>
-        </section>
-      </div>
-    </dialog>
-
-    <dialog id="assistantDialog" class="modal assistant-modal" aria-labelledby="assistantDialogTitle" aria-describedby="assistantDialogHelp">
-      <div class="assistant-dialog-body">
-        <div class="modal-heading assistant-heading">
-          <div class="assistant-heading-title">
-            <span class="assistant-avatar" aria-hidden="true">✦</span>
-            <div><p class="eyebrow">Assistant personnel</p><h2 id="assistantDialogTitle">Que veux-tu faire ?</h2></div>
-          </div>
-          <button type="button" class="close-button" data-close="assistantDialog" aria-label="Fermer l’assistant">×</button>
-        </div>
-        <p id="assistantDialogHelp" class="assistant-help">Demande-moi un rendez-vous, un créneau libre ou le résumé de ta journée. Je te fais toujours confirmer avant de modifier l’agenda.</p>
-        <section id="assistantMessages" class="assistant-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation avec l’assistant">
-          <div class="assistant-message assistant">Bonjour ! Tu peux me parler ou m’écrire. Que puis-je faire pour toi ?</div>
-        </section>
-        <div class="assistant-starters" aria-label="Exemples de demandes">
-          <button type="button" data-assistant-choice="Résume ma journée d’aujourd’hui">Ma journée</button>
-          <button type="button" data-assistant-choice="Trouve un créneau libre demain">Créneau libre</button>
-          <button type="button" data-assistant-choice="Affiche mes paiements à relancer">Mes relances</button>
-        </div>
-        <section id="assistantPreview" class="assistant-preview" hidden>
-          <p class="eyebrow">À confirmer</p>
-          <div id="assistantPreviewText"></div>
-          <div class="assistant-preview-actions"><button type="button" class="secondary-button" id="assistantCancel">Annuler</button><button type="button" class="primary-button" id="assistantConfirm">Confirmer</button></div>
-        </section>
-        <form id="assistantForm" class="assistant-form">
-          <label for="assistantInput">Écrire une demande</label>
-          <textarea id="assistantInput" rows="2" autocapitalize="sentences" enterkeyhint="send" placeholder="Ex. Ajoute Sarah vendredi à 14 h pour un remplissage"></textarea>
-          <div class="assistant-controls">
-            <button type="button" class="voice-button" id="assistantMic" aria-pressed="false" aria-describedby="assistantVoiceStatus">🎙 Parler</button>
-            <button type="submit" class="primary-button">Envoyer</button>
-          </div>
-          <input id="assistantVoiceReplies" type="checkbox" hidden tabindex="-1" aria-hidden="true">
-          <p class="assistant-speaking-note"><span aria-hidden="true">◉</span><span><strong>Réponse adaptée</strong> Au micro, je réponds à voix haute. Au clavier, je reste silencieux.</span></p>
-          <p id="assistantVoiceStatus" class="small-copy" role="status" aria-live="polite">Le micro reste désactivé tant que tu n’appuies pas sur « Parler ».</p>
-        </form>
-      </div>
-    </dialog>
-
-    <dialog id="serviceDialog" class="modal">
-      <form id="serviceForm">
-        <div class="modal-heading"><h2 id="serviceDialogTitle">Nouvelle prestation</h2><button type="button" class="close-button" data-close="serviceDialog" aria-label="Fermer">×</button></div>
-        <input id="serviceId" type="hidden">
-        <label class="field">Nom<input id="serviceName" required placeholder="Ex. Pose complète"></label>
-        <div class="two-columns">
-          <label class="field">Durée<select id="serviceDuration"><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="75">1 h 15</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label>
-          <label class="field">Prix (€)<input id="servicePrice" type="number" min="0" step="1" inputmode="decimal" placeholder="Optionnel"></label>
-        </div>
-        <label class="field">Couleur<select id="serviceColor"><option value="rose">Rose</option><option value="purple">Violet</option><option value="orange">Orange</option><option value="teal">Vert d’eau</option><option value="blue">Bleu</option><option value="green">Vert</option><option value="amber">Jaune</option><option value="coral">Corail</option></select></label>
-        <label class="check-field"><input id="serviceActive" type="checkbox" checked> <span><strong>Disponible à la création</strong><small>Décoche pour masquer sans perdre l’historique.</small></span></label>
-        <div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div>
-      </form>
-    </dialog>
+    <dialog id="serviceDialog" class="modal"><form id="serviceForm"><div class="modal-heading"><h2 id="serviceDialogTitle">Nouvelle prestation</h2><button type="button" class="close-button" data-close="serviceDialog" aria-label="Fermer">×</button></div><input id="serviceId" type="hidden"><label class="field">Nom<input id="serviceName" maxlength="200" required placeholder="Ex. Pose complète"></label><div class="two-columns"><label class="field">Durée<select id="serviceDuration"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="75">1 h 15</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label><label class="field">Prix (€)<input id="servicePrice" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" placeholder="Optionnel"></label></div><label class="field">Couleur<select id="serviceColor"><option value="rose">Rose</option><option value="purple">Violet</option><option value="orange">Orange</option><option value="teal">Vert d’eau</option><option value="blue">Bleu</option><option value="green">Vert</option><option value="amber">Jaune</option><option value="coral">Corail</option></select></label><label class="check-field"><input id="serviceActive" type="checkbox" checked><span><strong>Disponible à la création</strong><small>Décoche pour masquer sans perdre l’historique.</small></span></label><div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
+    <dialog id="supplementTypeDialog" class="modal"><form id="supplementTypeForm"><div class="modal-heading"><h2 id="supplementTypeTitle">Nouvelle nature</h2><button type="button" class="close-button" data-close="supplementTypeDialog" aria-label="Fermer">×</button></div><input id="supplementTypeId" type="hidden"><label class="field">Nom<input id="supplementTypeName" maxlength="80" required placeholder="Ex. Nail art"></label><label class="check-field"><input id="supplementTypeActive" type="checkbox" checked><span><strong>Disponible à la création</strong><small>Les anciens rendez-vous restent inchangés.</small></span></label><div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
+    <dialog id="badgeDialog" class="modal"><form id="badgeForm"><div class="modal-heading"><h2 id="badgeDialogTitle">Nouveau repère</h2><button type="button" class="close-button" data-close="badgeDialog" aria-label="Fermer">×</button></div><input id="badgeId" type="hidden"><label class="field">Nom<input id="badgeName" maxlength="60" required placeholder="Ex. Cliente VIP"></label><div class="two-columns"><label class="field">Symbole<select id="badgeSymbol"><option value="♥">♥ Cœur</option><option value="★">★ Étoile</option><option value="!">! Vigilance</option><option value="⏱">⏱ Horloge</option><option value="◆">◆ Losange</option><option value="✿">✿ Fleur</option></select></label><label class="field">Couleur<select id="badgeColor"><option value="#d64f7b">Rose</option><option value="#b8860b">Or</option><option value="#df7b2f">Orange</option><option value="#d95f5f">Corail</option><option value="#7059a8">Violet</option><option value="#287f78">Vert d’eau</option><option value="#356ea3">Bleu</option></select></label></div><div class="form-actions"><button id="deleteBadge" class="danger-button" type="button" hidden>Supprimer</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
+    <dialog id="lateBadgeDialog" class="modal conflict-modal"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2>Annulations tardives</h2><p id="lateBadgeText"></p><label class="field">Repère proposé<select id="lateBadgeChoice"></select></label><div class="stacked-actions"><button id="applyLateBadge" class="primary-button" type="button">Appliquer ce repère</button><button id="dismissLateBadge" class="secondary-button" type="button">Pas maintenant</button><button id="disableLateBadge" class="text-button" type="button">Ne plus proposer pour cette cliente</button></div></div></dialog>
 
     <section id="undoToast" class="undo-toast" role="status" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
-
-    <script src="assistant.js?v=11.1"></script>
-    <script src="app.js?v=11.1"></script>
+    <script src="app.js?v=12.0"></script>
   </body>
 </html>
