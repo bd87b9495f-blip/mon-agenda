@@ -1,11 +1,12 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.0 bêta';
-  const CURRENT_DATA_VERSION = 12;
+  const APP_VERSION = '12.1 bêta';
+  const CURRENT_DATA_VERSION = 13;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
-  const STATE_KEY = 'nail-planner-state-v12';
+  const STATE_KEY = 'nail-planner-state-v13';
+  const V12_KEY = 'nail-planner-state-v12';
   const V11_KEY = 'nail-planner-state-v11';
   const V10_KEY = 'nail-planner-state-v10';
   const V9_KEY = 'nail-planner-state-v9';
@@ -15,21 +16,25 @@
   const V5_KEY = 'nail-planner-state-v5';
   const LEGACY_APPOINTMENTS_KEY = 'nail-planner-v1';
   const LEGACY_PROFILES_KEY = 'nail-client-profiles-v1';
-  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v12';
+  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v13';
+  const V12_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v12';
   const V11_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v11';
   const V10_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v10';
   const V9_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v9';
   const V8_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v8';
-  const MIGRATION_SAFETY_KEY = 'nail-planner-before-migration-v12';
-  const APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v12';
+  const MIGRATION_SAFETY_KEY = 'nail-planner-before-migration-v13';
+  const APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v13';
+  const V12_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v12';
   const V11_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v11';
-  const CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v12';
-  const BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v12';
-  const CORRUPT_STATE_KEY = 'nail-planner-unreadable-state-v12';
+  const CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v13';
+  const V12_CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v12';
+  const BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v13';
+  const V12_BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v12';
+  const CORRUPT_STATE_KEY = 'nail-planner-unreadable-state-v13';
   const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
   const LIMITS = { clients: 20000, appointments: 100000, blocks: 20000, settingsItems: 500, text: 5000, shortText: 200, duration: 24 * 60, amount: 1000000 };
   const HOUR_HEIGHT = 68;
-  const WEEK_HOUR_HEIGHT = 52;
+  const WEEK_HOUR_HEIGHT = 44;
   const STATUS = {
     to_confirm: 'À confirmer', confirmed: 'Confirmé', completed: 'Terminé',
     cancelled: 'Annulé', no_show: 'Absente'
@@ -38,7 +43,7 @@
   const METHOD = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
   const CONTACT = { instagram: 'Instagram', messenger: 'Facebook / Messenger', phone: 'Téléphone / SMS', whatsapp: 'WhatsApp', other: 'Autre' };
   const COLORS = ['rose', 'purple', 'orange', 'teal', 'blue', 'green', 'amber', 'coral'];
-  const BADGE_COLORS = ['#d64f7b', '#b8860b', '#df7b2f', '#d95f5f', '#7059a8', '#287f78', '#356ea3'];
+  const BADGE_COLORS = ['#d64f7b', '#b8860b', '#df7b2f', '#d95f5f', '#8f3d55', '#7059a8', '#287f78', '#4f8a5b', '#3a8f9f', '#356ea3', '#6b7280'];
   const DAYS = [
     { key: 1, label: 'Lundi', short: 'Lun' }, { key: 2, label: 'Mardi', short: 'Mar' },
     { key: 3, label: 'Mercredi', short: 'Mer' }, { key: 4, label: 'Jeudi', short: 'Jeu' },
@@ -148,9 +153,9 @@
 
   function defaultSupplementTypes() {
     return [
-      { id: 'supp-decoration', name: 'Décorations', active: true },
-      { id: 'supp-travel-30', name: 'Déplacement +30 km', active: true },
-      { id: 'supp-other', name: 'Autre', active: true }
+      { id: 'supp-decoration', name: 'Décorations', price: '', active: true },
+      { id: 'supp-travel-30', name: 'Déplacement +30 km', price: '', active: true },
+      { id: 'supp-other', name: 'Autre', price: '', active: true }
     ];
   }
 
@@ -170,7 +175,8 @@
       if (!name || names.has(normaliseName(name))) return;
       let id = suppliedId || uuid();
       if (ids.has(id)) id = uuid();
-      result.push({ id, name, active: item?.active !== false }); ids.add(id); names.add(normaliseName(name));
+      const price = item?.price === '' || item?.price === null || item?.price === undefined ? '' : String(Math.min(LIMITS.amount, numericAmount(item.price)));
+      result.push({ id, name, price, active: item?.active !== false }); ids.add(id); names.add(normaliseName(name));
     });
     return result.length ? result : defaultSupplementTypes();
   }
@@ -279,7 +285,7 @@
     const inspectText = raw => Object.values(raw || {}).some(value => textTooLong(value));
     if (clients.some(inspectText) || blocks.some(inspectText) || appointments.some(raw => inspectText(raw) || (raw?.supplements || []).some(inspectText) || (raw?.history || []).some(inspectText))) throw new Error('INVALID_TEXT_LENGTH');
     if (appointments.some(raw => raw?.duration !== undefined && (!Number.isFinite(Number(raw.duration)) || Number(raw.duration) < 15 || Number(raw.duration) > LIMITS.duration))) throw new Error('INVALID_DURATION');
-    if (appointments.some(raw => numericAmount(raw?.price) > LIMITS.amount || (raw?.supplements || []).some(item => numericAmount(item?.amount) > LIMITS.amount))) throw new Error('INVALID_AMOUNT');
+    if (appointments.some(raw => numericAmount(raw?.price) > LIMITS.amount || (raw?.supplements || []).some(item => numericAmount(item?.amount) > LIMITS.amount)) || (settings.supplementTypes || []).some(item => numericAmount(item?.price) > LIMITS.amount)) throw new Error('INVALID_AMOUNT');
   }
 
   function migrateState(source, legacyProfiles = {}, options = {}) {
@@ -329,7 +335,7 @@
       const serviceIds = rawSettings.services.map(service => String(service?.id || '').trim()).filter(Boolean);
       if (rawSettings.services.some(service => !String(service?.name || '').trim()) || new Set(serviceIds).size !== serviceIds.length) throw new Error('INVALID_SERVICE');
     }
-    const services = normaliseServices(rawSettings.services, { addDefaults: Number(data.version || 0) < CURRENT_DATA_VERSION });
+    const services = normaliseServices(rawSettings.services, { addDefaults: Number(data.version || 0) < 12 });
     const serviceByName = name => services.find(service => normaliseName(service.name) === normaliseName(name));
     const ensureService = (name, duration, price, color) => {
       const found = serviceByName(name);
@@ -430,13 +436,22 @@
       }
     }
     const candidates = [
-      [11, V11_KEY], [10, V10_KEY], [9, V9_KEY], [8, V8_KEY], [7, V7_KEY], [6, V6_KEY], [5, V5_KEY]
+      [12, V12_KEY], [11, V11_KEY], [10, V10_KEY], [9, V9_KEY], [8, V8_KEY], [7, V7_KEY], [6, V6_KEY], [5, V5_KEY]
     ];
     for (const [version, key] of candidates) {
-      const state = safeJson(key, null);
-      if (!hasStoredState(state)) continue;
-      preserveBeforeMigration(state, version);
-      return migrateState(state);
+      let raw = null;
+      try { raw = localStorage.getItem(key); } catch {}
+      if (raw === null) continue;
+      try {
+        const state = JSON.parse(raw);
+        if (!hasStoredState(state)) throw new Error('INVALID_LEGACY_STATE');
+        const migrated = migrateState(state, {}, { strict: true });
+        preserveBeforeMigration(state, version);
+        return migrated;
+      } catch {
+        try { localStorage.setItem(`nail-planner-unreadable-state-v${version}`, raw); } catch {}
+        startupLoadWarning ||= `Les données de la version ${version} étaient illisibles. Une copie plus ancienne a été recherchée sans supprimer la copie abîmée.`;
+      }
     }
     const legacyAppointments = safeJson(LEGACY_APPOINTMENTS_KEY, []), legacyProfiles = safeJson(LEGACY_PROFILES_KEY, {});
     if (legacyAppointments.length || Object.keys(legacyProfiles).length) preserveBeforeMigration({ appointments: legacyAppointments, clientProfiles: legacyProfiles }, 1);
@@ -455,7 +470,8 @@
       appointmentSaving: false, blockSaving: false, clientSaving: false, serviceSaving: false, supplementSaving: false, badgeSaving: false, undo: null, undoTimer: null,
       updateRegistration: null, reloadingForUpdate: false, settingsPage: 'home', settingsDirty: false,
       editingSupplementTypeId: null, editingBadgeId: null, pendingLateBadgeClientId: null,
-      appointmentDraftBaseline: '', clientDraftBaseline: '', blockDraftBaseline: ''
+      appointmentDraftBaseline: '', clientDraftBaseline: '', blockDraftBaseline: '',
+      formBaselines: {}, pendingUnsavedClose: null, reviewFinancialDraft: null
     }
   };
   const cloneState = state => JSON.parse(JSON.stringify(state));
@@ -500,20 +516,20 @@
   const draftSignature = draft => JSON.stringify({ ...draft, savedAt: undefined });
 
   function appointmentDraft() {
-    const draft = safeJson(APPOINTMENT_DRAFT_KEY, null) || safeJson(V11_APPOINTMENT_DRAFT_KEY, null);
+    const draft = safeJson(APPOINTMENT_DRAFT_KEY, null) || safeJson(V12_APPOINTMENT_DRAFT_KEY, null) || safeJson(V11_APPOINTMENT_DRAFT_KEY, null);
     if (!draft || draft.version !== 1 || !draft.values || typeof draft.values !== 'object') return null;
     return draft;
   }
 
   function clearAppointmentDraft() {
-    try { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); } catch {}
+    try { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); } catch {}
     renderDraftNotice();
   }
 
   function clearAllFormDrafts() {
     try {
-      localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY);
-      localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(BLOCK_DRAFT_KEY);
+      localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY);
+      localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY);
     } catch {}
     renderDraftNotice();
   }
@@ -529,7 +545,7 @@
   }
 
   function renderDraftNotice() {
-    const candidates = [appointmentDraft(), safeJson(CLIENT_DRAFT_KEY, null), safeJson(BLOCK_DRAFT_KEY, null)].filter(draft => draft?.savedAt && draft?.values).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+    const candidates = [appointmentDraft(), clientFormDraft(), blockFormDraft()].filter(draft => draft?.savedAt && draft?.values).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
     const draft = candidates[0], target = $('#draftNotice');
     if (!target) return;
     target.hidden = !draft;
@@ -562,6 +578,9 @@
     return { id: $('#profileKey').value, name: $('#profileName').value, phone: $('#profilePhone').value, contactVia: $('#profileContactVia').value, badgeId: $('#profileBadge').value, address: $('#profileAddress').value, notes: $('#profileNotes').value };
   }
 
+  const clientFormDraft = () => safeJson(CLIENT_DRAFT_KEY, null) || safeJson(V12_CLIENT_DRAFT_KEY, null);
+  const blockFormDraft = () => safeJson(BLOCK_DRAFT_KEY, null) || safeJson(V12_BLOCK_DRAFT_KEY, null);
+
   function saveClientDraft() {
     if (!$('#clientDialog').open) return;
     const values = clientDraftValues();
@@ -577,21 +596,119 @@
   }
 
   function clearFormDraft(kind = app.ui.draftNoticeKind) {
-    try { if (kind === 'client') localStorage.removeItem(CLIENT_DRAFT_KEY); else if (kind === 'block') localStorage.removeItem(BLOCK_DRAFT_KEY); else { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); } } catch {}
+    try {
+      if (kind === 'client') { localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); }
+      else if (kind === 'block') { localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY); }
+      else { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); }
+    } catch {}
     renderDraftNotice();
   }
 
   function resumeLatestDraft() {
     const kind = app.ui.draftNoticeKind;
     if (kind === 'client') {
-      const draft = safeJson(CLIENT_DRAFT_KEY, null), client = clientById(draft?.values?.id); if (!draft || !client) { clearFormDraft('client'); return; }
+      const draft = clientFormDraft(), client = clientById(draft?.values?.id); if (!draft || !client) { clearFormDraft('client'); return; }
       openClient(client.id); $('#profileName').value = draft.values.name; $('#profilePhone').value = draft.values.phone; $('#profileContactVia').value = draft.values.contactVia; $('#profileBadge').value = draft.values.badgeId; $('#profileAddress').value = draft.values.address; $('#profileNotes').value = draft.values.notes; return;
     }
     if (kind === 'block') {
-      const draft = safeJson(BLOCK_DRAFT_KEY, null), values = draft?.values; if (!values) { clearFormDraft('block'); return; }
+      const draft = blockFormDraft(), values = draft?.values; if (!values) { clearFormDraft('block'); return; }
       const existing = app.state.blocks.find(block => block.id === values.id); openBlock(existing || null, { date: values.startDate, time: values.startTime }); app.ui.editingBlockId = existing?.id || null; $('#blockId').value = values.id || existing?.id || $('#blockId').value; $('#blockAllDay').checked = values.allDay; $('#blockAllDayDate').value = values.startDate; $('#blockStartDate').value = values.startDate; $('#blockStartTime').value = values.startTime; $('#blockEndDate').value = values.endDate; $('#blockEndTime').value = values.endTime; $('#blockReason').value = values.reason; $('#blockAddress').value = values.address; $('#blockNotes').value = values.notes; syncBlockAllDay(); return;
     }
     resumeAppointmentDraft();
+  }
+
+  function formSignature(form) {
+    if (!form) return '';
+    return JSON.stringify([...form.elements].filter(element => !['button', 'submit', 'reset'].includes(element.type)).map((element, index) => ({
+      key: element.id || element.name || String(index), type: element.type || element.tagName,
+      value: element.type === 'checkbox' || element.type === 'radio' ? Boolean(element.checked) : String(element.value ?? '')
+    })));
+  }
+
+  function captureFormBaseline(dialogId) {
+    const form = $(`#${dialogId}`)?.querySelector('form');
+    if (form) app.ui.formBaselines[dialogId] = formSignature(form);
+  }
+
+  function formHasChanges(dialogId) {
+    if (dialogId === 'settingsDialog') return app.ui.settingsDirty;
+    if (dialogId === 'dayReviewDialog') return false;
+    const form = $(`#${dialogId}`)?.querySelector('form'), baseline = app.ui.formBaselines[dialogId];
+    return Boolean(form && baseline !== undefined && formSignature(form) !== baseline);
+  }
+
+  function saveDraftForDialog(dialogId) {
+    if (dialogId === 'appointmentDialog') saveAppointmentDraft();
+    else if (dialogId === 'clientDialog') saveClientDraft();
+    else if (dialogId === 'blockDialog') saveBlockDraft();
+  }
+
+  function discardDraftForDialog(dialogId) {
+    if (dialogId === 'appointmentDialog') clearAppointmentDraft();
+    else if (dialogId === 'clientDialog') clearFormDraft('client');
+    else if (dialogId === 'blockDialog') clearFormDraft('block');
+  }
+
+  function afterDialogClosed(dialogId) {
+    delete app.ui.formBaselines[dialogId];
+    if (dialogId === 'settingsDialog') { app.ui.settingsDirty = false; showSettingsPage('home', true); renderScreen(); }
+    if (dialogId === 'dayReviewDialog') { app.ui.reviewFinancialDraft = null; app.ui.reviewPendingId = null; }
+    if (dialogId === 'reviewFinancialDialog') app.ui.reviewFinancialDraft = null;
+    if (dialogId === 'conflictDialog') { app.ui.pendingDraft = null; setAppointmentSaving(false); }
+    if (dialogId === 'duplicateClientDialog') { app.ui.pendingDuplicate = null; setAppointmentSaving(false); }
+  }
+
+  function closeDialogNow(dialogId, discard = false) {
+    const dialog = $(`#${dialogId}`); if (!dialog?.open) return;
+    if (discard) discardDraftForDialog(dialogId);
+    dialog.close(); afterDialogClosed(dialogId);
+  }
+
+  function requestDialogClose(dialogId) {
+    const dialog = $(`#${dialogId}`); if (!dialog?.open) return;
+    if (!formHasChanges(dialogId)) { closeDialogNow(dialogId); return; }
+    saveDraftForDialog(dialogId);
+    app.ui.pendingUnsavedClose = { dialogId };
+    const labels = { appointmentDialog: 'ce rendez-vous', clientDialog: 'cette fiche cliente', blockDialog: 'cette indisponibilité', serviceDialog: 'cette prestation', supplementTypeDialog: 'ce supplément', badgeDialog: 'ce repère', settingsDialog: 'ces réglages', reviewFinancialDialog: 'cet ajustement de tarif' };
+    $('#unsavedChangesText').textContent = `Enregistrer les modifications de ${labels[dialogId] || 'cette saisie'} avant de fermer ?`;
+    if (!$('#unsavedChangesDialog').open) $('#unsavedChangesDialog').showModal();
+  }
+
+  function saveSettingsBeforeClose() {
+    const buttonByPage = { agenda: '#saveWorkingHours', clients: '#saveClientSettings', reminders: '#saveReminderSettings' };
+    const button = $(buttonByPage[app.ui.settingsPage]);
+    if (!button) return false;
+    button.click();
+    return !app.ui.settingsDirty;
+  }
+
+  function requestSettingsPageChange(page) {
+    app.ui.pendingUnsavedClose = { dialogId: 'settingsDialog', settingsTarget: page };
+    $('#unsavedChangesText').textContent = 'Enregistrer les modifications de ces réglages avant de changer de rubrique ?';
+    if (!$('#unsavedChangesDialog').open) $('#unsavedChangesDialog').showModal();
+  }
+
+  function resolveUnsavedClose(action) {
+    const pending = app.ui.pendingUnsavedClose, prompt = $('#unsavedChangesDialog');
+    if (prompt.open) prompt.close();
+    if (!pending) return;
+    if (action === 'continue') { app.ui.pendingUnsavedClose = null; return; }
+    const { dialogId, settingsTarget } = pending; app.ui.pendingUnsavedClose = null;
+    if (action === 'discard') {
+      if (settingsTarget) { app.ui.settingsDirty = false; showSettingsPage(settingsTarget, true); return; }
+      closeDialogNow(dialogId, true); return;
+    }
+    if (dialogId === 'settingsDialog') {
+      if (!saveSettingsBeforeClose()) return;
+      if (settingsTarget) showSettingsPage(settingsTarget, true); else closeDialogNow(dialogId);
+      return;
+    }
+    $(`#${dialogId}`)?.querySelector('form')?.requestSubmit();
+  }
+
+  function hasOpenUnsavedChanges() {
+    return ['appointmentDialog', 'clientDialog', 'blockDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog']
+      .some(dialogId => $(`#${dialogId}`)?.open && formHasChanges(dialogId));
   }
 
   const clientById = id => app.state.clients.find(client => client.id === id) || null;
@@ -834,12 +951,16 @@
 
   function renderFullWeekView() {
     const dates = Array.from({ length: 7 }, (_, index) => addDays(app.ui.weekStart, index));
-    const appointments = dates.flatMap(date => activeAppointmentsForDate(dateKey(date)));
-    const blocks = [...new Map(dates.flatMap(date => blocksOnDate(date)).map(block => [block.id, block])).values()];
+    const weekDays = dates.map(date => {
+      const key = dateKey(date);
+      return { date, key, meta: dateMeta(date), hours: workHoursFor(date), appointments: appointmentsForDate(key), blocks: blocksOnDate(date) };
+    });
+    const appointments = weekDays.flatMap(day => day.appointments.filter(activeAppointment));
+    const blocks = [...new Map(weekDays.flatMap(day => day.blocks).map(block => [block.id, block])).values()];
     const minutes = appointments.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0), planned = appointments.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     $('#weekPeriodLabel').textContent = weekLabel(app.ui.weekStart);
     $('#weekSummary').innerHTML = `<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${blocks.length ? `<span class="block-summary">⊘ ${blocks.length} bloqué${blocks.length > 1 ? 's' : ''}</span>` : ''}`;
-    $('#weekSchedule').innerHTML = buildWeekTimeline(dates);
+    $('#weekSchedule').innerHTML = buildWeekTimeline(dates, weekDays);
   }
 
   function weekHorizontalStyle(layout = { column: 0, columns: 1 }) {
@@ -862,45 +983,71 @@
     return pieces.join('');
   }
 
-  function buildWeekTimeline(dates) {
-    const timedSegments = dates.flatMap(date => blocksOnDate(date).filter(block => !block.allDay).map(block => ({ date, block, segment: blockSegment(block, date) })));
-    const allAppointments = dates.flatMap(date => appointmentsForDate(dateKey(date)));
+  function buildWeekTimeline(dates, suppliedDays = null) {
+    const days = suppliedDays || dates.map(date => {
+      const key = dateKey(date);
+      return { date, key, meta: dateMeta(date), hours: workHoursFor(date), appointments: appointmentsForDate(key), blocks: blocksOnDate(date) };
+    });
+    const timedSegments = days.flatMap(day => day.blocks.filter(block => !block.allDay).map(block => ({ ...day, block, segment: blockSegment(block, day.date) })).filter(item => item.segment));
+    const allAppointments = days.flatMap(day => day.appointments);
     const starts = allAppointments.map(appointment => toMinutes(appointment.time)).concat(timedSegments.map(item => item.segment.startMinutes));
     const ends = allAppointments.map(appointment => toMinutes(appointment.time) + Number(appointment.duration || 0)).concat(timedSegments.map(item => item.segment.endMinutes));
-    if (dates.some(date => sameDay(date, new Date()))) { const now = new Date().getHours() * 60 + new Date().getMinutes(); starts.push(now); ends.push(now); }
-    const firstHour = Math.max(0, Math.floor(Math.min(8 * 60, ...starts) / 60));
-    const lastHour = Math.min(24, Math.ceil(Math.max(20 * 60, ...ends) / 60));
+    days.forEach(day => {
+      if (!day.hours.enabled || !validTime(day.hours.start) || !validTime(day.hours.end)) return;
+      starts.push(toMinutes(day.hours.start)); ends.push(toMinutes(day.hours.end));
+    });
+    const earliest = starts.length ? starts.reduce((minimum, value) => Math.min(minimum, value), starts[0]) : 9 * 60;
+    const latest = ends.length ? ends.reduce((maximum, value) => Math.max(maximum, value), ends[0]) : 19 * 60;
+    const firstHour = Math.max(0, Math.floor(earliest / 60));
+    const lastHour = Math.min(24, Math.ceil(latest / 60));
     const totalHours = Math.max(1, lastHour - firstHour), height = totalHours * WEEK_HOUR_HEIGHT;
-    const header = dates.map(date => {
-      const meta = dateMeta(date);
-      return `<button class="week-day-header ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''} ${sameDay(date, new Date()) ? 'today' : ''}" data-open-day="${dateKey(date)}"><span>${format(date, { weekday: 'short' }).slice(0, 3)}</span><strong>${date.getDate()}</strong>${meta.holiday ? '<small>Férié</small>' : ''}</button>`;
+    const header = days.map(day => {
+      const { date, key, meta } = day, flag = meta.holiday ? 'Férié' : meta.weekend ? 'WE' : '';
+      const label = `Ouvrir ${format(date, { weekday: 'long', day: 'numeric', month: 'long' })}${meta.holiday ? `, jour férié ${meta.holiday.label}` : meta.weekend ? ', week-end' : ''}`;
+      return `<button class="week-day-header ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''} ${sameDay(date, new Date()) ? 'today' : ''}" data-open-day="${key}" aria-label="${escapeHtml(label)}"><span>${format(date, { weekday: 'short' }).slice(0, 3)}</span><strong>${date.getDate()}</strong>${flag ? `<small class="week-day-flag">${flag}</small>` : ''}</button>`;
     }).join('');
-    const allDay = dates.map(date => {
-      const meta = dateMeta(date), blocks = blocksOnDate(date).filter(block => block.allDay);
-      const content = `${meta.holiday ? `<span class="week-holiday-chip" title="${escapeHtml(meta.holiday.label)}">${escapeHtml(meta.holiday.label)}</span>` : ''}${blocks.map(block => `<button class="week-all-day-block" data-edit-block="${escapeHtml(block.id)}" title="${escapeHtml(block.reason)}">⊘ ${escapeHtml(block.reason)}</button>`).join('')}`;
+    const allDay = days.map(day => {
+      const { meta } = day, blocks = day.blocks.filter(block => block.allDay);
+      const content = `${meta.holiday ? `<span class="week-holiday-chip" title="${escapeHtml(meta.holiday.label)}">${escapeHtml(meta.holiday.label)}</span>` : ''}${blocks.map(block => `<button class="week-all-day-block" data-edit-block="${escapeHtml(block.id)}" title="${escapeHtml(block.reason)}" aria-label="Indisponibilité : ${escapeHtml(block.reason)}">⊘ ${escapeHtml(block.reason)}</button>`).join('')}`;
       return `<div class="week-all-day-cell ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}">${content}</div>`;
     }).join('');
     const hourLabels = Array.from({ length: totalHours + 1 }, (_, index) => `<span style="top:${index * WEEK_HOUR_HEIGHT}px">${pad(firstHour + index)}h</span>`).join('');
-    const lanes = dates.map(date => {
-      const key = dateKey(date), meta = dateMeta(date), dayAppointments = appointmentsForDate(key), layouts = appointmentLayouts(dayAppointments);
-      const slots = Array.from({ length: totalHours }, (_, index) => `<button class="week-empty-slot" data-create-date="${key}" data-create-time="${pad(firstHour + index)}:00" style="top:${index * WEEK_HOUR_HEIGHT}px;height:${WEEK_HOUR_HEIGHT}px" aria-label="Ajouter un élément ${format(date, { weekday: 'long', day: 'numeric' })} à ${pad(firstHour + index)} heures"></button>`).join('');
-      const blockHtml = blocksOnDate(date).filter(block => !block.allDay).map(block => {
+    const lanes = days.map(day => {
+      const { date, key, meta } = day, dayAppointments = day.appointments, layouts = appointmentLayouts(dayAppointments);
+      const slots = Array.from({ length: totalHours * 2 }, (_, index) => {
+        const minutes = firstHour * 60 + index * 30, time = timeText(minutes);
+        return `<button class="week-empty-slot" data-create-date="${key}" data-create-time="${time}" style="top:${index * WEEK_HOUR_HEIGHT / 2}px;height:${WEEK_HOUR_HEIGHT / 2}px" aria-label="Ajouter un élément ${format(date, { weekday: 'long', day: 'numeric' })} à ${time}"></button>`;
+      }).join('');
+      const blockHtml = day.blocks.filter(block => !block.allDay).map(block => {
         const segment = blockSegment(block, date), start = Math.max(firstHour * 60, segment.startMinutes), end = Math.min(lastHour * 60, segment.endMinutes);
         if (end <= start) return '';
-        const top = ((start - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT, blockHeight = Math.max(20, ((end - start) / 60) * WEEK_HOUR_HEIGHT - 2);
-        return `<button class="week-blocked-block" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${blockHeight}px" title="${escapeHtml(block.reason)}">⊘</button>`;
+        const top = ((start - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT, blockHeight = Math.max(18, ((end - start) / 60) * WEEK_HOUR_HEIGHT - 2);
+        return `<button class="week-blocked-block" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${blockHeight}px" title="${escapeHtml(block.reason)}" aria-label="Indisponibilité : ${escapeHtml(block.reason)}"><span>⊘</span><small>${escapeHtml(block.reason)}</small></button>`;
       }).join('');
       const appointmentHtml = dayAppointments.map(appointment => {
         const client = clientFor(appointment), firstName = client.name.trim().split(/\s+/)[0] || client.name;
         const top = ((toMinutes(appointment.time) - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT;
-        const appointmentHeight = Math.max(24, (Number(appointment.duration || 0) / 60) * WEEK_HOUR_HEIGHT - 2), layout = layouts.get(appointment.id);
-        return `<button class="week-appointment ${serviceTheme(appointment)} ${!activeAppointment(appointment) ? 'inactive' : ''} ${hasAppointmentConflict(appointment) ? 'conflicted' : ''}" data-edit="${escapeHtml(appointment.id)}" style="top:${top}px;height:${appointmentHeight}px;${weekHorizontalStyle(layout)}" aria-label="${appointment.time}, ${escapeHtml(client.name)}, ${escapeHtml(appointment.service)}"><span>${appointment.time}</span><strong>${badgeHtml(client, 'planning')}${escapeHtml(firstName)}</strong></button>`;
+        const appointmentHeight = Math.max(19, (Number(appointment.duration || 0) / 60) * WEEK_HOUR_HEIGHT - 2), layout = layouts.get(appointment.id);
+        const conflicted = hasAppointmentConflict(appointment), compactTime = appointment.time;
+        return `<button class="week-appointment ${serviceTheme(appointment)} ${Number(appointment.duration || 0) <= 30 ? 'micro' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${!activeAppointment(appointment) ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" data-edit="${escapeHtml(appointment.id)}" style="top:${top}px;height:${appointmentHeight}px;${weekHorizontalStyle(layout)}" aria-label="${appointment.time}, ${escapeHtml(client.name)}, ${escapeHtml(appointment.service)}"><span class="week-appointment-time">${compactTime}</span><strong class="week-appointment-name">${escapeHtml(firstName)}</strong>${badgeHtml(client, 'week')}${conflicted ? '<span class="week-conflict-marker" aria-hidden="true">!</span>' : ''}</button>`;
       }).join('');
       const now = sameDay(date, new Date()) ? toMinutes(`${pad(new Date().getHours())}:${pad(new Date().getMinutes())}`) : -1;
       const nowLine = now >= firstHour * 60 && now <= lastHour * 60 ? `<span id="weekCurrentTimeLine" class="week-current-time" style="top:${((now - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT}px" aria-label="Heure actuelle"></span>` : '';
-      return `<div class="week-day-lane ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}" style="height:${height}px">${weekWorkShading(workHoursFor(date), firstHour, lastHour)}${slots}${blockHtml}${appointmentHtml}${nowLine}</div>`;
+      return `<div class="week-day-lane ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}" style="height:${height}px">${weekWorkShading(day.hours, firstHour, lastHour)}${slots}${blockHtml}${appointmentHtml}${nowLine}</div>`;
     }).join('');
-    return `<div class="week-grid"><div class="week-grid-header"><span class="week-corner"></span>${header}</div><div class="week-all-day-row"><span class="week-all-day-label">Jour<br>entier</span><div class="week-all-day-cells">${allDay}</div></div><div class="week-time-row"><div class="week-hour-labels" style="height:${height}px">${hourLabels}</div><div class="week-day-lanes" style="height:${height}px">${lanes}</div></div></div>`;
+    return `<div class="week-grid" data-first-hour="${firstHour}" data-last-hour="${lastHour}"><div class="week-sticky-head"><div class="week-grid-header"><span class="week-corner"></span>${header}</div><div class="week-all-day-row"><span class="week-all-day-label">Jour<br>entier</span><div class="week-all-day-cells">${allDay}</div></div></div><div class="week-time-row"><div class="week-hour-labels" style="height:${height}px">${hourLabels}</div><div class="week-day-lanes" style="height:${height}px">${lanes}</div></div></div>`;
+  }
+
+  function updateWeekCurrentTimeLine() {
+    const grid = $('#weekSchedule .week-grid'); if (!grid) return;
+    const now = new Date(), index = Array.from({ length: 7 }, (_, dayIndex) => dateKey(addDays(app.ui.weekStart, dayIndex))).indexOf(dateKey(now));
+    const firstHour = Number(grid.dataset.firstHour), lastHour = Number(grid.dataset.lastHour), minutes = now.getHours() * 60 + now.getMinutes();
+    let line = $('#weekCurrentTimeLine');
+    if (index < 0 || !Number.isFinite(firstHour) || !Number.isFinite(lastHour) || minutes < firstHour * 60 || minutes > lastHour * 60) { line?.remove(); return; }
+    const lane = $$('#weekSchedule .week-day-lane')[index]; if (!lane) return;
+    if (!line) { line = document.createElement('span'); line.id = 'weekCurrentTimeLine'; line.className = 'week-current-time'; line.setAttribute('aria-label', 'Heure actuelle'); lane.append(line); }
+    else if (line.parentElement !== lane) lane.append(line);
+    line.style.top = `${((minutes - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT}px`;
   }
 
   function blockDisplayLabel(block) {
@@ -1116,7 +1263,7 @@
     return `"${textValue.replace(/"/g, '""')}"`;
   }
 
-  function exportReportCsv() {
+  async function exportReportCsv() {
     const { start, end } = reportRange(), appointments = app.state.appointments.filter(item => { const date = parseDate(item.date); return date >= start && date < end; }).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
     const header = ['Date', 'Heure', 'Cliente', 'Téléphone', 'Contact via', 'Prestation', 'Durée (min)', 'Prix de base', 'Suppléments', 'Total', 'Statut', 'Paiement', 'Date paiement', 'Date relance'];
     const rows = appointments.map(appointment => {
@@ -1125,8 +1272,7 @@
     });
     const label = app.ui.reportMode === 'year' ? String(start.getFullYear()) : app.ui.reportMode === 'month' ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}` : dateKey(start);
     const blob = new Blob([`\ufeff${header.map(csvCell).join(';')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob), anchor = document.createElement('a');
-    anchor.href = url; anchor.download = `bilan-${app.ui.reportMode}-${label}.csv`; document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    await shareOrDownload(blob, `bilan-${app.ui.reportMode}-${label}.csv`, 'Bilan Mon agenda');
   }
 
   function renderActivityReport(inRange) {
@@ -1285,7 +1431,7 @@
       const prior = defaults.from, client = clientFor(prior); app.ui.formClientId = client.id; app.ui.formServiceColor = prior.serviceColor || 'rose';
       $('#clientName').value = client.name; $('#phone').value = client.phone; $('#contactVia').value = prior.contactVia || client.contactVia || ''; $('#address').value = appointmentAddress(prior); setDurationValue(prior.duration); $('#price').value = prior.price; renderSupplementRows(prior.supplements); populateServiceSelect(prior.serviceId, prior.service); $('#service').value = prior.service; $('#date').value = defaults.date || dateKey(app.ui.selectedDate); setTimePicker('time', defaults.time || prior.time); $('#appointmentWaze').hidden = !appointmentAddress(prior); renderSelectedClientInfo(client);
     } else { $('#date').value = defaults.date || dateKey(app.ui.selectedDate); setTimePicker('time', defaults.time || '10:00'); }
-    syncAppointmentFormMode(); updateAppointmentTotal(); updateConflictHint(); app.ui.appointmentDraftBaseline = draftSignature(appointmentDraftPayload()); $('#appointmentDialog').showModal(); if (!appointment) setTimeout(() => $('#clientName').focus(), 30);
+    syncAppointmentFormMode(); updateAppointmentTotal(); updateConflictHint(); app.ui.appointmentDraftBaseline = draftSignature(appointmentDraftPayload()); $('#appointmentDialog').showModal(); captureFormBaseline('appointmentDialog'); if (!appointment) setTimeout(() => $('#clientName').focus(), 30);
   }
 
   function renderSelectedClientInfo(client) {
@@ -1338,8 +1484,16 @@
   function addSupplementRow() {
     const active = app.state.settings.supplementTypes.find(type => type.active) || app.state.settings.supplementTypes[0];
     if (!active) { window.alert('Ajoute d’abord une nature de supplément dans les réglages.'); return; }
-    renderSupplementRows([...supplementsFromForm(true), { id: uuid(), typeId: active.id, label: active.name, amount: 0 }]);
+    renderSupplementRows([...supplementsFromForm(true), { id: uuid(), typeId: active.id, label: active.name, amount: numericAmount(active.price) }]);
     $('#supplementRows .supplement-row:last-child [data-supplement-amount]')?.focus();
+  }
+
+  function applySupplementDefaultPrice(select) {
+    const row = select?.closest?.('.supplement-row'), type = supplementTypeById(select?.value), amount = row?.querySelector?.('[data-supplement-amount]');
+    if (!row || !type || !amount) return;
+    row.dataset.fallbackLabel = type.name;
+    amount.value = type.price === '' ? '' : String(numericAmount(type.price));
+    updateAppointmentTotal();
   }
 
   function updateAppointmentTotal() {
@@ -1546,7 +1700,7 @@
       $('#blockId').value = uuid(); $('#blockAllDayDate').value = date; $('#blockStartDate').value = date; $('#blockEndDate').value = date; $('#blockStartTime').value = time; $('#blockEndTime').value = timeText(toMinutes(time) + 60);
     }
     app.ui.blockDraftBaseline = JSON.stringify(blockDraft());
-    $('#blockDialog').showModal();
+    $('#blockDialog').showModal(); captureFormBaseline('blockDialog');
   }
 
   function openQuickAdd(date = dateKey(app.ui.selectedDate), time = '10:00') {
@@ -1601,8 +1755,78 @@
   }
 
   function openDayReview(date = app.ui.selectedDate) {
-    app.ui.reviewDate = startOfDay(date); app.ui.reviewPendingId = null;
+    app.ui.reviewDate = startOfDay(date); app.ui.reviewPendingId = null; app.ui.reviewFinancialDraft = null;
     renderDayReview(); $('#dayReviewDialog').showModal();
+  }
+
+  function reviewSupplementsFromForm(keepEmpty = false) {
+    return $$('#reviewSupplementRows .supplement-row').map(row => {
+      const select = row.querySelector('[data-review-supplement-type]'), input = row.querySelector('[data-review-supplement-amount]'), type = supplementTypeById(select?.value);
+      return { id: row.dataset.supplementId || uuid(), typeId: type?.id || '', label: type?.name || row.dataset.fallbackLabel || 'Supplément', amount: numericAmount(input?.value) };
+    }).filter(item => keepEmpty || item.amount > 0);
+  }
+
+  function renderReviewSupplementRows(items = []) {
+    const target = $('#reviewSupplementRows'); if (!target) return;
+    target.innerHTML = normaliseSupplements(items).map(item => {
+      const current = supplementTypeById(item.typeId), types = app.state.settings.supplementTypes.filter(type => type.active || type.id === current?.id);
+      const legacy = !current && item.label ? `<option value="" selected>${escapeHtml(item.label)} · ancienne nature</option>` : '';
+      return `<div class="supplement-row" data-supplement-id="${escapeHtml(item.id)}" data-fallback-label="${escapeHtml(item.label)}"><label>Nature<select data-review-supplement-type>${legacy}${types.map(type => `<option value="${escapeHtml(type.id)}" ${type.id === item.typeId ? 'selected' : ''}>${escapeHtml(type.name)}</option>`).join('')}</select></label><label>Montant (€)<input data-review-supplement-amount type="number" min="0" max="1000000" step="0.01" inputmode="decimal" value="${item.amount || ''}"></label><button type="button" class="remove-supplement" data-remove-review-supplement="${escapeHtml(item.id)}" aria-label="Supprimer ce supplément">×</button></div>`;
+    }).join('');
+    updateReviewFinancialTotal();
+  }
+
+  function updateReviewFinancialTotal() {
+    const target = $('#reviewFinancialTotal'); if (!target) return;
+    const total = numericAmount($('#reviewFinancialPrice')?.value) + reviewSupplementsFromForm().reduce((sum, item) => sum + item.amount, 0);
+    target.textContent = `Total : ${money(total) || '0 €'}`;
+  }
+
+  function addReviewSupplementRow() {
+    const active = app.state.settings.supplementTypes.find(type => type.active) || app.state.settings.supplementTypes[0];
+    if (!active) { window.alert('Ajoute d’abord une nature de supplément dans les réglages.'); return; }
+    renderReviewSupplementRows([...reviewSupplementsFromForm(true), { id: uuid(), typeId: active.id, label: active.name, amount: numericAmount(active.price) }]);
+    $('#reviewSupplementRows .supplement-row:last-child [data-review-supplement-amount]')?.focus();
+  }
+
+  function applyReviewSupplementDefaultPrice(select) {
+    const row = select?.closest?.('.supplement-row'), type = supplementTypeById(select?.value), amount = row?.querySelector?.('[data-review-supplement-amount]');
+    if (!row || !type || !amount) return;
+    row.dataset.fallbackLabel = type.name; amount.value = type.price === '' ? '' : String(numericAmount(type.price)); updateReviewFinancialTotal();
+  }
+
+  function openReviewFinancialEditor(appointmentId) {
+    const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
+    const client = clientFor(appointment);
+    app.ui.reviewFinancialDraft = { appointmentId };
+    $('#reviewFinancialAppointmentId').value = appointment.id; $('#reviewFinancialPrice').value = appointment.price ?? '';
+    $('#reviewFinancialClient').textContent = `${client.name} · ${appointment.service} · ${appointment.time}–${endTime(appointment)}`;
+    renderReviewSupplementRows(appointment.supplements);
+    $('#reviewFinancialDialog').showModal(); captureFormBaseline('reviewFinancialDialog');
+  }
+
+  function saveReviewFinancials(appointmentId, suppliedPrice, suppliedSupplements) {
+    const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return false;
+    const usingForm = suppliedPrice === undefined && suppliedSupplements === undefined;
+    if (usingForm && !$('#reviewFinancialForm').reportValidity()) return false;
+    const rawPrice = usingForm ? $('#reviewFinancialPrice')?.value : suppliedPrice;
+    const price = rawPrice === '' || rawPrice === null || rawPrice === undefined ? '' : String(numericAmount(rawPrice));
+    const supplements = normaliseSupplements(usingForm ? reviewSupplementsFromForm() : suppliedSupplements);
+    const previousSupplements = normaliseSupplements(appointment.supplements);
+    if (price === appointment.price && JSON.stringify(supplements) === JSON.stringify(previousSupplements)) {
+      app.ui.reviewFinancialDraft = null;
+      if (usingForm && $('#reviewFinancialDialog')?.open) closeDialogNow('reviewFinancialDialog');
+      return true;
+    }
+    const beforeTotal = appointmentTotal(appointment), previousState = cloneState(app.state);
+    appointment.price = price; appointment.supplements = supplements; appointment.updatedAt = new Date().toISOString();
+    appendAppointmentHistory(appointment, 'financial', 'Tarif ajusté en fin de journée', `${money(beforeTotal) || '0 €'} → ${money(appointmentTotal(appointment)) || '0 €'}`);
+    if (!saveState()) { app.state = previousState; return false; }
+    offerUndo(previousState, 'Tarif du rendez-vous ajusté');
+    app.ui.reviewFinancialDraft = null; render();
+    if ($('#dayReviewDialog')?.open) renderDayReview();
+    if (usingForm && $('#reviewFinancialDialog')?.open) closeDialogNow('reviewFinancialDialog');
+    return true;
   }
 
   function renderDayReview() {
@@ -1614,7 +1838,7 @@
     $('#reviewDaySummary').innerHTML = `<span><strong>${active.length}</strong> RDV actif${active.length > 1 ? 's' : ''}</span><span><strong>${paidCount}</strong> payé${paidCount > 1 ? 's' : ''}</span><span><strong>${pendingCount}</strong> à régler</span><span class="review-summary"><strong>${reviewCount}</strong> à vérifier</span>`;
     $('#reviewAppointmentList').innerHTML = appointments.length ? appointments.map(appointment => {
       const client = clientFor(appointment), inactive = !activeAppointment(appointment), chooseReminder = !inactive && (appointment.paymentStatus === 'pending' || app.ui.reviewPendingId === appointment.id);
-      const paymentControls = inactive ? `<span class="review-inactive">${STATUS[appointment.status]}</span>` : `<div class="review-payment-actions"><button class="${appointment.paymentStatus === 'paid' ? 'active' : ''}" data-review-paid="${escapeHtml(appointment.id)}">✓ Payé</button><button class="${appointment.paymentStatus === 'pending' ? 'active' : ''}" data-review-pending="${escapeHtml(appointment.id)}">À régler</button></div>${chooseReminder ? `<div class="review-reminder-editor"><label>Date de relance<input type="date" data-review-reminder="${escapeHtml(appointment.id)}" value="${escapeHtml(appointment.paymentReminderDate || '')}"></label><button data-review-save="${escapeHtml(appointment.id)}">Enregistrer la relance</button></div>` : ''}`;
+      const paymentControls = inactive ? `<span class="review-inactive">${STATUS[appointment.status]}</span>` : `<button class="review-adjust-button" data-review-adjust="${escapeHtml(appointment.id)}">✎ Ajuster prix et suppléments</button><div class="review-payment-actions"><button class="${appointment.paymentStatus === 'paid' ? 'active' : ''}" data-review-paid="${escapeHtml(appointment.id)}">✓ Payé</button><button class="${appointment.paymentStatus === 'pending' ? 'active' : ''}" data-review-pending="${escapeHtml(appointment.id)}">À régler</button></div>${chooseReminder ? `<div class="review-reminder-editor"><label>Date de relance<input type="date" data-review-reminder="${escapeHtml(appointment.id)}" value="${escapeHtml(appointment.paymentReminderDate || '')}"></label><button data-review-save="${escapeHtml(appointment.id)}">Enregistrer la relance</button></div>` : ''}`;
       return `<article class="review-appointment ${inactive ? 'inactive' : ''}"><div class="review-appointment-heading"><button data-edit="${escapeHtml(appointment.id)}"><span>${appointment.time} – ${endTime(appointment)}</span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}</small></button><span class="service-dot ${appointment.serviceColor || 'rose'}"></span></div>${paymentControls}</article>`;
     }).join('') : '<section class="empty-message"><h2>Aucun rendez-vous</h2><p>Il n’y a rien à vérifier pour cette journée.</p></section>';
   }
@@ -1652,7 +1876,7 @@
     const stats = clientStats(client.id), history = clientHistory(client.id).slice(0, 12);
     $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.late}</strong><span>tardive${stats.late > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.paid ? `<article><strong>${money(stats.paid)}</strong><span>encaissé</span></article>` : ''}`;
     $('#clientHistory').innerHTML = `<p class="history-label">Historique</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${activeAppointment(appointment) && appointment.paymentStatus === 'unreviewed' ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' && activeAppointment(appointment) ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}`;
-    app.ui.clientDraftBaseline = JSON.stringify(clientDraftValues()); $('#clientDialog').showModal();
+    app.ui.clientDraftBaseline = JSON.stringify(clientDraftValues()); $('#clientDialog').showModal(); captureFormBaseline('clientDialog');
   }
 
   function renderWorkingHoursEditor() {
@@ -1675,7 +1899,7 @@
   }
 
   function renderSettingsSupplementList() {
-    $('#settingsSupplementList').innerHTML = app.state.settings.supplementTypes.map(type => `<button class="settings-service ${type.active ? '' : 'inactive'}" data-edit-supplement-type="${escapeHtml(type.id)}"><span class="settings-symbol">＋</span><span><strong>${escapeHtml(type.name)}</strong><small>${type.active ? 'Disponible' : 'Masquée'}</small></span><b>›</b></button>`).join('') || '<p class="small-copy">Aucune nature de supplément.</p>';
+    $('#settingsSupplementList').innerHTML = app.state.settings.supplementTypes.map(type => `<button class="settings-service ${type.active ? '' : 'inactive'}" data-edit-supplement-type="${escapeHtml(type.id)}"><span class="settings-symbol">＋</span><span><strong>${escapeHtml(type.name)}</strong><small>${type.price !== '' ? money(type.price) : 'Prix à définir'}${type.active ? ' · disponible' : ' · masquée'}</small></span><b>›</b></button>`).join('') || '<p class="small-copy">Aucune nature de supplément.</p>';
   }
 
   function renderSettingsBadgeList() {
@@ -1694,7 +1918,7 @@
   }
 
   function showSettingsPage(page = 'home', force = false) {
-    if (!force && app.ui.settingsDirty && !window.confirm('Quitter sans enregistrer les modifications de cette page ?')) return false;
+    if (!force && app.ui.settingsDirty) { requestSettingsPageChange(page); return false; }
     app.ui.settingsDirty = false; app.ui.settingsPage = page;
     $('#settingsHome').hidden = page !== 'home'; $('#settingsBack').hidden = page === 'home';
     $$('[data-settings-content]').forEach(section => { section.hidden = section.dataset.settingsContent !== page; });
@@ -1712,10 +1936,10 @@
   function openSettings() {
     renderSettingsHome(); renderWorkingHoursEditor(); renderSettingsServiceList(); renderSettingsSupplementList(); renderSettingsBadgeList();
     const last = app.state.settings.lastBackupAt ? new Date(app.state.settings.lastBackupAt) : null;
-    $('#backupStatus').textContent = last && !Number.isNaN(last.getTime()) ? `Dernier export lancé : ${format(last, { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Aucune sauvegarde exportée.';
+    $('#backupStatus').textContent = last && !Number.isNaN(last.getTime()) ? `Dernière sauvegarde exportée : ${format(last, { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Aucune sauvegarde exportée.';
     $('#appVersionLabel').textContent = `Mon agenda · version ${APP_VERSION}`;
     $('#aboutVersion').textContent = `Version ${APP_VERSION} · données v${CURRENT_DATA_VERSION}`;
-    $('#undoRestore').hidden = !safeJson(RESTORE_SAFETY_KEY, null) && !safeJson(V11_RESTORE_SAFETY_KEY, null) && !safeJson(V10_RESTORE_SAFETY_KEY, null) && !safeJson(V9_RESTORE_SAFETY_KEY, null) && !safeJson(V8_RESTORE_SAFETY_KEY, null);
+    $('#undoRestore').hidden = !safeJson(RESTORE_SAFETY_KEY, null) && !safeJson(V12_RESTORE_SAFETY_KEY, null) && !safeJson(V11_RESTORE_SAFETY_KEY, null) && !safeJson(V10_RESTORE_SAFETY_KEY, null) && !safeJson(V9_RESTORE_SAFETY_KEY, null) && !safeJson(V8_RESTORE_SAFETY_KEY, null);
     $('#undoMigration').hidden = !safeJson(MIGRATION_SAFETY_KEY, null);
     showSettingsPage('home', true); $('#settingsDialog').showModal();
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.screen === 'settings'));
@@ -1743,7 +1967,7 @@
   }
 
   function openService(service = null) {
-    app.ui.serviceSaving = false; $('#serviceForm button[type="submit"]').disabled = false; $('#serviceForm').reset(); $('#serviceId').value = service?.id || ''; $('#serviceDialogTitle').textContent = service ? 'Modifier la prestation' : 'Nouvelle prestation'; $('#serviceName').value = service?.name || ''; setDurationValue(service?.duration || 60, 'serviceDuration'); $('#servicePrice').value = service?.price ?? ''; $('#serviceColor').value = service?.color || 'rose'; $('#serviceActive').checked = service?.active !== false; $('#serviceDialog').showModal();
+    app.ui.serviceSaving = false; $('#serviceForm button[type="submit"]').disabled = false; $('#serviceForm').reset(); $('#serviceId').value = service?.id || ''; $('#serviceDialogTitle').textContent = service ? 'Modifier la prestation' : 'Nouvelle prestation'; $('#serviceName').value = service?.name || ''; setDurationValue(service?.duration || 60, 'serviceDuration'); $('#servicePrice').value = service?.price ?? ''; $('#serviceColor').value = service?.color || 'rose'; $('#serviceActive').checked = service?.active !== false; $('#serviceDialog').showModal(); captureFormBaseline('serviceDialog');
   }
 
   function saveService() {
@@ -1760,7 +1984,7 @@
   }
 
   function openSupplementType(type = null) {
-    app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; $('#supplementTypeForm').reset(); $('#supplementTypeId').value = type?.id || ''; $('#supplementTypeTitle').textContent = type ? 'Modifier la nature' : 'Nouvelle nature'; $('#supplementTypeName').value = type?.name || ''; $('#supplementTypeActive').checked = type?.active !== false; $('#supplementTypeDialog').showModal();
+    app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; $('#supplementTypeForm').reset(); $('#supplementTypeId').value = type?.id || ''; $('#supplementTypeTitle').textContent = type ? 'Modifier la nature' : 'Nouvelle nature'; $('#supplementTypeName').value = type?.name || ''; $('#supplementTypePrice').value = type?.price ?? ''; $('#supplementTypeActive').checked = type?.active !== false; $('#supplementTypeDialog').showModal(); captureFormBaseline('supplementTypeDialog');
   }
 
   function saveSupplementType() {
@@ -1768,14 +1992,15 @@
     app.ui.supplementSaving = true; $('#supplementTypeForm button[type="submit"]').disabled = true;
     const id = $('#supplementTypeId').value || uuid(), name = $('#supplementTypeName').value.trim();
     if (app.state.settings.supplementTypes.some(type => type.id !== id && normaliseName(type.name) === normaliseName(name))) { app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; window.alert('Cette nature existe déjà.'); return; }
-    const previousState = cloneState(app.state), record = { id, name, active: $('#supplementTypeActive').checked }, index = app.state.settings.supplementTypes.findIndex(type => type.id === id);
+    const rawPrice = $('#supplementTypePrice').value.trim();
+    const previousState = cloneState(app.state), record = { id, name, price: rawPrice === '' ? '' : String(numericAmount(rawPrice)), active: $('#supplementTypeActive').checked }, index = app.state.settings.supplementTypes.findIndex(type => type.id === id);
     if (index === -1) app.state.settings.supplementTypes.push(record); else app.state.settings.supplementTypes[index] = record;
     if (!saveState()) { app.state = previousState; app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; return; }
     $('#supplementTypeDialog').close(); renderSettingsSupplementList(); renderSettingsHome();
   }
 
   function openBadge(badge = null) {
-    app.ui.badgeSaving = false; $('#badgeForm button[type="submit"]').disabled = false; $('#badgeForm').reset(); $('#badgeId').value = badge?.id || ''; $('#badgeDialogTitle').textContent = badge ? 'Modifier le repère' : 'Nouveau repère'; $('#badgeName').value = badge?.name || ''; $('#badgeSymbol').value = badge?.symbol || '♥'; $('#badgeColor').value = badge?.color || '#d64f7b'; $('#deleteBadge').hidden = !badge; $('#badgeDialog').showModal();
+    app.ui.badgeSaving = false; $('#badgeForm button[type="submit"]').disabled = false; $('#badgeForm').reset(); $('#badgeId').value = badge?.id || ''; $('#badgeDialogTitle').textContent = badge ? 'Modifier le repère' : 'Nouveau repère'; $('#badgeName').value = badge?.name || ''; $('#badgeSymbol').value = badge?.symbol || '♥'; $('#badgeColor').value = badge?.color || '#d64f7b'; $('#deleteBadge').hidden = !badge; $('#badgeDialog').showModal(); captureFormBaseline('badgeDialog');
   }
 
   function saveBadge() {
@@ -1849,14 +2074,30 @@
     return `Sauvegarde du ${when} · version ${backupVersion(data)}\n${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} indisponibilité${counts.blocks > 1 ? 's' : ''}, ${counts.services} prestation${counts.services > 1 ? 's' : ''}.\nLes horaires, couleurs, prestations et autres réglages sont inclus.\n\nRemplacer les données actuelles ? Une copie de secours sera conservée sur cet appareil.`;
   }
 
-  function exportData() {
+  async function shareOrDownload(blob, filename, title) {
+    let file = null;
+    try { file = new File([blob], filename, { type: blob.type || 'application/octet-stream', lastModified: Date.now() }); } catch {}
+    let canShareFile = false;
+    try { canShareFile = Boolean(file && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })); } catch {}
+    if (canShareFile) {
+      try { await navigator.share({ files: [file], title }); return true; }
+      catch (error) { if (error?.name === 'AbortError') return false; }
+    }
+    const url = URL.createObjectURL(blob), anchor = document.createElement('a');
+    anchor.href = url; anchor.download = filename; document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  }
+
+  async function exportData() {
     const previousDate = app.state.settings.lastBackupAt, content = makeBackupPayload();
-    app.state.settings.lastBackupAt = content.exportedAt;
-    if (!saveState()) app.state.settings.lastBackupAt = previousDate;
     content.state.settings.lastBackupAt = content.exportedAt;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })), anchor = document.createElement('a');
     const now = new Date(), stamp = `${todayKey()}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    anchor.href = url; anchor.download = `sauvegarde-agenda-${stamp}.json`; document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); renderHeader(); renderSettingsHome();
+    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
+    const delivered = await shareOrDownload(blob, `sauvegarde-agenda-${stamp}.json`, 'Sauvegarde Mon agenda');
+    if (!delivered) return false;
+    app.state.settings.lastBackupAt = content.exportedAt;
+    if (!saveState()) { app.state.settings.lastBackupAt = previousDate; return false; }
+    renderHeader(); renderSettingsHome(); return true;
   }
 
   async function importData(file) {
@@ -1882,13 +2123,13 @@
   }
 
   function undoLastRestore() {
-    const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V11_RESTORE_SAFETY_KEY, null) || safeJson(V10_RESTORE_SAFETY_KEY, null) || safeJson(V9_RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
+    const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V12_RESTORE_SAFETY_KEY, null) || safeJson(V11_RESTORE_SAFETY_KEY, null) || safeJson(V10_RESTORE_SAFETY_KEY, null) || safeJson(V9_RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
     if (!backup || !window.confirm('Revenir aux données présentes juste avant la dernière restauration ?')) return;
     try {
       if (!recognisedBackup(backup) || (backup.app && backup.app !== BACKUP_APP_ID) || backupVersion(backup) > CURRENT_DATA_VERSION) throw new Error('INVALID_SAFETY_COPY');
       const restored = migrateState(backup.state || backup, backup.clientProfiles || {}, { strict: true });
       if (!saveState(restored)) return;
-      app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V11_RESTORE_SAFETY_KEY); localStorage.removeItem(V10_RESTORE_SAFETY_KEY); localStorage.removeItem(V9_RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); window.alert('Les données d’avant la restauration ont été récupérées.');
+      app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V12_RESTORE_SAFETY_KEY); localStorage.removeItem(V11_RESTORE_SAFETY_KEY); localStorage.removeItem(V10_RESTORE_SAFETY_KEY); localStorage.removeItem(V9_RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); window.alert('Les données d’avant la restauration ont été récupérées.');
     } catch { window.alert('La copie de secours locale n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); }
   }
 
@@ -1913,7 +2154,7 @@
     const worker = app.ui.updateRegistration?.waiting;
     if (!worker) return;
     saveOpenFormDrafts();
-    if ($$('dialog[open] form').length && !window.confirm('Une saisie est ouverte. Son brouillon a été enregistré. Mettre à jour maintenant ?')) return;
+    if (hasOpenUnsavedChanges()) { window.alert('Une saisie a été modifiée. Enregistre-la ou ferme-la avant d’appliquer la mise à jour.'); return; }
     app.ui.reloadingForUpdate = true; worker.postMessage({ type: 'SKIP_WAITING' });
   }
 
@@ -1929,7 +2170,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=12.0', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=12.1', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -1949,20 +2190,7 @@
 
   document.addEventListener('click', event => {
     const target = event.target.closest('button'); if (!target) return;
-    if (target.dataset.close) {
-      const dialog = $(`#${target.dataset.close}`);
-      if (target.dataset.close === 'settingsDialog') {
-        if (app.ui.settingsDirty && !window.confirm('Fermer sans enregistrer les modifications de cette page ?')) return;
-      }
-      if (target.dataset.close === 'appointmentDialog') saveAppointmentDraft();
-      if (target.dataset.close === 'clientDialog') saveClientDraft();
-      if (target.dataset.close === 'blockDialog') saveBlockDraft();
-      dialog.close();
-      if (target.dataset.close === 'settingsDialog') { app.ui.settingsDirty = false; showSettingsPage('home', true); renderScreen(); }
-      if (target.dataset.close === 'conflictDialog') { app.ui.pendingDraft = null; setAppointmentSaving(false); }
-      if (target.dataset.close === 'duplicateClientDialog') { app.ui.pendingDuplicate = null; setAppointmentSaving(false); }
-      return;
-    }
+    if (target.dataset.close) { requestDialogClose(target.dataset.close); return; }
     if (target.dataset.mode) { setMode(target.dataset.mode); return; }
     if (target.dataset.screen) { showScreen(target.dataset.screen); return; }
     if (target.dataset.reportPeriod) { app.ui.reportMode = target.dataset.reportPeriod; renderReport(); return; }
@@ -1987,7 +2215,6 @@
     if (target.id === 'exportReportCsv') { exportReportCsv(); return; }
     if (target.id === 'routeDay') { openRouteDay(); return; }
     if (target.id === 'dayReview') { openDayReview(app.ui.selectedDate); return; }
-    if (target.id === 'addBlockShortcut') { openBlock(null, { date: dateKey(app.ui.selectedDate), time: '09:00' }); return; }
     if (target.id === 'unclosedDayNotice') { const date = parseDate(target.dataset.reviewDate); if (date) openDayReview(date); return; }
     if (target.id === 'previousReviewDay') { app.ui.reviewDate = addDays(app.ui.reviewDate, -1); app.ui.reviewPendingId = null; renderDayReview(); return; }
     if (target.id === 'nextReviewDay') { app.ui.reviewDate = addDays(app.ui.reviewDate, 1); app.ui.reviewPendingId = null; renderDayReview(); return; }
@@ -2029,6 +2256,7 @@
     if (target.id === 'saveWorkingHours') { saveWorkingHours(); return; }
     if (target.id === 'addService') { openService(); return; }
     if (target.id === 'addSupplement') { addSupplementRow(); return; }
+    if (target.id === 'addReviewSupplement') { addReviewSupplementRow(); return; }
     if (target.id === 'addSupplementType') { openSupplementType(); return; }
     if (target.id === 'addBadge') { openBadge(); return; }
     if (target.id === 'deleteBadge') { deleteBadge(); return; }
@@ -2039,8 +2267,12 @@
     if (target.id === 'applyLateBadge') { settleLateBadgePrompt('apply'); return; }
     if (target.id === 'dismissLateBadge') { settleLateBadgePrompt('dismiss'); return; }
     if (target.id === 'disableLateBadge') { settleLateBadgePrompt('disable'); return; }
+    if (target.id === 'unsavedSave') { resolveUnsavedClose('save'); return; }
+    if (target.id === 'unsavedDiscard') { resolveUnsavedClose('discard'); return; }
+    if (target.id === 'unsavedContinue') { resolveUnsavedClose('continue'); return; }
     if (target.dataset.settingsPage) { showSettingsPage(target.dataset.settingsPage); return; }
     if (target.dataset.removeSupplement) { renderSupplementRows(supplementsFromForm(true).filter(item => item.id !== target.dataset.removeSupplement)); return; }
+    if (target.dataset.removeReviewSupplement) { renderReviewSupplementRows(reviewSupplementsFromForm(true).filter(item => item.id !== target.dataset.removeReviewSupplement)); return; }
     if (target.dataset.selectDate) { app.ui.selectedDate = parseDate(target.dataset.selectDate); app.ui.weekStart = mondayOf(app.ui.selectedDate); renderAgenda(); return; }
     if (target.dataset.openDay) { app.ui.selectedDate = parseDate(target.dataset.openDay); app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.mode = 'day'; renderAgenda(); return; }
     if (target.dataset.selectWeek) { const date = parseDate(target.dataset.selectWeek); app.ui.overviewWeekStart = mondayOf(date); app.ui.weekStart = mondayOf(date); app.ui.selectedDate = date; renderAgenda(); return; }
@@ -2057,6 +2289,7 @@
     if (target.dataset.suggestion) { const client = clientById(target.dataset.suggestion); if (client) fillFromClient(client); return; }
     if (target.dataset.todo) { openTodo(target.dataset.todo); return; }
     if (target.dataset.reviewPaid) { const appointment = app.state.appointments.find(item => item.id === target.dataset.reviewPaid); if (appointment) markAppointmentPaid(appointment.id, appointment.date); return; }
+    if (target.dataset.reviewAdjust) { openReviewFinancialEditor(target.dataset.reviewAdjust); return; }
     if (target.dataset.reviewPending) { app.ui.reviewPendingId = target.dataset.reviewPending; renderDayReview(); return; }
     if (target.dataset.reviewSave) { const input = $$('[data-review-reminder]').find(item => item.dataset.reviewReminder === target.dataset.reviewSave); savePaymentReminder(target.dataset.reviewSave, input?.value || ''); return; }
     if (target.dataset.reminderPaid) { markAppointmentPaid(target.dataset.reminderPaid, todayKey()); return; }
@@ -2088,6 +2321,7 @@
   $('#serviceForm').addEventListener('submit', event => { event.preventDefault(); saveService(); });
   $('#supplementTypeForm').addEventListener('submit', event => { event.preventDefault(); saveSupplementType(); });
   $('#badgeForm').addEventListener('submit', event => { event.preventDefault(); saveBadge(); });
+  $('#reviewFinancialForm').addEventListener('submit', event => { event.preventDefault(); saveReviewFinancials($('#reviewFinancialAppointmentId').value); });
   $('#clientName').addEventListener('input', event => {
     const exact = app.state.clients.filter(client => normaliseName(client.name) === normaliseName(event.target.value));
     if (exact.length === 1) fillFromClient(exact[0]);
@@ -2097,7 +2331,10 @@
   $('#serviceSelect').addEventListener('change', applyServicePreset);
   $('#price').addEventListener('input', updateAppointmentTotal);
   $('#supplementRows').addEventListener('input', updateAppointmentTotal);
-  $('#supplementRows').addEventListener('change', updateAppointmentTotal);
+  $('#supplementRows').addEventListener('change', event => { if (event.target.matches('[data-supplement-type]')) applySupplementDefaultPrice(event.target); else updateAppointmentTotal(); });
+  $('#reviewFinancialPrice').addEventListener('input', updateReviewFinancialTotal);
+  $('#reviewSupplementRows').addEventListener('input', updateReviewFinancialTotal);
+  $('#reviewSupplementRows').addEventListener('change', event => { if (event.target.matches('[data-review-supplement-type]')) applyReviewSupplementDefaultPrice(event.target); else updateReviewFinancialTotal(); });
   $('#paymentStatus').addEventListener('change', syncPaymentFields);
   $('#status').addEventListener('change', () => { syncStatusFields(); updateConflictHint(); });
   $('#date').addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); });
@@ -2130,18 +2367,24 @@
   $('#clientForm').addEventListener('change', () => { clearTimeout(clientDraftTimer); clientDraftTimer = setTimeout(saveClientDraft, 80); });
   $('#blockForm').addEventListener('input', () => { clearTimeout(blockDraftTimer); blockDraftTimer = setTimeout(saveBlockDraft, 150); });
   $('#blockForm').addEventListener('change', () => { clearTimeout(blockDraftTimer); blockDraftTimer = setTimeout(saveBlockDraft, 80); });
-  $('#appointmentDialog').addEventListener('cancel', saveAppointmentDraft);
-  $('#clientDialog').addEventListener('cancel', saveClientDraft);
-  $('#blockDialog').addEventListener('cancel', saveBlockDraft);
-  $('#settingsDialog').addEventListener('cancel', event => {
-    if (!app.ui.settingsDirty) return;
-    if (!window.confirm('Fermer sans enregistrer les modifications de cette page ?')) event.preventDefault();
-    else { app.ui.settingsDirty = false; showSettingsPage('home', true); renderScreen(); }
+  ['appointmentDialog', 'clientDialog', 'blockDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'dayReviewDialog'].forEach(dialogId => {
+    $(`#${dialogId}`).addEventListener('cancel', event => { event.preventDefault(); requestDialogClose(dialogId); });
   });
+  $('#unsavedChangesDialog').addEventListener('cancel', event => { event.preventDefault(); resolveUnsavedClose('continue'); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveOpenFormDrafts(); });
   globalThis.addEventListener?.('pagehide', saveOpenFormDrafts);
+  globalThis.addEventListener?.('beforeunload', event => {
+    saveOpenFormDrafts();
+    if (app.ui.reloadingForUpdate || !hasOpenUnsavedChanges()) return;
+    event.preventDefault(); event.returnValue = '';
+  });
 
-  if (globalThis.setInterval) globalThis.setInterval(() => { renderHeader(); if (app.ui.screen === 'agenda' && (app.ui.mode === 'day' || app.ui.mode === 'week')) renderAgenda(); }, 60 * 1000);
+  if (globalThis.setInterval) globalThis.setInterval(() => {
+    renderHeader();
+    if (app.ui.screen !== 'agenda') return;
+    if (app.ui.mode === 'day') renderAgenda();
+    else if (app.ui.mode === 'week') updateWeekCurrentTimeLine();
+  }, 60 * 1000);
   registerServiceWorker();
   navigator.storage?.persist?.().catch?.(() => {});
   render();
