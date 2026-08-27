@@ -1,11 +1,12 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.1.1 bêta';
-  const CURRENT_DATA_VERSION = 13;
+  const APP_VERSION = '12.2 bêta';
+  const CURRENT_DATA_VERSION = 14;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
-  const STATE_KEY = 'nail-planner-state-v13';
+  const STATE_KEY = 'nail-planner-state-v14';
+  const V13_KEY = 'nail-planner-state-v13';
   const V12_KEY = 'nail-planner-state-v12';
   const V11_KEY = 'nail-planner-state-v11';
   const V10_KEY = 'nail-planner-state-v10';
@@ -16,23 +17,29 @@
   const V5_KEY = 'nail-planner-state-v5';
   const LEGACY_APPOINTMENTS_KEY = 'nail-planner-v1';
   const LEGACY_PROFILES_KEY = 'nail-client-profiles-v1';
-  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v13';
+  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v14';
+  const V13_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v13';
   const V12_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v12';
   const V11_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v11';
   const V10_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v10';
   const V9_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v9';
   const V8_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v8';
-  const MIGRATION_SAFETY_KEY = 'nail-planner-before-migration-v13';
-  const APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v13';
+  const MIGRATION_SAFETY_KEY = 'nail-planner-before-migration-v14';
+  const APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v14';
+  const V13_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v13';
   const V12_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v12';
   const V11_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v11';
-  const CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v13';
+  const CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v14';
+  const V13_CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v13';
   const V12_CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v12';
-  const BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v13';
+  const BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v14';
+  const V13_BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v13';
   const V12_BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v12';
-  const CORRUPT_STATE_KEY = 'nail-planner-unreadable-state-v13';
-  const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
-  const LIMITS = { clients: 20000, appointments: 100000, blocks: 20000, settingsItems: 500, text: 5000, shortText: 200, duration: 24 * 60, amount: 1000000 };
+ const EXPENSE_DRAFT_KEY = 'nail-planner-expense-draft-v14';
+  const EXPENSE_CATEGORY_DRAFT_KEY = 'nail-planner-expense-category-draft-v14';
+  const CORRUPT_STATE_KEY = 'nail-planner-unreadable-state-v14';
+  const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
+  const LIMITS = { clients: 20000, appointments: 100000, blocks: 20000, expenses: 50000, settingsItems: 500, text: 5000, shortText: 200, duration: 24 * 60, amount: 1000000 };
   const HOUR_HEIGHT = 68;
   const WEEK_HOUR_HEIGHT = 44;
   const STATUS = {
@@ -43,7 +50,6 @@
   const METHOD = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
   const CONTACT = { instagram: 'Instagram', messenger: 'Facebook / Messenger', phone: 'Téléphone / SMS', whatsapp: 'WhatsApp', other: 'Autre' };
   const COLORS = ['rose', 'purple', 'orange', 'teal', 'blue', 'green', 'amber', 'coral'];
-  const BADGE_COLORS = ['#d64f7b', '#b8860b', '#df7b2f', '#d95f5f', '#8f3d55', '#7059a8', '#287f78', '#4f8a5b', '#3a8f9f', '#356ea3', '#6b7280'];
   const DAYS = [
     { key: 1, label: 'Lundi', short: 'Lun' }, { key: 2, label: 'Mardi', short: 'Mar' },
     { key: 3, label: 'Mercredi', short: 'Mer' }, { key: 4, label: 'Jeudi', short: 'Jeu' },
@@ -161,16 +167,37 @@
 
   function defaultClientBadges() {
     return [
-      { id: 'badge-favourite', name: 'Cliente appréciée', symbol: '♥', color: '#d64f7b' },
-      { id: 'badge-priority', name: 'Prioritaire', symbol: '★', color: '#b8860b' },
-      { id: 'badge-watch', name: 'Vigilance', symbol: '!', color: '#df7b2f' },
-      { id: 'badge-late', name: 'Annulations tardives', symbol: '⏱', color: '#d95f5f' }
+      { id: 'badge-favourite', name: 'Cliente appréciée', emoji: '🩷', symbol: '🩷' },
+      { id: 'badge-priority', name: 'Prioritaire', emoji: '⭐', symbol: '⭐' },
+      { id: 'badge-watch', name: 'Vigilance', emoji: '⚠️', symbol: '⚠️' },
+      { id: 'badge-late', name: 'Annulations tardives', emoji: '⏰', symbol: '⏰' }
     ];
+  }
+
+  function defaultExpenseCategories() {
+    return [
+      { id: 'expense-consumables', name: 'Réapprovisionnement / consommables', active: true },
+      { id: 'expense-equipment', name: 'Matériel / équipement', active: true },
+      { id: 'expense-training', name: 'Formation', active: true },
+      { id: 'expense-travel', name: 'Déplacement', active: true },
+      { id: 'expense-marketing', name: 'Communication / publicité', active: true },
+      { id: 'expense-software', name: 'Abonnement / logiciel', active: true },
+      { id: 'expense-other', name: 'Autre', active: true }
+    ];
+  }
+
+  function firstGrapheme(value, fallback = '🏷️') {
+    const text = String(value || '').trim();
+    if (!text) return fallback;
+    try {
+      const segment = new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(text)[Symbol.iterator]().next().value?.segment;
+      return segment || fallback;
+    } catch { return Array.from(text)[0] || fallback; }
   }
 
   function normaliseSupplementTypes(raw) {
     const source = Array.isArray(raw) ? raw : defaultSupplementTypes(), result = [], ids = new Set(), names = new Set();
-    source.forEach(item => {
+    source.slice(0, LIMITS.settingsItems).forEach(item => {
       const name = String(item?.name || '').trim().slice(0, 80), suppliedId = String(item?.id || '').trim() === 'custom' ? '' : String(item?.id || '').trim();
       if (!name || names.has(normaliseName(name))) return;
       let id = suppliedId || uuid();
@@ -183,17 +210,62 @@
 
   function normaliseClientBadges(raw) {
     const supplied = Array.isArray(raw), source = supplied ? raw : defaultClientBadges(), result = [], ids = new Set(), names = new Set();
-    source.forEach((item, index) => {
+    source.slice(0, LIMITS.settingsItems).forEach(item => {
       const name = String(item?.name || '').trim().slice(0, 60), suppliedId = String(item?.id || '').trim() === 'custom' ? '' : String(item?.id || '').trim();
       if (!name || names.has(normaliseName(name))) return;
       let id = suppliedId || uuid();
       if (ids.has(id)) id = uuid();
-      const symbol = String(item?.symbol || '●').trim().slice(0, 4) || '●';
-      const requestedColor = String(item?.color || '').toLowerCase();
-      const color = BADGE_COLORS.includes(requestedColor) ? requestedColor : defaultClientBadges()[index % defaultClientBadges().length].color;
-      result.push({ id, name, symbol, color }); ids.add(id); names.add(normaliseName(name));
+      const emoji = firstGrapheme(item?.emoji || item?.symbol);
+      const requestedColor = String(item?.color || '').trim().toLowerCase();
+      const badge = { id, name, emoji, symbol: emoji };
+      if (/^#[0-9a-f]{6}$/.test(requestedColor)) badge.color = requestedColor;
+      result.push(badge); ids.add(id); names.add(normaliseName(name));
     });
     return supplied ? result : (result.length ? result : defaultClientBadges());
+  }
+
+  function normaliseExpenseCategories(raw) {
+    const source = Array.isArray(raw) ? raw : defaultExpenseCategories(), result = [], ids = new Set(), names = new Set();
+    source.slice(0, LIMITS.settingsItems).forEach(item => {
+      const name = boundedText(item?.name || item?.label, 100), suppliedId = String(item?.id || '').trim();
+      const nameKey = normaliseName(name);
+      if (!name || names.has(nameKey)) return;
+      let id = suppliedId || uuid();
+      if (ids.has(id)) id = uuid();
+      result.push({ id, name, active: item?.active !== false });
+      ids.add(id); names.add(nameKey);
+    });
+    return result.length ? result : defaultExpenseCategories();
+  }
+
+  function normaliseExpenses(raw, categories) {
+    if (!Array.isArray(raw)) return [];
+    const categoryById = new Map(categories.map(category => [category.id, category]));
+    const categoryByName = new Map(categories.map(category => [normaliseName(category.name), category]));
+    const defaults = defaultExpenseCategories();
+    const fallbackCategory = categoryById.get('expense-other') || categories[0] || defaults[defaults.length - 1];
+    const ids = new Set();
+    return raw.slice(0, LIMITS.expenses).map(item => {
+      const date = pickDate(item?.date || item?.expenseDate || item?.createdAt);
+      const amount = numericAmount(item?.amount ?? item?.price ?? item?.total);
+      if (!validDate(date) || amount <= 0) return null;
+      let id = String(item?.id || '').trim() || uuid();
+      if (ids.has(id)) id = uuid();
+      ids.add(id);
+      const suppliedLabel = boundedText(item?.categoryLabel || item?.categoryName || item?.category || item?.nature, 100);
+      const category = categoryById.get(String(item?.categoryId || '').trim()) || categoryByName.get(normaliseName(suppliedLabel)) || fallbackCategory;
+      return {
+        id,
+        categoryId: category.id,
+        categoryLabel: suppliedLabel || category.name,
+        details: boundedText(item?.details || item?.description || item?.content || item?.items),
+        supplier: boundedText(item?.supplier || item?.vendor || item?.store || item?.enseigne, LIMITS.shortText),
+        date,
+        amount: Math.min(LIMITS.amount, amount),
+        createdAt: String(item?.createdAt || new Date().toISOString()),
+        updatedAt: String(item?.updatedAt || item?.createdAt || new Date().toISOString())
+      };
+    }).filter(Boolean);
   }
 
   function normaliseSupplements(raw) {
@@ -236,7 +308,7 @@
   function normaliseServices(raw, options = {}) {
     const source = Array.isArray(raw) ? raw : defaultServices();
     const services = [], byId = new Map(), legacyNames = new Set();
-    source.forEach((item, index) => {
+    source.slice(0, LIMITS.settingsItems).forEach((item, index) => {
       const name = String(item?.name || '').trim(), nameKey = normaliseName(name), suppliedId = String(item?.id || '').trim() === 'custom' ? '' : String(item?.id || '').trim();
       if (!name || (suppliedId && byId.has(suppliedId)) || (!suppliedId && legacyNames.has(nameKey))) return;
       const service = {
@@ -249,6 +321,7 @@
     });
     if (options.addDefaults !== false) {
       defaultServices().forEach(preset => {
+        if (services.length >= LIMITS.settingsItems) return;
         if (services.some(service => normaliseName(service.name) === normaliseName(preset.name))) return;
         const id = byId.has(preset.id) ? `${preset.id}-${uuid()}` : preset.id;
         const service = { ...preset, id };
@@ -266,37 +339,70 @@
     const allDay = Boolean(raw?.allDay) || Boolean(raw?.date && !raw?.startDate && !raw?.startTime);
     const startDate = pickDate(raw?.startDate || raw?.date);
     if (!validDate(startDate)) return null;
-    const details = { address: boundedText(raw?.address || raw?.location, LIMITS.shortText), notes: boundedText(raw?.notes || raw?.comment || raw?.commentaire) };
+    const blocksAppointments = typeof raw?.blocksAppointments === 'boolean' ? raw.blocksAppointments
+      : (typeof raw?.blocking === 'boolean' ? raw.blocking : (typeof raw?.blocksBookings === 'boolean' ? raw.blocksBookings : true));
+    const details = {
+      blocksAppointments,
+      address: boundedText(raw?.address || raw?.location, LIMITS.shortText), notes: boundedText(raw?.notes || raw?.comment || raw?.commentaire),
+      createdAt: String(raw?.createdAt || new Date().toISOString()), updatedAt: String(raw?.updatedAt || raw?.createdAt || new Date().toISOString())
+    };
     if (allDay) {
       const endDate = raw?.endDate ? pickDate(raw.endDate) : startDate;
       if (!validDate(endDate) || endDate < startDate) return null;
-      return { id: String(raw.id || uuid()), allDay: true, startDate, startTime: '00:00', endDate, endTime: '00:00', reason: boundedText(raw.reason || raw.label || 'Créneau bloqué', LIMITS.shortText) || 'Créneau bloqué', ...details };
+      return { id: String(raw.id || uuid()), allDay: true, startDate, startTime: '00:00', endDate, endTime: '00:00', reason: boundedText(raw.reason || raw.title || raw.label || 'Événement personnel', LIMITS.shortText) || 'Événement personnel', ...details };
     }
     const endDate = pickDate(raw?.endDate || startDate), startTime = validTime(raw?.startTime) ? raw.startTime : '09:00', endTime = validTime(raw?.endTime) ? raw.endTime : '10:00';
     if (!validDate(endDate) || dateTimeMs(endDate, endTime) <= dateTimeMs(startDate, startTime)) return null;
-    return { id: String(raw.id || uuid()), allDay: false, startDate, startTime, endDate, endTime, reason: boundedText(raw.reason || raw.label || 'Créneau bloqué', LIMITS.shortText) || 'Créneau bloqué', ...details };
+    return { id: String(raw.id || uuid()), allDay: false, startDate, startTime, endDate, endTime, reason: boundedText(raw.reason || raw.title || raw.label || 'Événement personnel', LIMITS.shortText) || 'Événement personnel', ...details };
   }
 
   function validateImportedState(data) {
     const state = data?.state || data || {};
-    const appointments = Array.isArray(state) ? state : state.appointments || [];
+    const currentSchema = Number(data?.dataVersion ?? state?.version ?? data?.version ?? 0) >= CURRENT_DATA_VERSION;
+    const appointments = Array.isArray(state) ? state : (Array.isArray(state.appointments) ? state.appointments : []);
     const clients = Array.isArray(state.clients) ? state.clients : [];
     const blocks = [state.blocks, state.blockedSlots, state.unavailableDays].filter(Array.isArray).flat();
+    const expenses = Array.isArray(state.expenses) ? state.expenses : (Array.isArray(state.spendings) ? state.spendings : []);
     const settings = state.settings && typeof state.settings === 'object' ? state.settings : {};
-    if (clients.length > LIMITS.clients || appointments.length > LIMITS.appointments || blocks.length > LIMITS.blocks) throw new Error('INVALID_TOO_MANY_ITEMS');
-    if ((settings.services?.length || 0) > LIMITS.settingsItems || (settings.supplementTypes?.length || 0) > LIMITS.settingsItems || (settings.clientBadges?.length || 0) > LIMITS.settingsItems) throw new Error('INVALID_TOO_MANY_SETTINGS');
+    if (clients.length > LIMITS.clients || appointments.length > LIMITS.appointments || blocks.length > LIMITS.blocks || expenses.length > LIMITS.expenses) throw new Error('INVALID_TOO_MANY_ITEMS');
+    if ((settings.services?.length || 0) > LIMITS.settingsItems || (settings.supplementTypes?.length || 0) > LIMITS.settingsItems || (settings.clientBadges?.length || 0) > LIMITS.settingsItems || (settings.expenseCategories?.length || 0) > LIMITS.settingsItems) throw new Error('INVALID_TOO_MANY_SETTINGS');
     const textTooLong = value => typeof value === 'string' && value.length > LIMITS.text;
     const inspectText = raw => Object.values(raw || {}).some(value => textTooLong(value));
-    if (clients.some(inspectText) || blocks.some(inspectText) || appointments.some(raw => inspectText(raw) || (raw?.supplements || []).some(inspectText) || (raw?.history || []).some(inspectText))) throw new Error('INVALID_TEXT_LENGTH');
+    const settingsText = ['services', 'supplementTypes', 'clientBadges', 'expenseCategories'].some(key => Array.isArray(settings[key]) && settings[key].some(inspectText));
+    if (clients.some(inspectText) || blocks.some(inspectText) || expenses.some(inspectText) || settingsText || appointments.some(raw => inspectText(raw) || (Array.isArray(raw?.supplements) && raw.supplements.some(inspectText)) || (Array.isArray(raw?.history) && raw.history.some(inspectText)))) throw new Error('INVALID_TEXT_LENGTH');
     if (appointments.some(raw => raw?.duration !== undefined && (!Number.isFinite(Number(raw.duration)) || Number(raw.duration) < 15 || Number(raw.duration) > LIMITS.duration))) throw new Error('INVALID_DURATION');
-    if (appointments.some(raw => numericAmount(raw?.price) > LIMITS.amount || (raw?.supplements || []).some(item => numericAmount(item?.amount) > LIMITS.amount)) || (settings.supplementTypes || []).some(item => numericAmount(item?.price) > LIMITS.amount)) throw new Error('INVALID_AMOUNT');
+    if (currentSchema && appointments.some(raw =>
+      (Object.prototype.hasOwnProperty.call(raw || {}, 'supplements') && !Array.isArray(raw.supplements))
+      || (Object.prototype.hasOwnProperty.call(raw || {}, 'history') && !Array.isArray(raw.history))
+      || (raw?.status !== undefined && !Object.prototype.hasOwnProperty.call(STATUS, raw.status))
+      || (raw?.paymentStatus !== undefined && !Object.prototype.hasOwnProperty.call(PAYMENT, raw.paymentStatus))
+      || (raw?.paymentMethod !== undefined && raw.paymentMethod !== '' && !Object.prototype.hasOwnProperty.call(METHOD, raw.paymentMethod))
+      || (raw?.contactVia !== undefined && raw.contactVia !== '' && !Object.prototype.hasOwnProperty.call(CONTACT, raw.contactVia))
+      || (raw?.lateCancellation !== undefined && typeof raw.lateCancellation !== 'boolean')
+    )) throw new Error('INVALID_APPOINTMENT_STRUCTURE');
+    if (currentSchema && clients.some(raw => raw?.contactVia !== undefined && raw.contactVia !== '' && !Object.prototype.hasOwnProperty.call(CONTACT, raw.contactVia))) throw new Error('INVALID_CLIENT_CONTACT');
+    const invalidAmount = (value, required = false) => {
+      if (!required && (value === '' || value === null || value === undefined)) return false;
+      const amount = Number(String(value ?? '').replace(',', '.'));
+      return !Number.isFinite(amount) || amount < (required ? 0.01 : 0) || amount > LIMITS.amount;
+    };
+    if (appointments.some(raw => invalidAmount(raw?.price) || (Array.isArray(raw?.supplements) && raw.supplements.some(item => invalidAmount(item?.amount))))
+      || (Array.isArray(settings.supplementTypes) && settings.supplementTypes.some(item => invalidAmount(item?.price)))
+      || expenses.some(item => invalidAmount(item?.amount ?? item?.price ?? item?.total, true))) throw new Error('INVALID_AMOUNT');
+    if (blocks.some(raw =>
+      (Object.prototype.hasOwnProperty.call(raw || {}, 'blocksAppointments') && typeof raw.blocksAppointments !== 'boolean')
+      || (Object.prototype.hasOwnProperty.call(raw || {}, 'blocking') && typeof raw.blocking !== 'boolean')
+      || (Object.prototype.hasOwnProperty.call(raw || {}, 'blocksBookings') && typeof raw.blocksBookings !== 'boolean')
+      || (currentSchema && Object.prototype.hasOwnProperty.call(raw || {}, 'allDay') && typeof raw.allDay !== 'boolean')
+    )) throw new Error('INVALID_BLOCKING_VALUE');
+    if (expenses.some(item => !validDate(pickDate(item?.date || item?.expenseDate)))) throw new Error('INVALID_EXPENSE_DATE');
   }
 
   function migrateState(source, legacyProfiles = {}, options = {}) {
     const data = source?.state || source || {}, strict = Boolean(options.strict), clients = [], clientsById = new Map(), firstClientByName = new Map();
     if (strict) validateImportedState(source);
     if (strict && !Array.isArray(data)) {
-      for (const key of ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays']) {
+      for (const key of ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'expenses', 'spendings']) {
         if (Object.prototype.hasOwnProperty.call(data, key) && !Array.isArray(data[key])) throw new Error('INVALID_STRUCTURE');
       }
       if (Object.prototype.hasOwnProperty.call(data, 'settings') && (!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings))) throw new Error('INVALID_STRUCTURE');
@@ -335,9 +441,22 @@
     if (strict && Object.prototype.hasOwnProperty.call(rawSettings, 'services') && !Array.isArray(rawSettings.services)) throw new Error('INVALID_STRUCTURE');
     if (strict && Object.prototype.hasOwnProperty.call(rawSettings, 'supplementTypes') && !Array.isArray(rawSettings.supplementTypes)) throw new Error('INVALID_STRUCTURE');
     if (strict && Object.prototype.hasOwnProperty.call(rawSettings, 'clientBadges') && !Array.isArray(rawSettings.clientBadges)) throw new Error('INVALID_STRUCTURE');
+    if (strict && Object.prototype.hasOwnProperty.call(rawSettings, 'expenseCategories') && !Array.isArray(rawSettings.expenseCategories)) throw new Error('INVALID_STRUCTURE');
     if (strict && Array.isArray(rawSettings.services)) {
       const serviceIds = rawSettings.services.map(service => String(service?.id || '').trim()).filter(Boolean);
       if (rawSettings.services.some(service => !String(service?.name || '').trim()) || new Set(serviceIds).size !== serviceIds.length) throw new Error('INVALID_SERVICE');
+    }
+    if (strict && Array.isArray(rawSettings.clientBadges)) {
+      const badgeIds = rawSettings.clientBadges.map(badge => String(badge?.id || '').trim()).filter(Boolean);
+      const badgeNames = rawSettings.clientBadges.map(badge => normaliseName(badge?.name)).filter(Boolean);
+      const emojiRequired = Number(data.version || 0) >= CURRENT_DATA_VERSION;
+      if (rawSettings.clientBadges.some(badge => !String(badge?.name || '').trim()) || new Set(badgeIds).size !== badgeIds.length || new Set(badgeNames).size !== badgeNames.length
+        || (emojiRequired && rawSettings.clientBadges.some(badge => !String(badge?.id || '').trim() || !String(badge?.emoji || badge?.symbol || '').trim()))) throw new Error('INVALID_CLIENT_BADGE');
+    }
+    if (strict && Array.isArray(rawSettings.expenseCategories)) {
+      const categoryIds = rawSettings.expenseCategories.map(category => String(category?.id || '').trim()).filter(Boolean);
+      const categoryNames = rawSettings.expenseCategories.map(category => normaliseName(category?.name || category?.label)).filter(Boolean);
+      if (rawSettings.expenseCategories.some(category => !String(category?.id || '').trim() || !String(category?.name || category?.label || '').trim()) || new Set(categoryIds).size !== categoryIds.length || new Set(categoryNames).size !== categoryNames.length) throw new Error('INVALID_EXPENSE_CATEGORY');
     }
     const services = normaliseServices(rawSettings.services, { addDefaults: Number(data.version || 0) < 12 });
     const serviceByName = name => services.find(service => normaliseName(service.name) === normaliseName(name));
@@ -383,31 +502,59 @@
         history: normaliseHistory(raw.history, raw.createdAt), createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || new Date().toISOString()
       };
     });
-    const seenBlocks = new Set();
-    const rawBlocks = [data.blocks, data.blockedSlots, data.unavailableDays].filter(Array.isArray).flat().filter(raw => {
+   const blockSources = [data.blocks, data.blockedSlots, data.unavailableDays].filter(Array.isArray).flat();
+   if (strict) {
+      [data.blocks, data.blockedSlots, data.unavailableDays].filter(Array.isArray).forEach(collection => {
+        const blockIds = collection.map(block => String(block?.id || '').trim()).filter(Boolean);
+        if (new Set(blockIds).size !== blockIds.length) throw new Error('INVALID_BLOCK');
+      });
+   }
+    const seenBlocks = new Map();
+    const rawBlocks = blockSources.filter(raw => {
       const key = String(raw?.id || '') || JSON.stringify(raw);
-      if (seenBlocks.has(key)) return false;
-      seenBlocks.add(key); return true;
+      const normalised = normaliseBlock(raw);
+      const signature = normalised ? JSON.stringify({
+        allDay: normalised.allDay, startDate: normalised.startDate, startTime: normalised.startTime,
+        endDate: normalised.endDate, endTime: normalised.endTime, reason: normalised.reason,
+        blocksAppointments: normalised.blocksAppointments, address: normalised.address, notes: normalised.notes
+      }) : '';
+      if (seenBlocks.has(key)) {
+        if (strict && seenBlocks.get(key) !== signature) throw new Error('INVALID_BLOCK_CONFLICT');
+        return false;
+      }
+      seenBlocks.set(key, signature); return true;
     });
     if (strict && rawBlocks.some(raw => !normaliseBlock(raw))) throw new Error('INVALID_BLOCK');
     const blocks = rawBlocks.map(normaliseBlock).filter(Boolean);
+   const expenseCategories = normaliseExpenseCategories(rawSettings.expenseCategories);
+   const rawExpenses = Array.isArray(data.expenses) ? data.expenses : (Array.isArray(data.spendings) ? data.spendings : []);
+   if (strict) {
+     const expenseIds = rawExpenses.map(expense => String(expense?.id || '').trim()).filter(Boolean);
+     if (rawExpenses.some(expense => !String(expense?.id || '').trim()) || new Set(expenseIds).size !== expenseIds.length) throw new Error('INVALID_EXPENSE');
+      if (Number(data.version || 0) >= CURRENT_DATA_VERSION) {
+        const categoryIds = new Set(expenseCategories.map(category => category.id));
+        if (rawExpenses.some(expense => !categoryIds.has(String(expense?.categoryId || '').trim()))) throw new Error('INVALID_EXPENSE_CATEGORY_REFERENCE');
+      }
+   }
+    const expenses = normaliseExpenses(rawExpenses, expenseCategories);
     const settings = {
       lastBackupAt: rawSettings.lastBackupAt || null,
       workingHours: normaliseHours(rawSettings.workingHours || rawSettings.workHours),
       services,
       supplementTypes: normaliseSupplementTypes(rawSettings.supplementTypes),
       clientBadges: normaliseClientBadges(rawSettings.clientBadges),
+      expenseCategories,
       lateCancellationThreshold: Math.min(20, Math.max(1, Number(rawSettings.lateCancellationThreshold) || 3)),
       lateCancellationPromptEnabled: rawSettings.lateCancellationPromptEnabled !== false,
       backupReminderDays: Math.min(90, Math.max(1, Number(rawSettings.backupReminderDays) || 7))
     };
     const validBadgeIds = new Set(settings.clientBadges.map(badge => badge.id));
     clients.forEach(client => { if (!validBadgeIds.has(client.badgeId)) client.badgeId = ''; });
-    return { version: CURRENT_DATA_VERSION, clients, appointments, blocks, settings };
+    return { version: CURRENT_DATA_VERSION, clients, appointments, blocks, expenses, settings };
   }
 
   function hasStoredState(state) {
-    return Boolean(state && (Array.isArray(state) || state.clients || state.appointments || state.blocks || state.settings));
+    return Boolean(state && (Array.isArray(state) || state.clients || state.appointments || state.blocks || state.expenses || state.settings));
   }
 
   function preserveBeforeMigration(state, sourceVersion) {
@@ -440,7 +587,7 @@
       }
     }
     const candidates = [
-      [12, V12_KEY], [11, V11_KEY], [10, V10_KEY], [9, V9_KEY], [8, V8_KEY], [7, V7_KEY], [6, V6_KEY], [5, V5_KEY]
+      [13, V13_KEY], [12, V12_KEY], [11, V11_KEY], [10, V10_KEY], [9, V9_KEY], [8, V8_KEY], [7, V7_KEY], [6, V6_KEY], [5, V5_KEY]
     ];
     for (const [version, key] of candidates) {
       let raw = null;
@@ -468,13 +615,14 @@
       screen: 'agenda', mode: 'day', selectedDate: startOfDay(new Date()), weekStart: mondayOf(new Date()),
       monthDate: localDate(new Date().getFullYear(), new Date().getMonth(), 1), overviewWeekStart: null,
       editingAppointmentId: null, editingBlockId: null, pendingDraft: null, formClientId: null, formServiceColor: 'rose', repeatDateEdited: false, repeatTimeEdited: false,
-      reportMode: 'week', reportTab: 'activity', reportDate: startOfDay(new Date()),
+      reportMode: 'week', expenseReportMode: 'month', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()),
       reviewDate: startOfDay(new Date()), reviewPendingId: null,
-      quickAddDate: todayKey(), quickAddTime: '10:00', pendingDuplicate: null,
-      appointmentSaving: false, blockSaving: false, clientSaving: false, serviceSaving: false, supplementSaving: false, badgeSaving: false, undo: null, undoTimer: null,
+     quickAddDate: todayKey(), quickAddTime: '10:00', pendingDuplicate: null,
+     appointmentSaving: false, blockSaving: false, expenseSaving: false, clientSaving: false, serviceSaving: false, supplementSaving: false, badgeSaving: false, undo: null, undoTimer: null, successTimer: null,
+      appointmentContactExpanded: true, appointmentAdjustmentsExpanded: false,
       updateRegistration: null, reloadingForUpdate: false, settingsPage: 'home', settingsDirty: false,
-      editingSupplementTypeId: null, editingBadgeId: null, pendingLateBadgeClientId: null,
-      appointmentDraftBaseline: '', clientDraftBaseline: '', blockDraftBaseline: '',
+      editingSupplementTypeId: null, editingBadgeId: null, editingExpenseId: null, pendingLateBadgeClientId: null, pendingBlockConflict: null,
+      appointmentDraftBaseline: '', clientDraftBaseline: '', blockDraftBaseline: '', expenseDraftBaseline: '',
       formBaselines: {}, pendingUnsavedClose: null, reviewFinancialDraft: null
     }
   };
@@ -493,6 +641,15 @@
     if (app.ui.undoTimer) clearTimeout(app.ui.undoTimer);
     app.ui.undoTimer = null; app.ui.undo = null;
     const toast = $('#undoToast'); if (toast) toast.hidden = true;
+  }
+
+  function showSuccess(message) {
+    const toast = $('#successToast');
+    if (!toast) return;
+    if (app.ui.successTimer) clearTimeout(app.ui.successTimer);
+    const label = $('#successMessage'); if (label) label.textContent = message; else toast.textContent = message;
+    toast.hidden = false;
+    app.ui.successTimer = setTimeout(() => { toast.hidden = true; app.ui.successTimer = null; }, 3200);
   }
 
   function offerUndo(previousState, message) {
@@ -520,20 +677,22 @@
   const draftSignature = draft => JSON.stringify({ ...draft, savedAt: undefined });
 
   function appointmentDraft() {
-    const draft = safeJson(APPOINTMENT_DRAFT_KEY, null) || safeJson(V12_APPOINTMENT_DRAFT_KEY, null) || safeJson(V11_APPOINTMENT_DRAFT_KEY, null);
+    const draft = safeJson(APPOINTMENT_DRAFT_KEY, null) || safeJson(V13_APPOINTMENT_DRAFT_KEY, null) || safeJson(V12_APPOINTMENT_DRAFT_KEY, null) || safeJson(V11_APPOINTMENT_DRAFT_KEY, null);
     if (!draft || draft.version !== 1 || !draft.values || typeof draft.values !== 'object') return null;
     return draft;
   }
 
   function clearAppointmentDraft() {
-    try { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); } catch {}
+    try { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); } catch {}
     renderDraftNotice();
   }
 
   function clearAllFormDrafts() {
     try {
-      localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY);
-      localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY);
+      localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY);
+      localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V13_CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY);
+     localStorage.removeItem(EXPENSE_DRAFT_KEY);
+      localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY);
     } catch {}
     renderDraftNotice();
   }
@@ -541,22 +700,24 @@
   function saveAppointmentDraft() {
     if (!$('#appointmentDialog').open) return;
     const draft = appointmentDraftPayload(), values = draft.values;
-    if (draftSignature(draft) === app.ui.appointmentDraftBaseline) return;
+    if (draftSignature(draft) === app.ui.appointmentDraftBaseline) { clearAppointmentDraft(); return; }
     const meaningful = values.clientName.trim() || values.serviceSelect || values.service.trim() || values.phone.trim() || values.address.trim() || values.notes.trim();
-    if (!meaningful) return;
+    if (!meaningful) { clearAppointmentDraft(); return; }
     draft.savedAt = new Date().toISOString();
     try { localStorage.setItem(APPOINTMENT_DRAFT_KEY, JSON.stringify(draft)); renderDraftNotice(); } catch {}
   }
 
   function renderDraftNotice() {
-    const candidates = [appointmentDraft(), clientFormDraft(), blockFormDraft()].filter(draft => draft?.savedAt && draft?.values).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+    const candidates = [appointmentDraft(), clientFormDraft(), blockFormDraft(), expenseFormDraft(), expenseCategoryFormDraft()].filter(draft => draft?.savedAt && draft?.values).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
     const draft = candidates[0], target = $('#draftNotice');
     if (!target) return;
     target.hidden = !draft;
     if (!draft) return;
     app.ui.draftNoticeKind = draft.kind || 'appointment';
     if (app.ui.draftNoticeKind === 'client') { $('#draftNoticeTitle').textContent = 'Fiche cliente en cours'; $('#draftNoticeText').textContent = draft.values.name || 'Modifications non enregistrées'; return; }
-    if (app.ui.draftNoticeKind === 'block') { $('#draftNoticeTitle').textContent = 'Indisponibilité en cours'; $('#draftNoticeText').textContent = draft.values.reason || 'Créneau à terminer'; return; }
+    if (app.ui.draftNoticeKind === 'block') { $('#draftNoticeTitle').textContent = 'Événement personnel en cours'; $('#draftNoticeText').textContent = draft.values.reason || 'Événement à terminer'; return; }
+   if (app.ui.draftNoticeKind === 'expense') { $('#draftNoticeTitle').textContent = 'Dépense en cours'; $('#draftNoticeText').textContent = `${draft.values.categoryLabel || 'Catégorie à choisir'}${draft.values.amount ? ` · ${money(draft.values.amount)}` : ''}`; return; }
+    if (app.ui.draftNoticeKind === 'expenseCategory') { $('#draftNoticeTitle').textContent = 'Catégorie de dépense en cours'; $('#draftNoticeText').textContent = draft.values.name || 'Nom à terminer'; return; }
     $('#draftNoticeTitle').textContent = 'Rendez-vous en cours';
     const name = String(draft.values.clientName || '').trim() || 'cliente non renseignée', date = validDate(draft.values.date) ? format(parseDate(draft.values.date), { day: 'numeric', month: 'short' }) : 'date à choisir';
     $('#draftNoticeText').textContent = `${name} · ${date}${validTime(draft.values.time) ? ` à ${draft.values.time}` : ''}`;
@@ -575,48 +736,100 @@
     app.ui.formClientId = draft.formClientId || null; app.ui.formServiceColor = draft.formServiceColor || 'rose';
     app.ui.repeatDateEdited = validDate(draft.values.repeatDate); app.ui.repeatTimeEdited = validTime(draft.values.repeatTime);
     const client = app.ui.formClientId ? clientById(app.ui.formClientId) : null;
-    renderSelectedClientInfo(client); syncStatusFields(); syncPaymentFields(); syncRepeatDate(false); updateAppointmentTotal(); updateConflictHint();
+    renderSelectedClientInfo(client); syncAppointmentContactSummary(client, !client); setAppointmentAdjustments($('#serviceSelect').value === 'custom'); syncStatusFields(); syncPaymentFields(); syncRepeatDate(false); updateAppointmentTotal(); updateConflictHint();
   }
 
   function clientDraftValues() {
     return { id: $('#profileKey').value, name: $('#profileName').value, phone: $('#profilePhone').value, contactVia: $('#profileContactVia').value, badgeId: $('#profileBadge').value, address: $('#profileAddress').value, notes: $('#profileNotes').value };
   }
 
-  const clientFormDraft = () => safeJson(CLIENT_DRAFT_KEY, null) || safeJson(V12_CLIENT_DRAFT_KEY, null);
-  const blockFormDraft = () => safeJson(BLOCK_DRAFT_KEY, null) || safeJson(V12_BLOCK_DRAFT_KEY, null);
+ const clientFormDraft = () => safeJson(CLIENT_DRAFT_KEY, null) || safeJson(V13_CLIENT_DRAFT_KEY, null) || safeJson(V12_CLIENT_DRAFT_KEY, null);
+  const blockFormDraft = () => safeJson(BLOCK_DRAFT_KEY, null) || safeJson(V13_BLOCK_DRAFT_KEY, null) || safeJson(V12_BLOCK_DRAFT_KEY, null);
+  const expenseFormDraft = () => safeJson(EXPENSE_DRAFT_KEY, null);
+ const expenseCategoryFormDraft = () => safeJson(EXPENSE_CATEGORY_DRAFT_KEY, null);
+
+  function expenseDraftValues() {
+    const category = app.state.settings.expenseCategories.find(item => item.id === $('#expenseCategory')?.value);
+    return {
+      id: $('#expenseId')?.value || '', categoryId: $('#expenseCategory')?.value || '', categoryLabel: category?.name || '',
+      details: $('#expenseDetails')?.value || '', supplier: $('#expenseSupplier')?.value || '', date: $('#expenseDate')?.value || '', amount: $('#expenseAmount')?.value || ''
+    };
+  }
+
+  const expenseDraftSignature = values => JSON.stringify({
+    id: values.id, categoryId: values.categoryId, details: values.details,
+    supplier: values.supplier, date: values.date, amount: values.amount
+  });
 
   function saveClientDraft() {
     if (!$('#clientDialog').open) return;
     const values = clientDraftValues();
-    if (JSON.stringify(values) === app.ui.clientDraftBaseline) return;
+    if (JSON.stringify(values) === app.ui.clientDraftBaseline) { clearFormDraft('client'); return; }
     try { localStorage.setItem(CLIENT_DRAFT_KEY, JSON.stringify({ version: 1, kind: 'client', savedAt: new Date().toISOString(), values })); renderDraftNotice(); } catch {}
   }
 
   function saveBlockDraft() {
     if (!$('#blockDialog').open) return;
     const values = blockDraft();
-    if (JSON.stringify(values) === app.ui.blockDraftBaseline) return;
+    if (JSON.stringify(values) === app.ui.blockDraftBaseline) { clearFormDraft('block'); return; }
     try { localStorage.setItem(BLOCK_DRAFT_KEY, JSON.stringify({ version: 1, kind: 'block', savedAt: new Date().toISOString(), values })); renderDraftNotice(); } catch {}
+  }
+
+  function saveExpenseDraft() {
+    if (!$('#expenseDialog')?.open) return;
+    const values = expenseDraftValues();
+    if (expenseDraftSignature(values) === app.ui.expenseDraftBaseline || (!values.details.trim() && !values.supplier.trim() && !values.amount && !values.categoryId)) { clearFormDraft('expense'); return; }
+   try { localStorage.setItem(EXPENSE_DRAFT_KEY, JSON.stringify({ version: 1, kind: 'expense', savedAt: new Date().toISOString(), values })); renderDraftNotice(); } catch {}
+ }
+
+  function expenseCategoryDraftValues() {
+    return { id: $('#expenseCategoryId')?.value || '', name: $('#expenseCategoryName')?.value || '' };
+  }
+
+ function saveExpenseCategoryDraft() {
+   if (!$('#expenseCategoriesDialog')?.open) return;
+    const changed = formHasChanges('expenseCategoriesDialog');
+   const values = expenseCategoryDraftValues();
+    if (!changed || !values.name.trim()) {
+      try { localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY); } catch {}
+      renderDraftNotice(); return;
+    }
+    try { localStorage.setItem(EXPENSE_CATEGORY_DRAFT_KEY, JSON.stringify({ version: 1, kind: 'expenseCategory', savedAt: new Date().toISOString(), values })); renderDraftNotice(); } catch {}
   }
 
   function clearFormDraft(kind = app.ui.draftNoticeKind) {
     try {
-      if (kind === 'client') { localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); }
-      else if (kind === 'block') { localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY); }
-      else { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); }
+      if (kind === 'client') { localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V13_CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); }
+      else if (kind === 'block') { localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY); }
+     else if (kind === 'expense') localStorage.removeItem(EXPENSE_DRAFT_KEY);
+      else if (kind === 'expenseCategory') localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY);
+      else { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); }
     } catch {}
     renderDraftNotice();
   }
 
-  function resumeLatestDraft() {
-    const kind = app.ui.draftNoticeKind;
-    if (kind === 'client') {
+ function resumeLatestDraft() {
+   const kind = app.ui.draftNoticeKind;
+    if (kind === 'expenseCategory') {
+      const draft = expenseCategoryFormDraft(), values = draft?.values;
+      if (!values) { clearFormDraft('expenseCategory'); return; }
+      openExpenseCategories();
+      if (expenseCategoryById(values.id)) editExpenseCategory(values.id);
+      $('#expenseCategoryName').value = values.name || '';
+      return;
+    }
+   if (kind === 'client') {
       const draft = clientFormDraft(), client = clientById(draft?.values?.id); if (!draft || !client) { clearFormDraft('client'); return; }
-      openClient(client.id); $('#profileName').value = draft.values.name; $('#profilePhone').value = draft.values.phone; $('#profileContactVia').value = draft.values.contactVia; $('#profileBadge').value = draft.values.badgeId; $('#profileAddress').value = draft.values.address; $('#profileNotes').value = draft.values.notes; return;
+      openClient(client.id); $('#profileName').value = draft.values.name; $('#profilePhone').value = draft.values.phone; $('#profileContactVia').value = draft.values.contactVia; $('#profileBadge').value = draft.values.badgeId; $('#profileAddress').value = draft.values.address; $('#profileNotes').value = draft.values.notes; $('#profileWaze').hidden = !String(draft.values.address || '').trim(); syncProfileBadgeSummary(false); return;
     }
     if (kind === 'block') {
       const draft = blockFormDraft(), values = draft?.values; if (!values) { clearFormDraft('block'); return; }
-      const existing = app.state.blocks.find(block => block.id === values.id); openBlock(existing || null, { date: values.startDate, time: values.startTime }); app.ui.editingBlockId = existing?.id || null; $('#blockId').value = values.id || existing?.id || $('#blockId').value; $('#blockAllDay').checked = values.allDay; $('#blockAllDayDate').value = values.startDate; $('#blockAllDayEndDate').value = values.endDate && values.endDate !== values.startDate ? values.endDate : ''; $('#blockStartDate').value = values.startDate; $('#blockStartTime').value = values.startTime; $('#blockEndDate').value = values.endDate || values.startDate; $('#blockEndTime').value = values.endTime; $('#blockReason').value = values.reason; $('#blockAddress').value = values.address; $('#blockNotes').value = values.notes; syncBlockAllDay(); return;
+      const existing = app.state.blocks.find(block => block.id === values.id); openBlock(existing || null, { date: values.startDate, time: values.startTime }); app.ui.editingBlockId = existing?.id || null; $('#blockId').value = values.id || existing?.id || $('#blockId').value; $('#blockAllDay').checked = values.allDay; $('#blockAllDayDate').value = values.startDate; $('#blockAllDayEndDate').value = values.endDate && values.endDate !== values.startDate ? values.endDate : ''; $('#blockStartDate').value = values.startDate; $('#blockStartTime').value = values.startTime; $('#blockEndDate').value = values.endDate || values.startDate; $('#blockEndTime').value = values.endTime; $('#blockReason').value = values.reason; $('#blockAppointments').checked = values.blocksAppointments !== false; $('#blockAddress').value = values.address; $('#blockNotes').value = values.notes; syncBlockAllDay(); syncBlockModePreview(); return;
+    }
+    if (kind === 'expense') {
+      const draft = expenseFormDraft(), values = draft?.values; if (!values) { clearFormDraft('expense'); return; }
+      const existing = app.state.expenses.find(expense => expense.id === values.id); openExpense(existing || null, { date: values.date });
+      $('#expenseId').value = values.id || existing?.id || $('#expenseId').value; populateExpenseCategorySelect(values.categoryId); $('#expenseDetails').value = values.details || ''; $('#expenseSupplier').value = values.supplier || ''; $('#expenseDate').value = values.date || todayKey(); $('#expenseAmount').value = values.amount || ''; return;
     }
     resumeAppointmentDraft();
   }
@@ -645,12 +858,16 @@
     if (dialogId === 'appointmentDialog') saveAppointmentDraft();
     else if (dialogId === 'clientDialog') saveClientDraft();
     else if (dialogId === 'blockDialog') saveBlockDraft();
+   else if (dialogId === 'expenseDialog') saveExpenseDraft();
+    else if (dialogId === 'expenseCategoriesDialog') saveExpenseCategoryDraft();
   }
 
   function discardDraftForDialog(dialogId) {
     if (dialogId === 'appointmentDialog') clearAppointmentDraft();
     else if (dialogId === 'clientDialog') clearFormDraft('client');
     else if (dialogId === 'blockDialog') clearFormDraft('block');
+   else if (dialogId === 'expenseDialog') clearFormDraft('expense');
+    else if (dialogId === 'expenseCategoriesDialog') clearFormDraft('expenseCategory');
   }
 
   function afterDialogClosed(dialogId) {
@@ -659,6 +876,7 @@
     if (dialogId === 'dayReviewDialog') { app.ui.reviewFinancialDraft = null; app.ui.reviewPendingId = null; }
     if (dialogId === 'reviewFinancialDialog') app.ui.reviewFinancialDraft = null;
     if (dialogId === 'conflictDialog') { app.ui.pendingDraft = null; setAppointmentSaving(false); }
+    if (dialogId === 'blockConflictDialog') { app.ui.pendingBlockConflict = null; setBlockSaving(false); }
     if (dialogId === 'duplicateClientDialog') { app.ui.pendingDuplicate = null; setAppointmentSaving(false); }
   }
 
@@ -668,18 +886,25 @@
     dialog.close(); afterDialogClosed(dialogId);
   }
 
+  function setUnsavedActionLabels(navigation = false) {
+    $('#unsavedSave').textContent = navigation ? 'Enregistrer puis continuer' : 'Enregistrer et fermer';
+    $('#unsavedDiscard').textContent = navigation ? 'Continuer sans enregistrer' : 'Quitter sans enregistrer';
+    $('#unsavedContinue').textContent = navigation ? 'Rester ici' : 'Continuer la modification';
+  }
+
   function requestDialogClose(dialogId) {
     const dialog = $(`#${dialogId}`); if (!dialog?.open) return;
     if (!formHasChanges(dialogId)) { closeDialogNow(dialogId); return; }
     saveDraftForDialog(dialogId);
     app.ui.pendingUnsavedClose = { dialogId };
-    const labels = { appointmentDialog: 'ce rendez-vous', clientDialog: 'cette fiche cliente', blockDialog: 'cette indisponibilité', serviceDialog: 'cette prestation', supplementTypeDialog: 'ce supplément', badgeDialog: 'ce repère', settingsDialog: 'ces réglages', reviewFinancialDialog: 'cet ajustement de tarif' };
+    setUnsavedActionLabels(false);
+    const labels = { appointmentDialog: 'ce rendez-vous', clientDialog: 'cette fiche cliente', blockDialog: 'cet événement personnel', expenseDialog: 'cette dépense', expenseCategoriesDialog: 'ces catégories', serviceDialog: 'cette prestation', supplementTypeDialog: 'ce supplément', badgeDialog: 'ce repère', settingsDialog: 'ces réglages', reviewFinancialDialog: 'cet ajustement de tarif' };
     $('#unsavedChangesText').textContent = `Enregistrer les modifications de ${labels[dialogId] || 'cette saisie'} avant de fermer ?`;
     if (!$('#unsavedChangesDialog').open) $('#unsavedChangesDialog').showModal();
   }
 
   function saveSettingsBeforeClose() {
-    const buttonByPage = { agenda: '#saveWorkingHours', clients: '#saveClientSettings', reminders: '#saveReminderSettings' };
+    const buttonByPage = { agenda: '#saveWorkingHours', clients: '#saveClientSettings', data: '#saveReminderSettings' };
     const button = $(buttonByPage[app.ui.settingsPage]);
     if (!button) return false;
     button.click();
@@ -688,30 +913,46 @@
 
   function requestSettingsPageChange(page) {
     app.ui.pendingUnsavedClose = { dialogId: 'settingsDialog', settingsTarget: page };
+    setUnsavedActionLabels(true);
     $('#unsavedChangesText').textContent = 'Enregistrer les modifications de ces réglages avant de changer de rubrique ?';
+    if (!$('#unsavedChangesDialog').open) $('#unsavedChangesDialog').showModal();
+ }
+
+  function requestExpenseCategoryChange(categoryId) {
+    app.ui.pendingUnsavedClose = { dialogId: 'expenseCategoriesDialog', expenseCategoryTarget: categoryId };
+    setUnsavedActionLabels(true);
+    $('#unsavedChangesText').textContent = 'Enregistrer cette catégorie avant d’en modifier une autre ?';
     if (!$('#unsavedChangesDialog').open) $('#unsavedChangesDialog').showModal();
   }
 
-  function resolveUnsavedClose(action) {
+ function resolveUnsavedClose(action) {
     const pending = app.ui.pendingUnsavedClose, prompt = $('#unsavedChangesDialog');
     if (prompt.open) prompt.close();
     if (!pending) return;
     if (action === 'continue') { app.ui.pendingUnsavedClose = null; return; }
-    const { dialogId, settingsTarget } = pending; app.ui.pendingUnsavedClose = null;
-    if (action === 'discard') {
-      if (settingsTarget) { app.ui.settingsDirty = false; showSettingsPage(settingsTarget, true); return; }
-      closeDialogNow(dialogId, true); return;
-    }
+    const { dialogId, settingsTarget, expenseCategoryTarget } = pending; app.ui.pendingUnsavedClose = null;
+   if (action === 'discard') {
+     if (settingsTarget) { app.ui.settingsDirty = false; showSettingsPage(settingsTarget, true); return; }
+      if (expenseCategoryTarget) { clearFormDraft('expenseCategory'); resetExpenseCategoryForm(); editExpenseCategory(expenseCategoryTarget); return; }
+     closeDialogNow(dialogId, true); return;
+   }
     if (dialogId === 'settingsDialog') {
       if (!saveSettingsBeforeClose()) return;
       if (settingsTarget) showSettingsPage(settingsTarget, true); else closeDialogNow(dialogId);
+     return;
+   }
+    if (expenseCategoryTarget) {
+      const form = $('#expenseCategoryForm'); form?.requestSubmit();
+      if (!formHasChanges('expenseCategoriesDialog')) editExpenseCategory(expenseCategoryTarget);
       return;
     }
-    $(`#${dialogId}`)?.querySelector('form')?.requestSubmit();
-  }
+   const form = $(`#${dialogId}`)?.querySelector('form');
+    form?.requestSubmit();
+    if ($(`#${dialogId}`)?.open && !formHasChanges(dialogId)) closeDialogNow(dialogId);
+ }
 
   function hasOpenUnsavedChanges() {
-    return ['appointmentDialog', 'clientDialog', 'blockDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog']
+    return ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog']
       .some(dialogId => $(`#${dialogId}`)?.open && formHasChanges(dialogId));
   }
 
@@ -721,6 +962,7 @@
   const serviceByName = name => app.state.settings.services.find(service => normaliseName(service.name) === normaliseName(name)) || null;
   const badgeById = id => app.state.settings.clientBadges.find(badge => badge.id === id) || null;
   const supplementTypeById = id => app.state.settings.supplementTypes.find(type => type.id === id) || null;
+  const expenseCategoryById = id => app.state.settings.expenseCategories.find(category => category.id === id) || null;
   const appointmentAddress = appointment => boundedText(appointment?.address || clientFor(appointment).address, LIMITS.shortText);
   const appointmentsForDate = key => app.state.appointments.filter(appointment => appointment.date === key).sort((a, b) => a.time.localeCompare(b.time));
   const activeAppointmentsForDate = key => appointmentsForDate(key).filter(activeAppointment);
@@ -732,7 +974,21 @@
 
   function badgeHtml(client, className = '') {
     const badge = clientBadge(client); if (!badge) return '';
-    return `<span class="client-badge ${className}" style="--badge-color:${escapeHtml(badge.color)}" title="${escapeHtml(badge.name)}" aria-label="${escapeHtml(badge.name)}">${escapeHtml(badge.symbol)}</span>`;
+    return `<span class="client-badge ${className}" title="${escapeHtml(badge.name)}" aria-label="${escapeHtml(badge.name)}">${escapeHtml(badge.emoji || badge.symbol)}</span>`;
+  }
+
+  function expenseCategoryLabel(expense) {
+    return expenseCategoryById(expense?.categoryId)?.name || boundedText(expense?.categoryLabel, 100) || 'Autre';
+  }
+
+  function eventBlocksAppointments(block) { return block?.blocksAppointments !== false; }
+
+  function blockTitle(block) { return boundedText(block?.reason || block?.title || 'Événement personnel', LIMITS.shortText) || 'Événement personnel'; }
+
+ function blockStatusMeta(block) {
+   return eventBlocksAppointments(block)
+     ? { icon: '🔒', label: 'Indisponible', className: 'blocking' }
+      : { icon: 'ℹ️', label: 'Information', className: 'informational' };
   }
 
   function lateCancellationCount(clientId) {
@@ -766,11 +1022,14 @@
     return app.state.blocks.filter(block => { const bounds = blockBounds(block); return intersects(bounds.start, bounds.end, start, end); });
   }
 
-  function blockSegment(block, date) {
-    const bounds = blockBounds(block), start = dayStartMs(date), end = dayEndMs(date);
-    if (!intersects(bounds.start, bounds.end, start, end)) return null;
-    return { startMinutes: Math.max(0, (Math.max(bounds.start, start) - start) / 60000), endMinutes: Math.min(1440, (Math.min(bounds.end, end) - start) / 60000) };
-  }
+ function blockSegment(block, date) {
+    const key = dateKey(date);
+    if (key < block.startDate || key > block.endDate) return null;
+    if (block.allDay) return { startMinutes: 0, endMinutes: 1440 };
+    const startMinutes = key === block.startDate ? toMinutes(block.startTime) : 0;
+    const endMinutes = key === block.endDate ? toMinutes(block.endTime) : 1440;
+    return endMinutes > startMinutes ? { startMinutes, endMinutes } : null;
+ }
 
   function workHoursFor(date) {
     return app.state.settings.workingHours[date.getDay()] || { enabled: false, start: '09:00', end: '19:00', breakStart: '', breakEnd: '' };
@@ -810,7 +1069,7 @@
     app.state.appointments.filter(appointment => activeAppointment(appointment) && appointment.id !== draft.id).forEach(appointment => {
       if (intersects(start, end, appointmentStart(appointment), appointmentEnd(appointment))) conflicts.push({ type: 'appointment', appointment });
     });
-    app.state.blocks.forEach(block => { const bounds = blockBounds(block); if (intersects(start, end, bounds.start, bounds.end)) conflicts.push({ type: 'block', block }); });
+    app.state.blocks.filter(eventBlocksAppointments).forEach(block => { const bounds = blockBounds(block); if (intersects(start, end, bounds.start, bounds.end)) conflicts.push({ type: 'block', block }); });
     return conflicts;
   }
 
@@ -830,13 +1089,17 @@
     if (opened) opened.opener = null;
   }
 
-  function routeEntriesForDate(date) {
-    const key = dateKey(date);
-    return [
-      ...activeAppointmentsForDate(key).filter(appointment => appointmentAddress(appointment)).map(appointment => ({ sortTime: appointment.time, time: appointment.time, title: clientFor(appointment).name, address: appointmentAddress(appointment) })),
-      ...blocksOnDate(date).filter(block => block.address).map(block => ({ sortTime: block.allDay || block.startDate < key ? '00:00' : block.startTime, time: block.allDay || block.startDate < key ? 'Journée' : block.startTime, title: `Indisponibilité · ${block.reason}`, address: block.address }))
-    ].sort((one, two) => one.sortTime.localeCompare(two.sortTime));
-  }
+ function routeEntriesForDate(date) {
+   const key = dateKey(date);
+   return [
+     ...activeAppointmentsForDate(key).filter(appointment => appointmentAddress(appointment)).map(appointment => ({ sortTime: appointment.time, time: appointment.time, title: clientFor(appointment).name, address: appointmentAddress(appointment) })),
+      ...blocksOnDate(date).filter(block => block.address).map(block => {
+        const startsToday = block.startDate === key, endsToday = block.endDate === key;
+        const time = block.allDay ? 'Journée' : startsToday ? block.startTime : endsToday ? `Jusqu’à ${block.endTime}` : 'Journée';
+        return { sortTime: startsToday && !block.allDay ? block.startTime : '00:00', time, title: `Événement personnel · ${blockTitle(block)}`, address: block.address };
+      })
+   ].sort((one, two) => one.sortTime.localeCompare(two.sortTime));
+ }
 
   function unreviewedForDate(key) {
     return activeAppointmentsForDate(key).filter(appointment => appointment.paymentStatus === 'unreviewed');
@@ -933,8 +1196,8 @@
   function dayStripHtml(attribute) {
     return Array.from({ length: 7 }, (_, index) => {
       const date = addDays(app.ui.weekStart, index), meta = dateMeta(date), count = activeAppointmentsForDate(dateKey(date)).length, blockCount = blocksOnDate(date).length;
-      const flags = `${meta.holiday ? '<span class="holiday-badge">Férié</span>' : ''}${meta.weekend ? '<span class="weekend-label">WE</span>' : ''}${blockCount ? '<span class="block-dot">⊘</span>' : ''}`;
-      const selected = sameDay(date, app.ui.selectedDate), label = `${format(date, { weekday: 'long', day: 'numeric', month: 'long' })}${meta.holiday ? `, jour férié ${meta.holiday.label}` : ''}, ${count} rendez-vous${blockCount ? `, ${blockCount} indisponibilité${blockCount > 1 ? 's' : ''}` : ''}`;
+      const flags = `${meta.holiday ? '<span class="holiday-badge">Férié</span>' : ''}${meta.weekend ? '<span class="weekend-label">WE</span>' : ''}${blockCount ? '<span class="block-dot">◇</span>' : ''}`;
+      const selected = sameDay(date, app.ui.selectedDate), label = `${format(date, { weekday: 'long', day: 'numeric', month: 'long' })}${meta.holiday ? `, jour férié ${meta.holiday.label}` : ''}, ${count} rendez-vous${blockCount ? `, ${blockCount} événement${blockCount > 1 ? 's' : ''} personnel${blockCount > 1 ? 's' : ''}` : ''}`;
       return `<button class="day-button ${selected ? 'selected' : ''} ${sameDay(date, new Date()) ? 'today' : ''} ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''} ${count ? 'has-event' : ''}" ${attribute}="${dateKey(date)}" aria-pressed="${selected}" aria-label="${escapeHtml(label)}"><span class="day-name">${format(date, { weekday: 'short' }).slice(0, 3)}</span><span class="day-number">${date.getDate()}</span>${flags}</button>`;
     }).join('');
   }
@@ -964,7 +1227,7 @@
     const blocks = [...new Map(weekDays.flatMap(day => day.blocks).map(block => [block.id, block])).values()];
     const minutes = appointments.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0), planned = appointments.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     $('#weekPeriodLabel').textContent = weekLabel(app.ui.weekStart);
-    $('#weekSummary').innerHTML = `<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${blocks.length ? `<span class="block-summary">⊘ ${blocks.length} bloqué${blocks.length > 1 ? 's' : ''}</span>` : ''}`;
+    $('#weekSummary').innerHTML = `<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}`;
     $('#weekSchedule').innerHTML = buildWeekTimeline(dates, weekDays);
   }
 
@@ -1013,26 +1276,31 @@
     }).join('');
     const allDay = days.map(day => {
       const { meta } = day, blocks = day.blocks.filter(block => block.allDay);
-      const content = `${meta.holiday ? `<span class="week-holiday-chip" title="${escapeHtml(meta.holiday.label)}">${escapeHtml(meta.holiday.label)}</span>` : ''}${blocks.map(block => `<button class="week-all-day-block" data-edit-block="${escapeHtml(block.id)}" title="${escapeHtml(`${block.reason} · ${blockDisplayLabel(block)}`)}" aria-label="Indisponibilité : ${escapeHtml(block.reason)}, ${escapeHtml(blockDisplayLabel(block))}">⊘ ${escapeHtml(block.reason)}</button>`).join('')}`;
+      const content = `${meta.holiday ? `<span class="week-holiday-chip" title="${escapeHtml(meta.holiday.label)}">${escapeHtml(meta.holiday.label)}</span>` : ''}${blocks.map(block => { const status = blockStatusMeta(block); return `<button class="week-all-day-block personal-event ${status.className}" data-edit-block="${escapeHtml(block.id)}" title="${escapeHtml(`${blockTitle(block)} · ${blockDisplayLabel(block)}`)}" aria-label="${status.label} : ${escapeHtml(blockTitle(block))}, ${escapeHtml(blockDisplayLabel(block))}">${status.icon} ${escapeHtml(blockTitle(block))}</button>`; }).join('')}`;
       return `<div class="week-all-day-cell ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}">${content}</div>`;
     }).join('');
     const hourLabels = Array.from({ length: totalHours + 1 }, (_, index) => `<span style="top:${index * WEEK_HOUR_HEIGHT}px">${pad(firstHour + index)}h</span>`).join('');
     const lanes = days.map(day => {
-      const { date, key, meta } = day, dayAppointments = day.appointments, layouts = appointmentLayouts(dayAppointments);
+      const { date, key, meta } = day, dayAppointments = day.appointments;
+      const timedEvents = day.blocks.filter(block => !block.allDay).map(block => ({ block, segment: blockSegment(block, date) })).filter(item => item.segment);
+      const layouts = timelineLayouts([
+        ...dayAppointments.map(appointment => ({ key: `a:${appointment.id}`, start: toMinutes(appointment.time), end: toMinutes(appointment.time) + Number(appointment.duration || 0) })),
+        ...timedEvents.map(item => ({ key: `b:${item.block.id}`, start: item.segment.startMinutes, end: item.segment.endMinutes }))
+      ]);
       const slots = Array.from({ length: totalHours * 2 }, (_, index) => {
         const minutes = firstHour * 60 + index * 30, time = timeText(minutes);
         return `<button class="week-empty-slot" data-create-date="${key}" data-create-time="${time}" style="top:${index * WEEK_HOUR_HEIGHT / 2}px;height:${WEEK_HOUR_HEIGHT / 2}px" aria-label="Ajouter un élément ${format(date, { weekday: 'long', day: 'numeric' })} à ${time}"></button>`;
       }).join('');
-      const blockHtml = day.blocks.filter(block => !block.allDay).map(block => {
-        const segment = blockSegment(block, date), start = Math.max(firstHour * 60, segment.startMinutes), end = Math.min(lastHour * 60, segment.endMinutes);
+      const blockHtml = timedEvents.map(({ block, segment }) => {
+        const start = Math.max(firstHour * 60, segment.startMinutes), end = Math.min(lastHour * 60, segment.endMinutes);
         if (end <= start) return '';
-        const top = ((start - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT, blockHeight = Math.max(18, ((end - start) / 60) * WEEK_HOUR_HEIGHT - 2);
-        return `<button class="week-blocked-block" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${blockHeight}px" title="${escapeHtml(block.reason)}" aria-label="Indisponibilité : ${escapeHtml(block.reason)}"><span>⊘</span><small>${escapeHtml(block.reason)}</small></button>`;
+        const top = ((start - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT, blockHeight = Math.max(22, ((end - start) / 60) * WEEK_HOUR_HEIGHT - 2), layout = layouts.get(`b:${block.id}`), status = blockStatusMeta(block);
+        return `<button class="week-blocked-block personal-event ${status.className} ${layout?.columns > 1 ? 'overlapped' : ''}" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${blockHeight}px;${weekHorizontalStyle(layout)}" title="${escapeHtml(blockTitle(block))}" aria-label="${status.label} : ${escapeHtml(blockTitle(block))}"><span>${status.icon}</span><small>${escapeHtml(blockTitle(block))}</small></button>`;
       }).join('');
       const appointmentHtml = dayAppointments.map(appointment => {
         const client = clientFor(appointment), firstName = client.name.trim().split(/\s+/)[0] || client.name;
         const top = ((toMinutes(appointment.time) - firstHour * 60) / 60) * WEEK_HOUR_HEIGHT;
-        const appointmentHeight = Math.max(19, (Number(appointment.duration || 0) / 60) * WEEK_HOUR_HEIGHT - 2), layout = layouts.get(appointment.id);
+        const appointmentHeight = Math.max(22, (Number(appointment.duration || 0) / 60) * WEEK_HOUR_HEIGHT - 2), layout = layouts.get(`a:${appointment.id}`);
         const conflicted = hasAppointmentConflict(appointment), compactTime = appointment.time;
         return `<button class="week-appointment ${serviceTheme(appointment)} ${Number(appointment.duration || 0) <= 30 ? 'micro' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${!activeAppointment(appointment) ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" data-edit="${escapeHtml(appointment.id)}" style="top:${top}px;height:${appointmentHeight}px;${weekHorizontalStyle(layout)}" aria-label="${appointment.time}, ${escapeHtml(client.name)}, ${escapeHtml(appointment.service)}"><span class="week-appointment-time">${compactTime}</span><strong class="week-appointment-name">${escapeHtml(firstName)}</strong>${badgeHtml(client, 'week')}${conflicted ? '<span class="week-conflict-marker" aria-hidden="true">!</span>' : ''}</button>`;
       }).join('');
@@ -1073,12 +1341,12 @@
     const meta = dateMeta(app.ui.selectedDate), blocks = blocksOnDate(app.ui.selectedDate), parts = [];
     if (meta.holiday) parts.push(`<strong>☀ Jour férié</strong> · ${escapeHtml(meta.holiday.label)}`);
     if (meta.weekend) parts.push('<strong>◒ Week-end</strong>');
-    if (blocks.length) parts.push(`<strong>⊘ ${blocks.length} créneau${blocks.length > 1 ? 'x' : ''} bloqué${blocks.length > 1 ? 's' : ''}</strong> · ${escapeHtml(blocks[0].reason)}`);
+    if (blocks.length) parts.push(`<strong>◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''} personnel${blocks.length > 1 ? 's' : ''}</strong> · ${escapeHtml(blockTitle(blocks[0]))}`);
     $('#holidayBanner').hidden = !parts.length;
-    $('#holidayBanner').innerHTML = parts.length ? `<div class="calendar-banner ${blocks.length ? 'blocked' : ''}">${parts.join(' &nbsp; · &nbsp; ')}</div>` : '';
+    $('#holidayBanner').innerHTML = parts.length ? `<div class="calendar-banner ${blocks.some(eventBlocksAppointments) ? 'blocked' : ''}">${parts.join(' &nbsp; · &nbsp; ')}</div>` : '';
     const allDay = blocks.filter(block => block.allDay), target = $('#dayAllDayBlocks');
     target.hidden = !allDay.length;
-    target.innerHTML = allDay.map(block => `<button data-edit-block="${escapeHtml(block.id)}"><span>${escapeHtml(blockDisplayLabel(block))}</span><strong>⊘ ${escapeHtml(block.reason)}</strong>${block.address ? `<small>${escapeHtml(block.address)}</small>` : ''}</button>`).join('');
+    target.innerHTML = allDay.map(block => { const status = blockStatusMeta(block); return `<button class="personal-event ${status.className}" data-edit-block="${escapeHtml(block.id)}"><span>${escapeHtml(blockDisplayLabel(block))} · ${status.label}</span><strong>${status.icon} ${escapeHtml(blockTitle(block))}</strong>${block.address ? `<small>${escapeHtml(block.address)}</small>` : ''}</button>`; }).join('');
   }
 
   function renderDaySummary() {
@@ -1088,26 +1356,26 @@
     const paid = appointments.filter(appointment => appointment.paymentStatus === 'paid').reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     const first = appointments[0], last = [...appointments].sort((one, two) => appointmentEnd(two) - appointmentEnd(one))[0];
     const clientSpan = first && last ? `<span class="client-hours-summary"><strong>${first.time}</strong> début clientes</span><span class="client-hours-summary"><strong>${endTime(last)}</strong> fin clientes</span>` : '';
-    $('#daySummary').innerHTML = `${clientSpan}<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${paid ? `<span><strong>${money(paid)}</strong> encaissé</span>` : ''}${blocks.length ? `<span class="block-summary">⊘ ${blocks.length} bloqué${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
+    $('#daySummary').innerHTML = `${clientSpan}<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${paid ? `<span><strong>${money(paid)}</strong> encaissé</span>` : ''}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
   }
 
-  function appointmentLayouts(appointments) {
-    const layouts = new Map(), ordered = [...appointments].filter(activeAppointment).sort((one, two) => appointmentStart(one) - appointmentStart(two) || appointmentEnd(one) - appointmentEnd(two));
+  function timelineLayouts(items) {
+    const layouts = new Map(), ordered = [...items].filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start).sort((one, two) => one.start - two.start || one.end - two.end || String(one.key).localeCompare(String(two.key)));
     let group = [], groupEnd = -Infinity;
     const placeGroup = items => {
       const columnEnds = [], placed = [];
-      items.forEach(appointment => {
-        const start = appointmentStart(appointment), end = appointmentEnd(appointment);
+      items.forEach(item => {
+        const { start, end } = item;
         let column = columnEnds.findIndex(value => value <= start);
         if (column === -1) column = columnEnds.length;
-        columnEnds[column] = end; placed.push({ appointment, column });
+        columnEnds[column] = end; placed.push({ item, column });
       });
-      placed.forEach(item => layouts.set(item.appointment.id, { column: item.column, columns: columnEnds.length }));
+      placed.forEach(placedItem => layouts.set(placedItem.item.key, { column: placedItem.column, columns: columnEnds.length }));
     };
-    ordered.forEach(appointment => {
-      const start = appointmentStart(appointment), end = appointmentEnd(appointment);
+    ordered.forEach(item => {
+      const { start, end } = item;
       if (group.length && start >= groupEnd) { placeGroup(group); group = []; groupEnd = -Infinity; }
-      group.push(appointment); groupEnd = Math.max(groupEnd, end);
+      group.push(item); groupEnd = Math.max(groupEnd, end);
     });
     if (group.length) placeGroup(group);
     return layouts;
@@ -1147,16 +1415,19 @@
     const firstHour = Math.floor(Math.min(8 * 60, ...itemStarts) / 60), lastHour = Math.ceil(Math.max(20 * 60, ...itemEnds) / 60), totalHours = Math.max(1, lastHour - firstHour);
     const lines = Array.from({ length: totalHours + 1 }, (_, index) => `<span class="timeline-hour" style="top:${index * HOUR_HEIGHT}px">${pad(firstHour + index)}:00</span><i class="timeline-line" style="top:${index * HOUR_HEIGHT}px"></i>`).join('');
     const empty = Array.from({ length: totalHours }, (_, index) => `<button class="timeline-empty" data-create-time="${pad(firstHour + index)}:00" style="top:${index * HOUR_HEIGHT}px;height:${HOUR_HEIGHT}px" aria-label="Ajouter un rendez-vous à ${pad(firstHour + index)} h"></button>`).join('');
-    const blockHtml = blocks.filter(block => !block.allDay).map(block => {
-      const segment = blockSegment(block, date); if (!segment) return '';
+    const layouts = timelineLayouts([
+      ...appointments.map(appointment => ({ key: `a:${appointment.id}`, start: toMinutes(appointment.time), end: toMinutes(appointment.time) + Number(appointment.duration || 0) })),
+      ...timedBlocks.map(item => ({ key: `b:${item.block.id}`, start: item.segment.startMinutes, end: item.segment.endMinutes }))
+    ]);
+    const blockHtml = timedBlocks.map(({ block, segment }) => {
       const start = Math.max(firstHour * 60, segment.startMinutes), end = Math.min(lastHour * 60, segment.endMinutes), top = ((start - firstHour * 60) / 60) * HOUR_HEIGHT, height = Math.max(28, ((end - start) / 60) * HOUR_HEIGHT - 2);
-      return `<button class="blocked-block ${block.allDay ? 'all-day-block' : ''}" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${height}px"><span>⊘ ${escapeHtml(block.reason)}</span><small>${escapeHtml(blockDetailsLabel(block))}</small></button>`;
+      const layout = layouts.get(`b:${block.id}`), status = blockStatusMeta(block);
+      return `<button class="blocked-block personal-event ${status.className} ${layout?.columns > 1 ? 'overlapped' : ''}" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${height}px;${appointmentHorizontalStyle(layout)}"><span>${status.icon} ${escapeHtml(blockTitle(block))}</span><small>${status.label} · ${escapeHtml(blockDetailsLabel(block))}</small></button>`;
     }).join('');
-    const layouts = appointmentLayouts(appointments);
     const appointmentHtml = appointments.map(appointment => {
       const client = clientFor(appointment), top = ((toMinutes(appointment.time) - firstHour * 60) / 60) * HOUR_HEIGHT;
       const height = Math.max(30, (Number(appointment.duration || 0) / 60) * HOUR_HEIGHT - 4), compact = Number(appointment.duration || 0) <= 60;
-      const inactive = !activeAppointment(appointment), conflicted = hasAppointmentConflict(appointment), layout = layouts.get(appointment.id);
+      const inactive = !activeAppointment(appointment), conflicted = hasAppointmentConflict(appointment), layout = layouts.get(`a:${appointment.id}`);
       const reason = appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : '';
       return `<article class="appointment-block ${serviceTheme(appointment)} status-${appointment.status} ${compact ? 'compact' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${inactive ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" style="top:${top}px;height:${height}px;${appointmentHorizontalStyle(layout)}"><button class="appointment-edit" data-edit="${escapeHtml(appointment.id)}"><span class="appointment-time">${appointment.time} – ${endTime(appointment)}</span><strong class="appointment-name">${badgeHtml(client, 'planning')}${escapeHtml(client.name)}</strong><span class="appointment-meta">${escapeHtml(appointment.service)} · ${Number(appointment.duration)} min${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${reason}</span></button><div class="appointment-footer"><span class="status-badge">${STATUS[appointment.status]}</span>${appointment.paymentStatus === 'paid' && activeAppointment(appointment) ? '<span class="paid-badge">Payé</span>' : ''}</div></article>`;
     }).join('');
@@ -1165,17 +1436,75 @@
     $('#dayTimeline').innerHTML = `<div class="timeline-inner" style="height:${totalHours * HOUR_HEIGHT}px">${renderWorkShading(workHoursFor(date), firstHour, lastHour)}${lines}${empty}${blockHtml}${appointmentHtml}${currentLine}</div>`;
   }
 
+  function dayOrdinal(value) {
+    const date = value instanceof Date ? value : parseDate(value);
+    return date ? Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000) : NaN;
+  }
+
+  function blockCalendarEndDate(block) {
+    if (block.allDay || block.endTime !== '00:00' || block.endDate === block.startDate) return block.endDate;
+    return dateKey(addDays(parseDate(block.endDate), -1));
+  }
+
+  function buildMonthEventSegments(calendarStart, weekCount, blocks = app.state.blocks, maxLanes = 3) {
+    const startOrdinal = dayOrdinal(calendarStart), totalDays = Math.max(1, Number(weekCount) || 1) * 7, finalOrdinal = startOrdinal + totalDays - 1;
+    const candidates = blocks.map(block => {
+      const start = dayOrdinal(block.startDate), end = dayOrdinal(blockCalendarEndDate(block));
+      return { block, start, end, visibleStart: Math.max(startOrdinal, start), visibleEnd: Math.min(finalOrdinal, end) };
+    }).filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.visibleEnd >= item.visibleStart)
+      .sort((one, two) => one.visibleStart - two.visibleStart || (two.visibleEnd - two.visibleStart) - (one.visibleEnd - one.visibleStart) || String(one.block.id).localeCompare(String(two.block.id)));
+    const perRow = Array.from({ length: Math.max(1, Number(weekCount) || 1) }, () => []);
+    candidates.forEach(item => {
+      const firstRow = Math.floor((item.visibleStart - startOrdinal) / 7), lastRow = Math.floor((item.visibleEnd - startOrdinal) / 7);
+      for (let row = firstRow; row <= lastRow; row += 1) {
+        const rowStart = startOrdinal + row * 7, segmentStart = Math.max(item.visibleStart, rowStart), segmentEnd = Math.min(item.visibleEnd, rowStart + 6);
+        perRow[row].push({ block: item.block, blockId: item.block.id, row, startColumn: segmentStart - rowStart + 1, span: segmentEnd - segmentStart + 1, startOrdinal: segmentStart, endOrdinal: segmentEnd, continuesBefore: item.start < segmentStart, continuesAfter: item.end > segmentEnd });
+      }
+    });
+    const segments = [], overflowByDate = {};
+    perRow.forEach(rowItems => {
+      const laneEnds = [];
+      rowItems.forEach(segment => {
+        let lane = laneEnds.findIndex(end => end < segment.startColumn);
+        if (lane === -1) lane = laneEnds.length;
+        laneEnds[lane] = segment.startColumn + segment.span - 1;
+        if (lane < maxLanes) segments.push({ ...segment, lane });
+        else {
+          for (let offset = 0; offset < segment.span; offset += 1) {
+            const key = dateKey(addDays(calendarStart, segment.row * 7 + segment.startColumn - 1 + offset));
+            overflowByDate[key] = (overflowByDate[key] || 0) + 1;
+          }
+        }
+      });
+    });
+    return { segments, overflowByDate };
+  }
+
   function renderMonthView() {
     const month = app.ui.monthDate;
     $('#monthLabel').textContent = format(month, { month: 'long', year: 'numeric' });
     const first = localDate(month.getFullYear(), month.getMonth(), 1), last = localDate(month.getFullYear(), month.getMonth() + 1, 0), start = mondayOf(first), end = addDays(mondayOf(last), 6), dates = [];
     for (let date = start; date <= end; date = addDays(date, 1)) dates.push(date);
     const headings = DAYS.map(day => `<div class="month-weekday">${day.short}</div>`).join('');
-    $('#monthGrid').innerHTML = headings + dates.map(date => {
-      const meta = dateMeta(date), blocks = blocksOnDate(date).length, count = activeAppointmentsForDate(dateKey(date)).length, selectedWeek = app.ui.overviewWeekStart && sameDay(mondayOf(date), app.ui.overviewWeekStart);
-      const label = `${format(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${meta.holiday ? `, jour férié ${meta.holiday.label}` : ''}${count ? `, ${count} rendez-vous` : ', aucun rendez-vous'}${blocks ? `, ${blocks} indisponibilité${blocks > 1 ? 's' : ''}` : ''}`;
-      return `<button class="month-day ${date.getMonth() !== month.getMonth() ? 'muted' : ''} ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''} ${blocks ? 'has-block' : ''} ${sameDay(date, new Date()) ? 'today' : ''} ${selectedWeek ? 'selected-week' : ''}" data-select-week="${dateKey(date)}" aria-label="${escapeHtml(label)}"><span class="month-number">${date.getDate()}</span>${meta.holiday ? '<span class="month-holiday">F</span>' : ''}${blocks ? '<span class="month-block">⊘</span>' : ''}${count ? `<span class="month-event-count">${count}</span>` : ''}</button>`;
+    const weekCount = dates.length / 7, monthEvents = buildMonthEventSegments(start, weekCount, app.state.blocks, 3);
+    const rows = Array.from({ length: weekCount }, (_, row) => {
+      const rowDates = dates.slice(row * 7, row * 7 + 7);
+      const days = rowDates.map(date => {
+        const meta = dateMeta(date), eventCount = blocksOnDate(date).length, count = activeAppointmentsForDate(dateKey(date)).length, selectedWeek = app.ui.overviewWeekStart && sameDay(mondayOf(date), app.ui.overviewWeekStart);
+        const label = `${format(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${meta.holiday ? `, jour férié ${meta.holiday.label}` : ''}${count ? `, ${count} rendez-vous` : ', aucun rendez-vous'}${eventCount ? `, ${eventCount} événement${eventCount > 1 ? 's' : ''} personnel${eventCount > 1 ? 's' : ''}` : ''}`;
+        return `<button class="month-day ${date.getMonth() !== month.getMonth() ? 'muted' : ''} ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''} ${eventCount ? 'has-event' : ''} ${sameDay(date, new Date()) ? 'today' : ''} ${selectedWeek ? 'selected-week' : ''}" data-select-week="${dateKey(date)}" aria-label="${escapeHtml(label)}"><span class="month-number">${date.getDate()}</span>${meta.holiday ? '<span class="month-holiday">F</span>' : ''}${count ? `<span class="month-event-count">${count}</span>` : ''}</button>`;
+      }).join('');
+      const bands = monthEvents.segments.filter(segment => segment.row === row).map(segment => {
+        const status = blockStatusMeta(segment.block), before = segment.continuesBefore ? 'continues-before' : '', after = segment.continuesAfter ? 'continues-after' : '';
+        return `<button class="month-event-band event-${status.className} ${before} ${after}" data-edit-block="${escapeHtml(segment.block.id)}" data-event-lane="${segment.lane}" style="grid-column:${segment.startColumn} / span ${segment.span};grid-row:${segment.lane + 1};--event-lane:${segment.lane}" title="${escapeHtml(`${blockTitle(segment.block)} · ${blockDisplayLabel(segment.block)}`)}">${status.icon} ${escapeHtml(blockTitle(segment.block))}</button>`;
+      }).join('');
+      const overflow = rowDates.map((date, column) => {
+        const hidden = monthEvents.overflowByDate[dateKey(date)] || 0;
+        return hidden ? `<button class="month-event-overflow" data-select-week="${dateKey(date)}" style="grid-column:${column + 1}">+${hidden} événement${hidden > 1 ? 's' : ''}</button>` : '';
+      }).join('');
+      return `<section class="month-week-row"><div class="month-days-row">${days}</div><div class="month-event-layer">${bands}${overflow}</div></section>`;
     }).join('');
+    $('#monthGrid').innerHTML = headings + rows;
     renderWeekOverview();
   }
 
@@ -1188,13 +1517,13 @@
       ].sort((a, b) => a.time.localeCompare(b.time));
       const content = entries.length ? entries.map(entry => {
         if (entry.type === 'block') {
-          const block = entry.block;
-          return `<div class="overview-entry"><button class="overview-block" data-edit-block="${escapeHtml(block.id)}"><span>⊘</span><span><strong>${escapeHtml(block.reason)}</strong><small>${escapeHtml(blockDetailsLabel(block))}</small></span></button></div>`;
+          const block = entry.block, status = blockStatusMeta(block);
+          return `<div class="overview-entry"><button class="overview-block event-${status.className}" data-edit-block="${escapeHtml(block.id)}"><span>${status.icon}</span><span><strong>${escapeHtml(blockTitle(block))}</strong><small>${status.label} · ${escapeHtml(blockDetailsLabel(block))}</small></span></button></div>`;
         }
         const appointment = entry.appointment, client = clientFor(appointment), payment = activeAppointment(appointment) ? ` · ${PAYMENT[appointment.paymentStatus] || 'À vérifier'}` : '';
         return `<div class="overview-entry"><button class="overview-appointment ${serviceTheme(appointment)} ${!activeAppointment(appointment) ? 'inactive' : ''}" data-edit="${escapeHtml(appointment.id)}"><span class="overview-time">${appointment.time}</span><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><span>${escapeHtml(appointment.service)} · fin ${endTime(appointment)}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${payment}</span></span><span class="mini-status">${STATUS[appointment.status]}</span></button></div>`;
-      }).join('') : '<p>Aucun rendez-vous</p>';
-      return `<article class="overview-day ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}"><div class="overview-day-heading"><button data-open-day="${key}"><h3>${format(date, { weekday: 'long', day: 'numeric', month: 'short' })}${meta.holiday ? ` <small>· Férié : ${escapeHtml(meta.holiday.label)}</small>` : ''}</h3><small>${appointments.filter(activeAppointment).length} RDV · ${escapeHtml(workHoursLabel(hours))}</small></button><span>›</span></div>${content}</article>`;
+      }).join('') : '<p>Aucun rendez-vous ni événement personnel</p>';
+      return `<article class="overview-day ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}"><div class="overview-day-heading"><button data-open-day="${key}"><h3>${format(date, { weekday: 'long', day: 'numeric', month: 'short' })}${meta.holiday ? ` <small>· Férié : ${escapeHtml(meta.holiday.label)}</small>` : ''}</h3><small>${appointments.filter(activeAppointment).length} RDV · ${blocks.length} événement${blocks.length > 1 ? 's' : ''} · ${escapeHtml(workHoursLabel(hours))}</small></button><span>›</span></div>${content}</article>`;
     }).join('');
   }
 
@@ -1234,21 +1563,68 @@
     }).join('') : '<section class="empty-message"><h2>Aucune cliente trouvée</h2><p>Essaie un autre nom ou retire le filtre.</p></section>';
   }
 
-  function reportRange() {
-    if (app.ui.reportMode === 'week') { const start = mondayOf(app.ui.reportDate); return { start, end: addDays(start, 7) }; }
-    if (app.ui.reportMode === 'year') { const start = localDate(app.ui.reportDate.getFullYear(), 0, 1); return { start, end: localDate(start.getFullYear() + 1, 0, 1) }; }
+  function reportRange(mode = app.ui.reportMode) {
+    if (mode === 'day') { const start = startOfDay(app.ui.reportDate); return { start, end: addDays(start, 1) }; }
+    if (mode === 'week') { const start = mondayOf(app.ui.reportDate); return { start, end: addDays(start, 7) }; }
+    if (mode === 'year') { const start = localDate(app.ui.reportDate.getFullYear(), 0, 1); return { start, end: localDate(start.getFullYear() + 1, 0, 1) }; }
     const start = localDate(app.ui.reportDate.getFullYear(), app.ui.reportDate.getMonth(), 1);
     return { start, end: localDate(start.getFullYear(), start.getMonth() + 1, 1) };
   }
 
+  function expenseReportRange(mode = app.ui.expenseReportMode) { return reportRange(mode); }
+
+ function currentReportMode() { return app.ui.reportTab === 'expenses' ? app.ui.expenseReportMode : app.ui.reportMode; }
+
+  function shiftReportDate(direction) {
+    const mode = currentReportMode(), amount = direction < 0 ? -1 : 1;
+    if (mode === 'day') app.ui.reportDate = addDays(app.ui.reportDate, amount);
+    else if (mode === 'week') app.ui.reportDate = addDays(app.ui.reportDate, amount * 7);
+    else if (mode === 'year') app.ui.reportDate = localDate(app.ui.reportDate.getFullYear() + amount, 0, 1);
+    else app.ui.reportDate = localDate(app.ui.reportDate.getFullYear(), app.ui.reportDate.getMonth() + amount, 1);
+  }
+
+  function expensesForRange(start, end) {
+    return app.state.expenses.filter(expense => { const date = parseDate(expense.date); return date && date >= start && date < end; }).sort((one, two) => one.date.localeCompare(two.date) || String(one.createdAt).localeCompare(String(two.createdAt)));
+  }
+
+  function expenseSummary(expenses) {
+    const total = numericAmount(expenses.reduce((sum, expense) => sum + numericAmount(expense.amount), 0)), count = expenses.length;
+    return { total, count, average: count ? numericAmount(total / count) : 0 };
+  }
+
+  function aggregateExpensesByCategory(expenses) {
+    const groups = new Map();
+    expenses.forEach(expense => {
+      const id = expense.categoryId || 'expense-other', row = groups.get(id) || { id, categoryId: id, label: expenseCategoryLabel(expense), total: 0, count: 0 };
+      row.total = numericAmount(row.total + numericAmount(expense.amount)); row.count += 1; groups.set(id, row);
+    });
+    return [...groups.values()].sort((one, two) => two.total - one.total || one.label.localeCompare(two.label, 'fr'));
+  }
+
   function renderReport() {
-    const { start, end } = reportRange();
-    $('#reportPeriodLabel').textContent = app.ui.reportMode === 'week' ? `${format(start, { day: 'numeric', month: 'short' })} – ${format(addDays(end, -1), { day: 'numeric', month: 'short' })}` : app.ui.reportMode === 'year' ? String(start.getFullYear()) : format(start, { month: 'long', year: 'numeric' });
-    $$('.report-period-button').forEach(button => button.classList.toggle('active', button.dataset.reportPeriod === app.ui.reportMode));
-    $$('.report-tab').forEach(button => button.classList.toggle('active', button.dataset.reportTab === app.ui.reportTab));
+    const mode = currentReportMode(), { start, end } = reportRange(mode), expensesTab = app.ui.reportTab === 'expenses';
+    $('#reportPeriodLabel').textContent = mode === 'day' ? format(start, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : mode === 'week' ? `${format(start, { day: 'numeric', month: 'short' })} – ${format(addDays(end, -1), { day: 'numeric', month: 'short' })}` : mode === 'year' ? String(start.getFullYear()) : format(start, { month: 'long', year: 'numeric' });
+    $$('.report-period-button').forEach(button => { const allowed = expensesTab ? button.dataset.reportPeriod !== 'week' : button.dataset.reportPeriod !== 'day'; button.hidden = !allowed; const active = allowed && button.dataset.reportPeriod === mode; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
+    $$('.report-tab').forEach(button => { const active = button.dataset.reportTab === app.ui.reportTab; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
+    $('#exportReportCsv').textContent = expensesTab ? 'Exporter les dépenses' : 'Exporter CSV';
+    if (expensesTab) { renderExpensesReport(start, end); return; }
     const byAppointmentDate = appointment => { const date = parseDate(appointment.date); return date >= start && date < end; };
     if (app.ui.reportTab === 'activity') renderActivityReport(byAppointmentDate); else renderPaymentsReport(byAppointmentDate, start, end);
-    if (app.ui.reportMode === 'year') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start));
+    if (mode === 'year') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start));
+  }
+
+  function renderExpensesReport(start, end) {
+    const expenses = expensesForRange(start, end), summary = expenseSummary(expenses), globalActive = app.ui.expenseReportView === 'global';
+    const switcher = `<section class="expense-view-switch" aria-label="Présentation des dépenses"><button class="${globalActive ? 'active' : ''}" data-expense-view="global" aria-pressed="${globalActive}">Vue globale</button><button class="${globalActive ? '' : 'active'}" data-expense-view="categories" aria-pressed="${!globalActive}">Par catégorie</button></section>`;
+    const note = '<p class="information-note expense-separate-note"><span>i</span><strong>Information uniquement : les revenus encaissés ne sont pas diminués par les dépenses.</strong></p>';
+    if (globalActive) {
+      const rows = [...expenses].reverse().map(expense => `<button class="expense-row" data-edit-expense="${escapeHtml(expense.id)}"><span class="expense-row-date">${format(parseDate(expense.date), { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(expenseCategoryLabel(expense))}</strong><small>${escapeHtml([expense.details, expense.supplier].filter(Boolean).join(' · ') || 'Aucun détail')}</small></span><b>${money(expense.amount)} ›</b></button>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
+      $('#reportContent').innerHTML = `${switcher}${note}<section class="metrics-grid expense-metrics"><article><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>sans déduction des revenus</small></article><article><span>Nombre</span><strong>${summary.count}</strong><small>achat${summary.count > 1 ? 's' : ''} enregistré${summary.count > 1 ? 's' : ''}</small></article><article><span>Montant moyen</span><strong>${money(summary.average) || '0 €'}</strong><small>moyenne des dépenses</small></article></section><section class="report-panel"><h2>Historique des dépenses</h2>${rows}</section>`;
+      return;
+    }
+    const groups = aggregateExpensesByCategory(expenses), maximum = Math.max(1, ...groups.map(group => group.total));
+    const rows = groups.map((group, index) => `<article class="expense-category-row"><div class="expense-category-heading"><span><strong>${escapeHtml(group.label)}</strong><small>${group.count} dépense${group.count > 1 ? 's' : ''}</small></span><b>${money(group.total)}</b></div><div class="expense-category-bar"><span style="--bar-width:${Math.max(2, group.total / maximum * 100).toFixed(1)}%;--expense-bar-index:${index % 7}"></span></div></article>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
+    $('#reportContent').innerHTML = `${switcher}${note}<section class="metrics-grid expense-metrics"><article><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>${summary.count} dépense${summary.count > 1 ? 's' : ''}</small></article></section><section class="report-panel"><h2>Dépenses par catégorie</h2>${rows}</section>`;
   }
 
   function annualBreakdown(yearStart) {
@@ -1273,7 +1649,15 @@
   }
 
   async function exportReportCsv() {
-    const { start, end } = reportRange(), appointments = app.state.appointments.filter(item => { const date = parseDate(item.date); return date >= start && date < end; }).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
+    if (app.ui.reportTab === 'expenses') {
+      const mode = app.ui.expenseReportMode, { start, end } = expenseReportRange(mode), expenses = expensesForRange(start, end);
+      const header = ['Date', 'Catégorie', 'Description', 'Fournisseur', 'Montant'];
+      const rows = expenses.map(expense => [expense.date, expenseCategoryLabel(expense), expense.details, expense.supplier, numericAmount(expense.amount).toFixed(2)].map(csvCell).join(';'));
+      const label = mode === 'year' ? String(start.getFullYear()) : mode === 'month' ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}` : dateKey(start);
+      const blob = new Blob([`\ufeff${header.map(csvCell).join(';')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
+      return shareOrDownload(blob, `depenses-${mode}-${label}.csv`, 'Dépenses Mon agenda');
+    }
+    const { start, end } = reportRange(app.ui.reportMode), appointments = app.state.appointments.filter(item => { const date = parseDate(item.date); return date >= start && date < end; }).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
     const header = ['Date', 'Heure', 'Cliente', 'Téléphone', 'Contact via', 'Prestation', 'Durée (min)', 'Prix de base', 'Suppléments', 'Total', 'Statut', 'Paiement', 'Date paiement', 'Date relance'];
     const rows = appointments.map(appointment => {
       const client = clientFor(appointment), supplementText = normaliseSupplements(appointment.supplements).map(item => `${item.label}: ${numericAmount(item.amount).toFixed(2)} €`).join(' | ');
@@ -1326,6 +1710,32 @@
     $('#serviceSelect').innerHTML = `<option value="">Choisir…</option>${active.map(service => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)}${service.price !== '' ? ` · ${money(service.price)}` : ''}</option>`).join('')}<option value="custom">Autre prestation…</option>`;
     $('#serviceSelect').value = selected;
     $('#customServiceField').hidden = selected !== 'custom'; $('#service').required = selected === 'custom';
+  }
+
+  function durationLabel(minutes) {
+    const value = Number(minutes) || 0, hours = Math.floor(value / 60), rest = value % 60;
+    if (!hours) return `${rest} min`;
+    return `${hours} h${rest ? ` ${rest}` : ''}`;
+  }
+
+  function updateAppointmentServiceSummary() {
+    const preset = serviceById($('#serviceSelect').value), name = preset?.name || $('#service').value.trim(), selected = Boolean(name);
+    $('#appointmentServiceSummary').hidden = !selected;
+    if (selected) $('#appointmentServiceSummaryText').textContent = `${name} · ${durationLabel($('#duration').value)} · ${money($('#price').value) || 'prix à définir'}`;
+  }
+
+  function setAppointmentAdjustments(expanded) {
+    const custom = $('#serviceSelect').value === 'custom', visible = Boolean(expanded || custom);
+    $('#appointmentServiceAdjustments').hidden = !visible; $('#toggleAppointmentAdjustments').setAttribute('aria-expanded', String(visible)); $('#toggleAppointmentAdjustments').textContent = visible && !custom ? 'Réduire' : 'Ajuster';
+    app.ui.appointmentAdjustmentsExpanded = visible; updateAppointmentServiceSummary();
+  }
+
+  function syncAppointmentContactSummary(client, expanded = app.ui.appointmentContactExpanded) {
+    const selected = Boolean(client?.id), summary = $('#appointmentContactSummary'), fields = $('#appointmentContactFields');
+    summary.hidden = !selected || expanded; fields.hidden = selected && !expanded;
+    if (!selected) { app.ui.appointmentContactExpanded = true; return; }
+    const details = [$('#phone').value || 'sans téléphone', CONTACT[$('#contactVia').value] || 'contact non précisé', $('#address').value || 'sans adresse'];
+    $('#appointmentContactSummaryText').textContent = details.join(' · '); app.ui.appointmentContactExpanded = Boolean(expanded);
   }
 
   function syncPaymentFields() {
@@ -1407,8 +1817,10 @@
     syncStatusFields(); syncRepeatDate(true); syncPaymentFields();
   }
 
-  function resetAppointmentForm() {
-    $('#appointmentForm').reset(); $('#appointmentId').value = ''; populateServiceSelect();
+ function resetAppointmentForm() {
+   $('#appointmentForm').reset(); $('#appointmentId').value = ''; populateServiceSelect();
+    app.ui.appointmentContactExpanded = true; app.ui.appointmentAdjustmentsExpanded = false;
+    $('#appointmentContactSummary').hidden = true; $('#appointmentContactFields').hidden = false; $('#appointmentServiceSummary').hidden = true; setAppointmentAdjustments(false);
     $('#date').value = dateKey(app.ui.selectedDate); setTimePicker('time', '10:00'); setTimePicker('repeatTime', '10:00'); setDurationValue(60); populateStatusSelect(false, 'confirmed');
     $('#paymentStatus').value = 'unreviewed'; $('#paymentDate').value = ''; $('#paymentReminderDate').value = ''; $('#paymentMethod').value = ''; $('#repeatWeeks').value = '0'; $('#repeatDate').value = ''; $('#repeatTime').value = '';
     $('#contactVia').value = ''; $('#lateCancellation').checked = false; renderSupplementRows([]); renderAppointmentHistory(null);
@@ -1418,17 +1830,17 @@
     syncPaymentFields(); syncAppointmentFormMode();
   }
 
-  function setAppointmentSaving(value) {
-    app.ui.appointmentSaving = Boolean(value);
-    const submit = $('#appointmentForm button[type="submit"]');
-    if (submit) { submit.disabled = app.ui.appointmentSaving; submit.textContent = app.ui.appointmentSaving ? 'Enregistrement…' : 'Enregistrer'; }
-  }
+ function setAppointmentSaving(value) {
+   app.ui.appointmentSaving = Boolean(value);
+    const submit = $('#appointmentSubmitButton');
+    if (submit) { submit.disabled = app.ui.appointmentSaving; submit.textContent = app.ui.appointmentSaving ? 'Enregistrement…' : (app.ui.editingAppointmentId ? 'Enregistrer les modifications' : 'Créer le rendez-vous'); }
+ }
 
-  function setBlockSaving(value) {
-    app.ui.blockSaving = Boolean(value);
-    const submit = $('#blockForm button[type="submit"]');
-    if (submit) { submit.disabled = app.ui.blockSaving; submit.textContent = app.ui.blockSaving ? 'Enregistrement…' : 'Enregistrer'; }
-  }
+ function setBlockSaving(value) {
+   app.ui.blockSaving = Boolean(value);
+    const submit = $('#blockSubmitButton');
+    if (submit) { submit.disabled = app.ui.blockSaving; submit.textContent = app.ui.blockSaving ? 'Enregistrement…' : (app.ui.editingBlockId ? 'Enregistrer les modifications' : 'Ajouter l’événement'); }
+ }
 
   function openAppointment(appointment = null, defaults = {}) {
     resetAppointmentForm();
@@ -1440,20 +1852,22 @@
       const prior = defaults.from, client = clientFor(prior); app.ui.formClientId = client.id; app.ui.formServiceColor = prior.serviceColor || 'rose';
       $('#clientName').value = client.name; $('#phone').value = client.phone; $('#contactVia').value = prior.contactVia || client.contactVia || ''; $('#address').value = appointmentAddress(prior); setDurationValue(prior.duration); $('#price').value = prior.price; renderSupplementRows(prior.supplements); populateServiceSelect(prior.serviceId, prior.service); $('#service').value = prior.service; $('#date').value = defaults.date || dateKey(app.ui.selectedDate); setTimePicker('time', defaults.time || prior.time); $('#appointmentWaze').hidden = !appointmentAddress(prior); renderSelectedClientInfo(client);
     } else { $('#date').value = defaults.date || dateKey(app.ui.selectedDate); setTimePicker('time', defaults.time || '10:00'); }
-    syncAppointmentFormMode(); updateAppointmentTotal(); updateConflictHint(); app.ui.appointmentDraftBaseline = draftSignature(appointmentDraftPayload()); $('#appointmentDialog').showModal(); captureFormBaseline('appointmentDialog'); if (!appointment) setTimeout(() => $('#clientName').focus(), 30);
-  }
+   syncAppointmentFormMode(); updateAppointmentTotal(); updateConflictHint(); app.ui.appointmentDraftBaseline = draftSignature(appointmentDraftPayload()); $('#appointmentDialog').showModal(); captureFormBaseline('appointmentDialog'); if (!appointment) setTimeout(() => $('#clientName').focus(), 30);
+    const selectedClient = app.ui.formClientId ? clientById(app.ui.formClientId) : null;
+    syncAppointmentContactSummary(selectedClient, !selectedClient); setAppointmentAdjustments($('#serviceSelect').value === 'custom'); setAppointmentSaving(false);
+ }
 
-  function renderSelectedClientInfo(client) {
-    const target = $('#selectedClientInfo');
-    if (!client?.id) { target.hidden = true; target.innerHTML = ''; return; }
+ function renderSelectedClientInfo(client) {
+   const target = $('#selectedClientInfo');
+   if (!client?.id) { target.hidden = true; target.innerHTML = ''; syncAppointmentContactSummary(null, true); return; }
     target.hidden = false;
     const late = lateCancellationCount(client.id);
     target.innerHTML = `<div class="selected-client-heading"><span>Fiche cliente sélectionnée</span>${badgeHtml(client)}</div><strong>${escapeHtml(client.name)}</strong><p>${client.contactVia ? `Contact via ${escapeHtml(CONTACT[client.contactVia])} · ` : ''}${late ? `${late} annulation${late > 1 ? 's' : ''} tardive${late > 1 ? 's' : ''} · ` : ''}${client.notes ? escapeHtml(client.notes) : 'Aucune note cliente.'}</p>`;
   }
 
-  function fillFromClient(client) {
-    app.ui.formClientId = client.id; $('#clientName').value = client.name; $('#phone').value = client.phone || ''; $('#contactVia').value = client.contactVia || ''; $('#address').value = client.address || ''; $('#appointmentWaze').hidden = !client.address; $('#clientSuggestions').hidden = true; renderSelectedClientInfo(client); updateConflictHint();
-  }
+ function fillFromClient(client) {
+   app.ui.formClientId = client.id; app.ui.appointmentContactExpanded = false; $('#clientName').value = client.name; $('#phone').value = client.phone || ''; $('#contactVia').value = client.contactVia || ''; $('#address').value = client.address || ''; $('#appointmentWaze').hidden = !client.address; $('#clientSuggestions').hidden = true; renderSelectedClientInfo(client); syncAppointmentContactSummary(client, false); updateConflictHint();
+ }
 
   function renderSuggestions() {
     const term = normaliseName($('#clientName').value), target = $('#clientSuggestions');
@@ -1470,7 +1884,7 @@
       $('#service').value = preset.name; setDurationValue(preset.duration); $('#price').value = preset.price; app.ui.formServiceColor = preset.color;
     } else if (!custom) { $('#service').value = ''; app.ui.formServiceColor = 'rose'; }
     if (custom) setTimeout(() => $('#service').focus(), 0);
-    updateAppointmentTotal(); updateConflictHint();
+    setAppointmentAdjustments(custom); updateAppointmentTotal(); updateConflictHint();
   }
 
   function supplementsFromForm(keepEmpty = false) {
@@ -1505,10 +1919,11 @@
     updateAppointmentTotal();
   }
 
-  function updateAppointmentTotal() {
-    const total = numericAmount($('#price')?.value) + supplementsFromForm().reduce((sum, item) => sum + item.amount, 0);
-    if ($('#appointmentTotal')) $('#appointmentTotal').textContent = `Total : ${money(total) || '0 €'}`;
-  }
+ function updateAppointmentTotal() {
+   const total = numericAmount($('#price')?.value) + supplementsFromForm().reduce((sum, item) => sum + item.amount, 0);
+   if ($('#appointmentTotal')) $('#appointmentTotal').textContent = `Total : ${money(total) || '0 €'}`;
+    updateAppointmentServiceSummary();
+ }
 
   function renderAppointmentHistory(appointment) {
     const target = $('#appointmentHistory'); if (!target) return;
@@ -1541,7 +1956,7 @@
   }
 
   function conflictDescription(conflict) {
-    if (conflict.type === 'block') return `l’indisponibilité « ${conflict.block.reason} » · ${blockDetailsLabel(conflict.block)}`;
+    if (conflict.type === 'block') return `l’événement personnel « ${blockTitle(conflict.block)} » · ${blockDetailsLabel(conflict.block)}`;
     const appointment = conflict.appointment;
     return `le rendez-vous de ${clientFor(appointment).name} · ${appointment.service} · ${appointment.time}–${endTime(appointment)}`;
   }
@@ -1617,7 +2032,7 @@
     const createdAt = new Date().toISOString();
     const repeated = { ...appointment, id: uuid(), date: requestedDate, time: requestedTime, supplements: normaliseSupplements(appointment.supplements), status: 'confirmed', paymentStatus: 'unreviewed', paymentDate: '', paymentReminderDate: '', paymentMethod: '', cancellationReason: '', lateCancellation: false, recurrenceId, parentAppointmentId: appointment.id, history: [appointmentHistoryEntry('created', 'Prochain rendez-vous créé', `Depuis le rendez-vous du ${appointment.date}`)], createdAt, updatedAt: createdAt };
     const conflicts = findConflicts(repeated), warnings = scheduleWarnings(repeated);
-    if ((conflicts.length || warnings.length) && !window.confirm(`Le prochain RDV du ${format(date, { day: 'numeric', month: 'long' })} à ${repeated.time} demande ton attention.\n${conflicts.length ? 'Il chevauche un rendez-vous ou une indisponibilité.\n' : ''}${warnings.join('\n')}\n\nLe créer quand même ?`)) return 'Le rendez-vous principal est enregistré. Le prochain RDV n’a pas été créé afin que tu puisses choisir un autre jour.';
+    if ((conflicts.length || warnings.length) && !window.confirm(`Le prochain RDV du ${format(date, { day: 'numeric', month: 'long' })} à ${repeated.time} demande ton attention.\n${conflicts.length ? 'Il chevauche un rendez-vous ou un événement personnel bloquant.\n' : ''}${warnings.join('\n')}\n\nLe créer quand même ?`)) return 'Le rendez-vous principal est enregistré. Le prochain RDV n’a pas été créé afin que tu puisses choisir un autre jour.';
     appointment.recurrenceId = recurrenceId;
     app.state.appointments.push(repeated); return `Le prochain RDV a été créé le ${format(date, { day: 'numeric', month: 'long' })} avec le statut Confirmé.`;
   }
@@ -1663,7 +2078,7 @@
     const currentBadge = clientBadge(client);
     $('#lateBadgeText').textContent = `${client.name} totalise déjà ${count} annulation${count > 1 ? 's' : ''} tardive${count > 1 ? 's' : ''}. Veux-tu lui attribuer un repère de vigilance ?${currentBadge ? ` Son repère actuel « ${currentBadge.name} » sera remplacé si tu valides.` : ''}`;
     const preferred = badgeById('badge-watch') || app.state.settings.clientBadges[0];
-    $('#lateBadgeChoice').innerHTML = app.state.settings.clientBadges.map(badge => `<option value="${escapeHtml(badge.id)}">${escapeHtml(badge.symbol)} ${escapeHtml(badge.name)}</option>`).join('');
+    $('#lateBadgeChoice').innerHTML = app.state.settings.clientBadges.map(badge => `<option value="${escapeHtml(badge.id)}">${escapeHtml(badge.emoji || badge.symbol)} ${escapeHtml(badge.name)}</option>`).join('');
     $('#lateBadgeChoice').value = preferred?.id || '';
     $('#lateBadgeDialog').showModal();
   }
@@ -1681,7 +2096,7 @@
   function openConflictDialog(draft, conflicts) {
     app.ui.pendingDraft = draft;
     $('#conflictList').innerHTML = conflicts.map(conflict => {
-      if (conflict.type === 'block') return `<article class="conflict-item"><strong>Indisponibilité</strong><span>${escapeHtml(conflictDescription(conflict))}</span></article>`;
+      if (conflict.type === 'block') { const status = blockStatusMeta(conflict.block); return `<article class="conflict-item"><strong>${status.icon} ${status.label}</strong><span>${escapeHtml(conflictDescription(conflict))}</span></article>`; }
       const appointment = conflict.appointment;
       return `<article class="conflict-item"><strong>${escapeHtml(clientFor(appointment).name)}</strong><span>${escapeHtml(appointment.service)} · ${appointment.time} – ${endTime(appointment)}</span></article>`;
     }).join('');
@@ -1704,19 +2119,29 @@
     start.disabled = !allDay; end.disabled = !allDay;
   }
 
+  function syncBlockModePreview() {
+    const blocking = $('#blockAppointments')?.checked !== false, target = $('#blockModePreview');
+    if (!target) return;
+    target.classList.toggle('blocking', blocking); target.classList.toggle('informational', !blocking);
+    target.innerHTML = blocking
+      ? '<span aria-hidden="true">🔒</span><div><strong>Indisponible</strong><small>Les rendez-vous qui chevauchent seront signalés, sans être interdits.</small></div>'
+      : '<span aria-hidden="true">ℹ️</span><div><strong>Information</strong><small>L’événement reste visible mais ne déclenche aucun conflit.</small></div>';
+  }
+
   function resetBlockForm() {
-    $('#blockForm').reset(); app.ui.editingBlockId = null; $('#blockId').value = ''; $('#blockAllDay').checked = false; $('#blockAllDayDate').value = dateKey(app.ui.selectedDate); $('#blockAllDayEndDate').value = ''; $('#blockStartDate').value = dateKey(app.ui.selectedDate); $('#blockEndDate').value = dateKey(app.ui.selectedDate); $('#blockStartTime').value = '09:00'; $('#blockEndTime').value = '10:00'; $('#blockAddress').value = ''; $('#blockNotes').value = ''; $('#blockValidation').hidden = true; $('#deleteBlock').hidden = true; setBlockSaving(false); syncBlockAllDay();
+    $('#blockForm').reset(); app.ui.editingBlockId = null; $('#blockId').value = ''; $('#blockAllDay').checked = false; $('#blockAppointments').checked = true; $('#blockAllDayDate').value = dateKey(app.ui.selectedDate); $('#blockAllDayEndDate').value = ''; $('#blockStartDate').value = dateKey(app.ui.selectedDate); $('#blockEndDate').value = dateKey(app.ui.selectedDate); $('#blockStartTime').value = '09:00'; $('#blockEndTime').value = '10:00'; $('#blockAddress').value = ''; $('#blockNotes').value = ''; $('#blockValidation').hidden = true; $('#deleteBlock').hidden = true; setBlockSaving(false); syncBlockAllDay(); syncBlockModePreview();
   }
 
   function openBlock(block = null, defaults = {}) {
     resetBlockForm();
-    $('#blockFormTitle').textContent = block ? 'Modifier l’indisponibilité' : 'Ajouter une indisponibilité';
+    $('#blockFormTitle').textContent = block ? 'Modifier l’événement personnel' : 'Nouvel événement personnel';
     if (block) {
-      app.ui.editingBlockId = block.id; $('#blockId').value = block.id; $('#blockAllDay').checked = block.allDay; $('#blockAllDayDate').value = block.startDate; $('#blockAllDayEndDate').value = block.endDate !== block.startDate ? block.endDate : ''; $('#blockStartDate').value = block.startDate; $('#blockEndDate').value = block.endDate; $('#blockStartTime').value = block.startTime; $('#blockEndTime').value = block.endTime; $('#blockReason').value = block.reason; $('#blockAddress').value = block.address || ''; $('#blockNotes').value = block.notes || ''; $('#deleteBlock').hidden = false; syncBlockAllDay();
+      app.ui.editingBlockId = block.id; $('#blockId').value = block.id; $('#blockAllDay').checked = block.allDay; $('#blockAppointments').checked = eventBlocksAppointments(block); $('#blockAllDayDate').value = block.startDate; $('#blockAllDayEndDate').value = block.endDate !== block.startDate ? block.endDate : ''; $('#blockStartDate').value = block.startDate; $('#blockEndDate').value = block.endDate; $('#blockStartTime').value = block.startTime; $('#blockEndTime').value = block.endTime; $('#blockReason').value = blockTitle(block); $('#blockAddress').value = block.address || ''; $('#blockNotes').value = block.notes || ''; $('#deleteBlock').hidden = false; syncBlockAllDay(); syncBlockModePreview();
     } else {
       const date = validDate(defaults.date) ? defaults.date : dateKey(app.ui.selectedDate), time = validTime(defaults.time) ? defaults.time : '09:00';
       $('#blockId').value = uuid(); $('#blockAllDayDate').value = date; $('#blockAllDayEndDate').value = ''; $('#blockStartDate').value = date; $('#blockEndDate').value = date; $('#blockStartTime').value = time; $('#blockEndTime').value = timeText(toMinutes(time) + 60);
     }
+    $('#blockSubmitButton').textContent = block ? 'Enregistrer les modifications' : 'Ajouter l’événement';
     app.ui.blockDraftBaseline = JSON.stringify(blockDraft());
     $('#blockDialog').showModal(); captureFormBaseline('blockDialog');
   }
@@ -1732,12 +2157,37 @@
   function blockDraft() {
     const allDay = $('#blockAllDay').checked, startDate = allDay ? $('#blockAllDayDate').value : $('#blockStartDate').value;
     const endDate = allDay ? ($('#blockAllDayEndDate').value || startDate) : $('#blockEndDate').value;
-    return { id: app.ui.editingBlockId || $('#blockId').value || uuid(), allDay, startDate, startTime: allDay ? '00:00' : $('#blockStartTime').value, endDate, endTime: allDay ? '00:00' : $('#blockEndTime').value, reason: $('#blockReason').value.trim() || 'Créneau bloqué', address: $('#blockAddress').value.trim(), notes: $('#blockNotes').value.trim() };
+    return { id: app.ui.editingBlockId || $('#blockId').value || uuid(), allDay, startDate, startTime: allDay ? '00:00' : $('#blockStartTime').value, endDate, endTime: allDay ? '00:00' : $('#blockEndTime').value, reason: $('#blockReason').value.trim(), blocksAppointments: $('#blockAppointments').checked, address: $('#blockAddress').value.trim(), notes: $('#blockNotes').value.trim() };
   }
 
   function activeAppointmentsOverlappingBlock(block) {
+    if (!eventBlocksAppointments(block)) return [];
     const bounds = blockBounds(block);
     return app.state.appointments.filter(appointment => activeAppointment(appointment) && intersects(bounds.start, bounds.end, appointmentStart(appointment), appointmentEnd(appointment))).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
+  }
+
+  function needsBlockConflictCheck(block, previous) {
+    if (!eventBlocksAppointments(block)) return false;
+    if (!previous || !eventBlocksAppointments(previous)) return true;
+    const next = blockBounds(block), before = blockBounds(previous);
+    return next.start !== before.start || next.end !== before.end;
+  }
+
+  function openBlockConflictDialog(block, overlaps) {
+    app.ui.pendingBlockConflict = block;
+    $('#blockConflictList').innerHTML = overlaps.map(appointment => `<article class="conflict-item"><strong>${escapeHtml(clientFor(appointment).name)}</strong><span>${escapeHtml(appointment.service)} · ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${appointment.time}–${endTime(appointment)}</span></article>`).join('');
+    $('#blockConflictDialog').showModal();
+  }
+
+  function commitBlock(block) {
+   const previousState = cloneState(app.state), index = app.state.blocks.findIndex(item => item.id === block.id);
+    const now = new Date().toISOString(), existing = index >= 0 ? app.state.blocks[index] : null;
+    const clean = normaliseBlock({ ...block, createdAt: existing?.createdAt || now, updatedAt: now }); if (!clean) { setBlockSaving(false); return false; }
+    if (index === -1) app.state.blocks.push(clean); else app.state.blocks[index] = clean;
+    if (!saveState()) { app.state = previousState; setBlockSaving(false); return false; }
+    app.ui.selectedDate = parseDate(clean.startDate) || app.ui.selectedDate; app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.monthDate = localDate(app.ui.selectedDate.getFullYear(), app.ui.selectedDate.getMonth(), 1);
+    clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, index === -1 ? 'Événement personnel ajouté' : 'Événement personnel modifié');
+    return true;
   }
 
   function saveBlock() {
@@ -1745,16 +2195,121 @@
     setBlockSaving(true);
     const block = blockDraft(), validation = $('#blockValidation');
     let error = '';
-    if (!validDate(block.startDate)) error = block.allDay ? 'Choisis le jour de début.' : 'Choisis le jour et l’heure de début.';
+    if (!block.reason) error = 'Donne un titre à cet événement personnel.';
+    else if (!validDate(block.startDate)) error = block.allDay ? 'Choisis la date de début.' : 'Choisis la date et l’heure de début.';
     else if (!validDate(block.endDate) || (block.allDay && block.endDate < block.startDate)) error = 'Le jour de fin doit être identique ou postérieur au jour de début.';
     else if (!block.allDay && (!validTime(block.startTime) || !validTime(block.endTime) || dateTimeMs(block.endDate, block.endTime) <= dateTimeMs(block.startDate, block.startTime))) error = 'La fin doit être après le début du créneau.';
     if (error) { validation.hidden = false; validation.textContent = error; setBlockSaving(false); return; }
-    const overlaps = activeAppointmentsOverlappingBlock(block);
-    const bounds = blockBounds(block), otherBlocks = app.state.blocks.filter(item => item.id !== block.id).filter(item => { const other = blockBounds(item); return intersects(bounds.start, bounds.end, other.start, other.end); });
-    if ((overlaps.length || otherBlocks.length) && !window.confirm(`Cette indisponibilité chevauche ${overlaps.length ? `${overlaps.length} rendez-vous` : ''}${overlaps.length && otherBlocks.length ? ' et ' : ''}${otherBlocks.length ? `${otherBlocks.length} autre${otherBlocks.length > 1 ? 's' : ''} indisponibilité${otherBlocks.length > 1 ? 's' : ''}` : ''}. La conserver quand même ?`)) { setBlockSaving(false); return; }
-    const previousState = cloneState(app.state), index = app.state.blocks.findIndex(item => item.id === block.id); if (index === -1) app.state.blocks.push(block); else app.state.blocks[index] = block;
-    if (!saveState()) { app.state = previousState; setBlockSaving(false); return; }
-    app.ui.selectedDate = parseDate(block.startDate) || app.ui.selectedDate; app.ui.weekStart = mondayOf(app.ui.selectedDate); clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, index === -1 ? 'Indisponibilité ajoutée' : 'Indisponibilité modifiée');
+    const existing = app.state.blocks.find(item => item.id === block.id), overlaps = needsBlockConflictCheck(block, existing) ? activeAppointmentsOverlappingBlock(block) : [];
+    if (overlaps.length) { openBlockConflictDialog(block, overlaps); return; }
+    commitBlock(block);
+  }
+
+  function populateExpenseCategorySelect(selectedId = '') {
+    const target = $('#expenseCategory'); if (!target) return;
+    const selected = expenseCategoryById(selectedId), categories = app.state.settings.expenseCategories.filter(category => category.active || category.id === selected?.id);
+    target.innerHTML = categories.map(category => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}${category.active ? '' : ' · ancienne catégorie'}</option>`).join('');
+    target.value = selected?.id || categories[0]?.id || '';
+  }
+
+  function setExpenseSaving(value) {
+    app.ui.expenseSaving = Boolean(value);
+    const submit = $('#expenseSubmitButton');
+    if (submit) { submit.disabled = app.ui.expenseSaving; submit.textContent = app.ui.expenseSaving ? 'Enregistrement…' : (app.ui.editingExpenseId ? 'Enregistrer les modifications' : 'Ajouter la dépense'); }
+  }
+
+  function resetExpenseForm(defaults = {}) {
+    $('#expenseForm').reset(); app.ui.editingExpenseId = null; $('#expenseId').value = uuid(); populateExpenseCategorySelect(); $('#expenseDate').value = validDate(defaults.date) ? defaults.date : todayKey(); $('#expenseValidation').hidden = true; $('#deleteExpense').hidden = true; setExpenseSaving(false);
+  }
+
+  function openExpense(expense = null, defaults = {}) {
+    resetExpenseForm(defaults);
+    $('#expenseFormTitle').textContent = expense ? 'Modifier la dépense' : 'Nouvelle dépense';
+    if (expense) {
+      app.ui.editingExpenseId = expense.id; $('#expenseId').value = expense.id; populateExpenseCategorySelect(expense.categoryId); $('#expenseDetails').value = expense.details || ''; $('#expenseSupplier').value = expense.supplier || ''; $('#expenseDate').value = expense.date; $('#expenseAmount').value = String(numericAmount(expense.amount)); $('#deleteExpense').hidden = false;
+    }
+    $('#expenseSubmitButton').textContent = expense ? 'Enregistrer les modifications' : 'Ajouter la dépense';
+    app.ui.expenseDraftBaseline = expenseDraftSignature(expenseDraftValues()); $('#expenseDialog').showModal(); captureFormBaseline('expenseDialog');
+  }
+
+  function saveExpense() {
+    if (app.ui.expenseSaving || !$('#expenseForm').reportValidity()) return false;
+    setExpenseSaving(true);
+    const values = expenseDraftValues(), validation = $('#expenseValidation'), rawAmount = Number(String(values.amount).replace(',', '.'));
+    let error = '';
+    if (!expenseCategoryById(values.categoryId)) error = 'Choisis une catégorie de dépense.';
+    else if (!validDate(values.date)) error = 'Choisis une date valide.';
+    else if (!Number.isFinite(rawAmount) || rawAmount <= 0 || rawAmount > LIMITS.amount) error = 'Saisis un montant supérieur à 0 €.';
+    if (error) { validation.textContent = error; validation.hidden = false; setExpenseSaving(false); return false; }
+    const existing = app.state.expenses.find(expense => expense.id === values.id), category = expenseCategoryById(values.categoryId), now = new Date().toISOString();
+    const record = normaliseExpenses([{ id: values.id || uuid(), categoryId: category.id, categoryLabel: category.name, details: values.details, supplier: values.supplier, date: values.date, amount: rawAmount, createdAt: existing?.createdAt || now, updatedAt: now }], app.state.settings.expenseCategories)[0];
+    if (!record) { validation.textContent = 'Cette dépense ne peut pas être enregistrée. Vérifie les informations.'; validation.hidden = false; setExpenseSaving(false); return false; }
+    const previousState = cloneState(app.state), index = app.state.expenses.findIndex(expense => expense.id === record.id);
+    if (index === -1) app.state.expenses.push(record); else app.state.expenses[index] = record;
+    if (!saveState()) { app.state = previousState; setExpenseSaving(false); return false; }
+    app.ui.editingExpenseId = null; clearFormDraft('expense'); $('#expenseDialog').close(); render(); offerUndo(previousState, index === -1 ? 'Dépense enregistrée' : 'Dépense modifiée');
+    return true;
+  }
+
+  function deleteExpense(id = app.ui.editingExpenseId || $('#expenseId')?.value) {
+    const expense = app.state.expenses.find(item => item.id === id); if (!expense || !window.confirm('Supprimer cette dépense ?')) return false;
+    const previousState = cloneState(app.state); app.state.expenses = app.state.expenses.filter(item => item.id !== expense.id);
+    if (!saveState()) { app.state = previousState; return false; }
+    app.ui.editingExpenseId = null; clearFormDraft('expense'); if ($('#expenseDialog').open) $('#expenseDialog').close(); render(); offerUndo(previousState, 'Dépense supprimée');
+    return true;
+  }
+
+  function renderExpenseCategoryList() {
+    const target = $('#expenseCategoryList'); if (!target) return;
+    target.innerHTML = app.state.settings.expenseCategories.map(category => {
+      const count = app.state.expenses.filter(expense => expense.categoryId === category.id).length;
+      return `<button class="settings-service ${category.active ? '' : 'inactive'}" data-edit-expense-category="${escapeHtml(category.id)}"><span class="settings-symbol">€</span><span><strong>${escapeHtml(category.name)}</strong><small>${count} dépense${count > 1 ? 's' : ''}${category.active ? '' : ' · masquée'}</small></span><b>›</b></button>`;
+    }).join('');
+  }
+
+  function resetExpenseCategoryForm() {
+    $('#expenseCategoryForm').reset(); $('#expenseCategoryId').value = ''; $('#deleteExpenseCategory').hidden = true; $('#expenseCategorySubmit').textContent = 'Ajouter la catégorie'; captureFormBaseline('expenseCategoriesDialog');
+  }
+
+  function openExpenseCategories() {
+    renderExpenseCategoryList(); resetExpenseCategoryForm(); $('#expenseCategoriesDialog').showModal(); captureFormBaseline('expenseCategoriesDialog');
+  }
+
+  function editExpenseCategory(categoryId) {
+    const category = expenseCategoryById(categoryId); if (!category) return;
+    $('#expenseCategoryId').value = category.id; $('#expenseCategoryName').value = category.name; $('#deleteExpenseCategory').hidden = false; $('#expenseCategorySubmit').textContent = category.active ? 'Enregistrer le nom' : 'Réactiver et enregistrer'; captureFormBaseline('expenseCategoriesDialog');
+  }
+
+ function saveExpenseCategory() {
+   if (!$('#expenseCategoryForm').reportValidity()) return false;
+   const id = $('#expenseCategoryId').value || uuid(), name = boundedText($('#expenseCategoryName').value, 100);
+    if (!name) { window.alert('Donne un nom à cette catégorie.'); $('#expenseCategoryName').focus(); return false; }
+    if (app.state.settings.expenseCategories.some(category => category.id !== id && normaliseName(category.name) === normaliseName(name))) { window.alert('Cette catégorie existe déjà.'); return false; }
+    const index = app.state.settings.expenseCategories.findIndex(category => category.id === id);
+    if (index === -1 && app.state.settings.expenseCategories.length >= LIMITS.settingsItems) { window.alert('Le nombre maximal de catégories est atteint.'); return false; }
+    const previousState = cloneState(app.state), record = { id, name, active: true };
+    if (index === -1) app.state.settings.expenseCategories.push(record);
+    else {
+      app.state.settings.expenseCategories[index] = record;
+      app.state.expenses.forEach(expense => { if (expense.categoryId === id) expense.categoryLabel = name; });
+    }
+    if (!saveState()) { app.state = previousState; return false; }
+    clearFormDraft('expenseCategory'); populateExpenseCategorySelect($('#expenseCategory').value || id); renderExpenseCategoryList(); resetExpenseCategoryForm(); showSuccess(index === -1 ? 'Catégorie ajoutée' : 'Catégorie mise à jour');
+    return true;
+  }
+
+ function deleteExpenseCategory() {
+   const id = $('#expenseCategoryId').value, category = expenseCategoryById(id); if (!category) return false;
+    const selectedExpenseCategoryId = $('#expenseCategory').value;
+    const used = app.state.expenses.some(expense => expense.categoryId === id), activeCount = app.state.settings.expenseCategories.filter(item => item.active).length;
+    if (category.active && activeCount <= 1) { window.alert('Garde au moins une catégorie disponible.'); return false; }
+    const wording = used ? 'Cette catégorie est déjà utilisée. La masquer pour les prochaines dépenses ?' : 'Supprimer cette catégorie ?';
+    if (!window.confirm(wording)) return false;
+    const previousState = cloneState(app.state);
+    if (used) category.active = false; else app.state.settings.expenseCategories = app.state.settings.expenseCategories.filter(item => item.id !== id);
+    if (!saveState()) { app.state = previousState; return false; }
+    clearFormDraft('expenseCategory'); populateExpenseCategorySelect(selectedExpenseCategoryId); renderExpenseCategoryList(); resetExpenseCategoryForm(); showSuccess(used ? 'Catégorie masquée' : 'Catégorie supprimée');
+    return true;
   }
 
   function openRouteDay() {
@@ -1885,15 +2440,23 @@
     app.ui.reviewPendingId = null; render(); renderDayReview();
   }
 
-  function clientStats(clientId) {
+ function clientStats(clientId) {
     const history = clientHistory(clientId), visits = history.filter(activeAppointment), paid = visits.filter(appointment => appointment.paymentStatus === 'paid').reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     return { visits: visits.length, cancelled: history.filter(appointment => appointment.status === 'cancelled').length, late: lateCancellationCount(clientId), noShows: history.filter(appointment => appointment.status === 'no_show').length, paid };
+ }
+
+  function syncProfileBadgeSummary(expanded = false) {
+    const badge = badgeById($('#profileBadge').value);
+    $('#profileBadgeField').hidden = Boolean(badge) && !expanded;
+    $('#profileBadgeSummary').hidden = !badge || expanded;
+    if (badge) $('#profileBadgeSummaryText').textContent = `${badge.emoji || badge.symbol} ${badge.name}`;
   }
 
-  function openClient(clientId) {
+ function openClient(clientId) {
     const client = clientById(clientId); if (!client) return;
     app.ui.clientSaving = false;
-    $('#profileKey').value = client.id; $('#profileName').value = client.name; $('#profilePhone').value = client.phone; $('#profileContactVia').value = client.contactVia || ''; $('#profileBadge').innerHTML = `<option value="">Aucun repère</option>${app.state.settings.clientBadges.map(badge => `<option value="${escapeHtml(badge.id)}">${escapeHtml(badge.symbol)} ${escapeHtml(badge.name)}</option>`).join('')}`; $('#profileBadge').value = client.badgeId || ''; $('#profileAddress').value = client.address; $('#profileNotes').value = client.notes; $('#profileWaze').hidden = !client.address;
+   $('#profileKey').value = client.id; $('#profileName').value = client.name; $('#profilePhone').value = client.phone; $('#profileContactVia').value = client.contactVia || ''; $('#profileBadge').innerHTML = `<option value="">Aucun repère</option>${app.state.settings.clientBadges.map(badge => `<option value="${escapeHtml(badge.id)}">${escapeHtml(badge.emoji || badge.symbol)} ${escapeHtml(badge.name)}</option>`).join('')}`; $('#profileBadge').value = client.badgeId || ''; $('#profileAddress').value = client.address; $('#profileNotes').value = client.notes; $('#profileWaze').hidden = !client.address;
+    syncProfileBadgeSummary(false);
     const stats = clientStats(client.id), history = clientHistory(client.id).slice(0, 12);
     $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.late}</strong><span>tardive${stats.late > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.paid ? `<article><strong>${money(stats.paid)}</strong><span>encaissé</span></article>` : ''}`;
     $('#clientHistory').innerHTML = `<p class="history-label">Historique</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${activeAppointment(appointment) && appointment.paymentStatus === 'unreviewed' ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' && activeAppointment(appointment) ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}`;
@@ -1923,9 +2486,9 @@
     $('#settingsSupplementList').innerHTML = app.state.settings.supplementTypes.map(type => `<button class="settings-service ${type.active ? '' : 'inactive'}" data-edit-supplement-type="${escapeHtml(type.id)}"><span class="settings-symbol">＋</span><span><strong>${escapeHtml(type.name)}</strong><small>${type.price !== '' ? money(type.price) : 'Prix à définir'}${type.active ? ' · disponible' : ' · masquée'}</small></span><b>›</b></button>`).join('') || '<p class="small-copy">Aucune nature de supplément.</p>';
   }
 
-  function renderSettingsBadgeList() {
-    $('#settingsBadgeList').innerHTML = app.state.settings.clientBadges.map(badge => `<button class="settings-service" data-edit-badge="${escapeHtml(badge.id)}"><span class="client-badge" style="--badge-color:${escapeHtml(badge.color)}">${escapeHtml(badge.symbol)}</span><span><strong>${escapeHtml(badge.name)}</strong><small>${app.state.clients.filter(client => client.badgeId === badge.id).length} cliente(s)</small></span><b>›</b></button>`).join('') || '<p class="small-copy">Aucun repère. Tu peux en recréer un avec « Ajouter ».</p>';
-  }
+ function renderSettingsBadgeList() {
+    $('#settingsBadgeList').innerHTML = app.state.settings.clientBadges.map(badge => `<button class="settings-service" data-edit-badge="${escapeHtml(badge.id)}"><span class="client-badge">${escapeHtml(badge.emoji || badge.symbol)}</span><span><strong>${escapeHtml(badge.name)}</strong><small>${app.state.clients.filter(client => client.badgeId === badge.id).length} cliente(s)</small></span><b>›</b></button>`).join('') || '<p class="small-copy">Aucun repère. Tu peux en recréer un avec « Ajouter ».</p>';
+ }
 
   function renderSettingsHome() {
     const workingDays = Object.values(app.state.settings.workingHours).filter(hours => hours.enabled).length;
@@ -1933,9 +2496,18 @@
     $('#settingsServicesSummary').textContent = `${app.state.settings.services.filter(service => service.active).length} prestation(s) disponible(s)`;
     $('#settingsSupplementsSummary').textContent = `${app.state.settings.supplementTypes.filter(type => type.active).length} nature(s) disponible(s)`;
     $('#settingsClientsSummary').textContent = `${app.state.settings.clientBadges.length} repère(s) · seuil ${app.state.settings.lateCancellationThreshold}`;
-    $('#settingsRemindersSummary').textContent = `Sauvegarde après ${app.state.settings.backupReminderDays} jours`;
+   const last = app.state.settings.lastBackupAt ? new Date(app.state.settings.lastBackupAt) : null;
+    const exportLabel = last && !Number.isNaN(last.getTime()) ? `dernier export ${format(last, { day: 'numeric', month: 'short' })}` : 'aucun export';
+    $('#settingsDataSummary').textContent = `${exportLabel} · rappel après ${app.state.settings.backupReminderDays} jours`;
+  }
+
+  function renderBackupStatus() {
+    const target = $('#backupStatus');
+    if (!target) return;
     const last = app.state.settings.lastBackupAt ? new Date(app.state.settings.lastBackupAt) : null;
-    $('#settingsDataSummary').textContent = last && !Number.isNaN(last.getTime()) ? `Dernier export ${format(last, { day: 'numeric', month: 'short' })}` : 'Aucun export';
+    target.textContent = last && !Number.isNaN(last.getTime())
+      ? `Dernière sauvegarde exportée : ${format(last, { day: 'numeric', month: 'long', year: 'numeric' })}`
+      : 'Aucune sauvegarde exportée.';
   }
 
   function showSettingsPage(page = 'home', force = false) {
@@ -1943,24 +2515,22 @@
     app.ui.settingsDirty = false; app.ui.settingsPage = page;
     $('#settingsHome').hidden = page !== 'home'; $('#settingsBack').hidden = page === 'home';
     $$('[data-settings-content]').forEach(section => { section.hidden = section.dataset.settingsContent !== page; });
-    const labels = { agenda: 'Agenda et horaires', services: 'Prestations et tarifs', supplements: 'Suppléments', clients: 'Clientes et repères', payments: 'Paiements et bilans', reminders: 'Rappels', data: 'Données et sauvegardes', about: 'À propos' };
+    const labels = { agenda: 'Agenda et horaires', services: 'Prestations et tarifs', supplements: 'Suppléments', clients: 'Clientes et repères', data: 'Données et sauvegardes', about: 'À propos' };
     $('#settingsTitle').textContent = page === 'home' ? 'Réglages' : labels[page] || 'Réglages';
     if (page === 'agenda') renderWorkingHoursEditor();
     if (page === 'services') renderSettingsServiceList();
     if (page === 'supplements') renderSettingsSupplementList();
     if (page === 'clients') { renderSettingsBadgeList(); $('#lateCancellationThreshold').value = String(app.state.settings.lateCancellationThreshold); $('#lateCancellationPromptEnabled').checked = app.state.settings.lateCancellationPromptEnabled; }
-    if (page === 'reminders') $('#backupReminderDays').value = String(app.state.settings.backupReminderDays);
-    if (page === 'data') updateStorageStatus();
+    if (page === 'data') { $('#backupReminderDays').value = String(app.state.settings.backupReminderDays); updateStorageStatus(); }
     return true;
   }
 
   function openSettings() {
     renderSettingsHome(); renderWorkingHoursEditor(); renderSettingsServiceList(); renderSettingsSupplementList(); renderSettingsBadgeList();
-    const last = app.state.settings.lastBackupAt ? new Date(app.state.settings.lastBackupAt) : null;
-    $('#backupStatus').textContent = last && !Number.isNaN(last.getTime()) ? `Dernière sauvegarde exportée : ${format(last, { day: 'numeric', month: 'long', year: 'numeric' })}` : 'Aucune sauvegarde exportée.';
+    renderBackupStatus();
     $('#appVersionLabel').textContent = `Mon agenda · version ${APP_VERSION}`;
     $('#aboutVersion').textContent = `Version ${APP_VERSION} · données v${CURRENT_DATA_VERSION}`;
-    $('#undoRestore').hidden = !safeJson(RESTORE_SAFETY_KEY, null) && !safeJson(V12_RESTORE_SAFETY_KEY, null) && !safeJson(V11_RESTORE_SAFETY_KEY, null) && !safeJson(V10_RESTORE_SAFETY_KEY, null) && !safeJson(V9_RESTORE_SAFETY_KEY, null) && !safeJson(V8_RESTORE_SAFETY_KEY, null);
+    $('#undoRestore').hidden = !safeJson(RESTORE_SAFETY_KEY, null) && !safeJson(V13_RESTORE_SAFETY_KEY, null) && !safeJson(V12_RESTORE_SAFETY_KEY, null) && !safeJson(V11_RESTORE_SAFETY_KEY, null) && !safeJson(V10_RESTORE_SAFETY_KEY, null) && !safeJson(V9_RESTORE_SAFETY_KEY, null) && !safeJson(V8_RESTORE_SAFETY_KEY, null);
     $('#undoMigration').hidden = !safeJson(MIGRATION_SAFETY_KEY, null);
     showSettingsPage('home', true); $('#settingsDialog').showModal();
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.screen === 'settings'));
@@ -1998,8 +2568,10 @@
     if (!name) { app.ui.serviceSaving = false; return; }
     const duplicate = app.state.settings.services.find(service => service.id !== id && normaliseName(service.name) === normaliseName(name));
     if (duplicate) { app.ui.serviceSaving = false; window.alert('Une prestation avec ce nom existe déjà.'); return; }
+    const index = app.state.settings.services.findIndex(service => service.id === id);
+    if (index === -1 && app.state.settings.services.length >= LIMITS.settingsItems) { app.ui.serviceSaving = false; window.alert('Le nombre maximal de prestations est atteint.'); return; }
     const previousState = cloneState(app.state), record = { id, name, duration: Number($('#serviceDuration').value), price: $('#servicePrice').value.trim(), color: $('#serviceColor').value, active: $('#serviceActive').checked };
-    const index = app.state.settings.services.findIndex(service => service.id === id); if (index === -1) app.state.settings.services.push(record); else app.state.settings.services[index] = record;
+    if (index === -1) app.state.settings.services.push(record); else app.state.settings.services[index] = record;
     if (!saveState()) { app.state = previousState; app.ui.serviceSaving = false; return; }
     app.ui.serviceSaving = false; $('#serviceDialog').close(); renderSettingsServiceList(); renderSettingsHome();
   }
@@ -2013,27 +2585,37 @@
     app.ui.supplementSaving = true; $('#supplementTypeForm button[type="submit"]').disabled = true;
     const id = $('#supplementTypeId').value || uuid(), name = $('#supplementTypeName').value.trim();
     if (app.state.settings.supplementTypes.some(type => type.id !== id && normaliseName(type.name) === normaliseName(name))) { app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; window.alert('Cette nature existe déjà.'); return; }
-    const rawPrice = $('#supplementTypePrice').value.trim();
-    const previousState = cloneState(app.state), record = { id, name, price: rawPrice === '' ? '' : String(numericAmount(rawPrice)), active: $('#supplementTypeActive').checked }, index = app.state.settings.supplementTypes.findIndex(type => type.id === id);
+    const rawPrice = $('#supplementTypePrice').value.trim(), index = app.state.settings.supplementTypes.findIndex(type => type.id === id);
+    if (index === -1 && app.state.settings.supplementTypes.length >= LIMITS.settingsItems) { app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; window.alert('Le nombre maximal de suppléments est atteint.'); return; }
+    const previousState = cloneState(app.state), record = { id, name, price: rawPrice === '' ? '' : String(numericAmount(rawPrice)), active: $('#supplementTypeActive').checked };
     if (index === -1) app.state.settings.supplementTypes.push(record); else app.state.settings.supplementTypes[index] = record;
     if (!saveState()) { app.state = previousState; app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; return; }
     $('#supplementTypeDialog').close(); renderSettingsSupplementList(); renderSettingsHome();
   }
 
-  function openBadge(badge = null) {
-    app.ui.badgeSaving = false; $('#badgeForm button[type="submit"]').disabled = false; $('#badgeForm').reset(); $('#badgeId').value = badge?.id || ''; $('#badgeDialogTitle').textContent = badge ? 'Modifier le repère' : 'Nouveau repère'; $('#badgeName').value = badge?.name || ''; $('#badgeSymbol').value = badge?.symbol || '♥'; $('#badgeColor').value = badge?.color || '#d64f7b'; $('#deleteBadge').hidden = !badge; $('#badgeDialog').showModal(); captureFormBaseline('badgeDialog');
+ function openBadge(badge = null) {
+    app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; $('#badgeForm').reset(); $('#badgeId').value = badge?.id || ''; $('#badgeDialogTitle').textContent = badge ? 'Modifier le repère' : 'Nouveau repère'; $('#badgeName').value = badge?.name || ''; $('#badgeSymbol').value = badge?.emoji || badge?.symbol || '🙂'; $('#deleteBadge').hidden = !badge; $('#badgeSubmitButton').textContent = badge ? 'Enregistrer les modifications' : 'Ajouter le repère'; updateBadgePreview(); $('#badgeDialog').showModal(); captureFormBaseline('badgeDialog');
+ }
+
+  function updateBadgePreview() {
+    $('#badgeEmojiPreview').textContent = firstGrapheme($('#badgeSymbol').value, '🙂');
+    $('#badgePreviewName').textContent = $('#badgeName').value.trim() || 'Nouveau repère';
   }
 
-  function saveBadge() {
-    if (app.ui.badgeSaving || !$('#badgeForm').reportValidity()) return;
-    app.ui.badgeSaving = true; $('#badgeForm button[type="submit"]').disabled = true;
-    const id = $('#badgeId').value || uuid(), name = $('#badgeName').value.trim();
-    if (app.state.settings.clientBadges.some(badge => badge.id !== id && normaliseName(badge.name) === normaliseName(name))) { app.ui.badgeSaving = false; $('#badgeForm button[type="submit"]').disabled = false; window.alert('Un repère avec ce nom existe déjà.'); return; }
-    const previousState = cloneState(app.state), record = { id, name, symbol: $('#badgeSymbol').value, color: $('#badgeColor').value }, index = app.state.settings.clientBadges.findIndex(badge => badge.id === id);
-    if (index === -1) app.state.settings.clientBadges.push(record); else app.state.settings.clientBadges[index] = record;
-    if (!saveState()) { app.state = previousState; app.ui.badgeSaving = false; $('#badgeForm button[type="submit"]').disabled = false; return; }
-    $('#badgeDialog').close(); renderSettingsBadgeList(); renderSettingsHome(); render();
-  }
+ function saveBadge() {
+   if (app.ui.badgeSaving || !$('#badgeForm').reportValidity()) return;
+    app.ui.badgeSaving = true; $('#badgeSubmitButton').disabled = true;
+   const id = $('#badgeId').value || uuid(), name = $('#badgeName').value.trim();
+    if (app.state.settings.clientBadges.some(badge => badge.id !== id && normaliseName(badge.name) === normaliseName(name))) { app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; window.alert('Un repère avec ce nom existe déjà.'); return; }
+    const emoji = firstGrapheme($('#badgeSymbol').value, '');
+    if (!emoji) { app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; window.alert('Choisis un emoji pour ce repère.'); return; }
+    const index = app.state.settings.clientBadges.findIndex(badge => badge.id === id);
+    if (index === -1 && app.state.settings.clientBadges.length >= LIMITS.settingsItems) { app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; window.alert('Le nombre maximal de repères est atteint.'); return; }
+    const previousState = cloneState(app.state), record = { id, name, emoji, symbol: emoji };
+   if (index === -1) app.state.settings.clientBadges.push(record); else app.state.settings.clientBadges[index] = record;
+    if (!saveState()) { app.state = previousState; app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; return; }
+    $('#badgeDialog').close(); renderSettingsBadgeList(); renderSettingsHome(); render(); showSuccess(index === -1 ? 'Repère ajouté' : 'Repère mis à jour');
+ }
 
   function deleteBadge() {
     const id = $('#badgeId').value, badge = badgeById(id); if (!badge) return;
@@ -2068,7 +2650,14 @@
   }
 
   function backupCounts(state) {
-    return { clients: state.clients.length, appointments: state.appointments.length, blocks: state.blocks.length, services: state.settings.services.length };
+    return {
+      clients: state.clients.length,
+      appointments: state.appointments.length,
+      blocks: state.blocks.length,
+      expenses: Array.isArray(state.expenses) ? state.expenses.length : 0,
+      services: state.settings.services.length,
+      expenseCategories: Array.isArray(state.settings.expenseCategories) ? state.settings.expenseCategories.length : 0
+    };
   }
 
   function makeBackupPayload(state = app.state, reason = 'manual') {
@@ -2086,13 +2675,13 @@
     if (!data || typeof data !== 'object') return false;
     const state = data.state && typeof data.state === 'object' ? data.state : data;
     if (Array.isArray(state)) return true;
-    return ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'clientProfiles'].some(key => Object.prototype.hasOwnProperty.call(state, key));
+    return ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'expenses', 'spendings', 'clientProfiles'].some(key => Object.prototype.hasOwnProperty.call(state, key));
   }
 
   function backupPreview(data, state) {
     const exported = data?.exportedAt ? new Date(data.exportedAt) : null, when = exported && !Number.isNaN(exported.getTime()) ? format(exported, { day: 'numeric', month: 'long', year: 'numeric' }) : 'date inconnue';
     const counts = backupCounts(state);
-    return `Sauvegarde du ${when} · version ${backupVersion(data)}\n${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} indisponibilité${counts.blocks > 1 ? 's' : ''}, ${counts.services} prestation${counts.services > 1 ? 's' : ''}.\nLes horaires, couleurs, prestations et autres réglages sont inclus.\n\nRemplacer les données actuelles ? Une copie de secours sera conservée sur cet appareil.`;
+    return `Sauvegarde du ${when} · version ${backupVersion(data)}\n${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''} personnel${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}, ${counts.services} prestation${counts.services > 1 ? 's' : ''}.\nLes horaires, repères, catégories et autres réglages sont inclus.\n\nRemplacer les données actuelles ? Une copie de secours sera conservée sur cet appareil.`;
   }
 
   async function shareOrDownload(blob, filename, title) {
@@ -2113,12 +2702,12 @@
     const previousDate = app.state.settings.lastBackupAt, content = makeBackupPayload();
     content.state.settings.lastBackupAt = content.exportedAt;
     const now = new Date(), stamp = `${todayKey()}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(content)], { type: 'application/json' });
     const delivered = await shareOrDownload(blob, `sauvegarde-agenda-${stamp}.json`, 'Sauvegarde Mon agenda');
     if (!delivered) return false;
     app.state.settings.lastBackupAt = content.exportedAt;
     if (!saveState()) { app.state.settings.lastBackupAt = previousDate; return false; }
-    renderHeader(); renderSettingsHome(); return true;
+    renderHeader(); renderSettingsHome(); renderBackupStatus(); showSuccess('Sauvegarde créée'); return true;
   }
 
   async function importData(file) {
@@ -2128,7 +2717,7 @@
       const data = JSON.parse(await file.text());
       if (!recognisedBackup(data) || (data.app && data.app !== BACKUP_APP_ID)) throw new Error('UNKNOWN_BACKUP');
       if (Number(data.backupFormatVersion || 1) > BACKUP_FORMAT_VERSION || backupVersion(data) > CURRENT_DATA_VERSION) throw new Error('FUTURE_BACKUP');
-      const migrated = migrateState(data.state || data, data.clientProfiles || data.state?.clientProfiles || {}, { strict: true });
+      const migrated = migrateState(data, data.clientProfiles || data.state?.clientProfiles || {}, { strict: true });
       if (!window.confirm(backupPreview(data, migrated))) return;
       const safety = makeBackupPayload(app.state, 'before-restore');
       try { localStorage.setItem(RESTORE_SAFETY_KEY, JSON.stringify(safety)); }
@@ -2137,20 +2726,20 @@
       app.state = migrated; clearAllFormDrafts(); $('#settingsDialog').close(); render(); window.alert('Sauvegarde restaurée et adaptée à la version actuelle. Toutes les données compatibles ont été conservées.');
     } catch (error) {
       if (error?.message === 'FUTURE_BACKUP') window.alert('Cette sauvegarde vient d’une version plus récente. Mets d’abord l’application à jour : tes données actuelles n’ont pas été modifiées.');
-      else if (error?.message === 'INVALID_FILE_SIZE') window.alert('Ce fichier est trop volumineux. La taille maximale acceptée est de 10 Mo. Tes données actuelles n’ont pas été modifiées.');
+      else if (error?.message === 'INVALID_FILE_SIZE') window.alert('Ce fichier est trop volumineux. La taille maximale acceptée est de 25 Mo. Tes données actuelles n’ont pas été modifiées.');
       else if (String(error?.message || '').startsWith('INVALID_')) window.alert('La sauvegarde contient au moins une donnée incomplète ou abîmée. Rien n’a été restauré afin d’éviter une perte partielle.');
       else window.alert('Ce fichier ne semble pas être une sauvegarde valide de Mon agenda.');
     } finally { input.value = ''; }
   }
 
   function undoLastRestore() {
-    const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V12_RESTORE_SAFETY_KEY, null) || safeJson(V11_RESTORE_SAFETY_KEY, null) || safeJson(V10_RESTORE_SAFETY_KEY, null) || safeJson(V9_RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
+    const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V13_RESTORE_SAFETY_KEY, null) || safeJson(V12_RESTORE_SAFETY_KEY, null) || safeJson(V11_RESTORE_SAFETY_KEY, null) || safeJson(V10_RESTORE_SAFETY_KEY, null) || safeJson(V9_RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
     if (!backup || !window.confirm('Revenir aux données présentes juste avant la dernière restauration ?')) return;
     try {
       if (!recognisedBackup(backup) || (backup.app && backup.app !== BACKUP_APP_ID) || backupVersion(backup) > CURRENT_DATA_VERSION) throw new Error('INVALID_SAFETY_COPY');
-      const restored = migrateState(backup.state || backup, backup.clientProfiles || {}, { strict: true });
+      const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, { strict: true });
       if (!saveState(restored)) return;
-      app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V12_RESTORE_SAFETY_KEY); localStorage.removeItem(V11_RESTORE_SAFETY_KEY); localStorage.removeItem(V10_RESTORE_SAFETY_KEY); localStorage.removeItem(V9_RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); window.alert('Les données d’avant la restauration ont été récupérées.');
+      app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V13_RESTORE_SAFETY_KEY); localStorage.removeItem(V12_RESTORE_SAFETY_KEY); localStorage.removeItem(V11_RESTORE_SAFETY_KEY); localStorage.removeItem(V10_RESTORE_SAFETY_KEY); localStorage.removeItem(V9_RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); window.alert('Les données d’avant la restauration ont été récupérées.');
     } catch { window.alert('La copie de secours locale n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); }
   }
 
@@ -2159,7 +2748,7 @@
     if (!backup || !window.confirm('Récupérer la copie créée juste avant la mise à jour ? Les ajouts effectués depuis seront remplacés.')) return;
     try {
       if (!recognisedBackup(backup) || (backup.app && backup.app !== BACKUP_APP_ID) || backupVersion(backup) > CURRENT_DATA_VERSION) throw new Error('INVALID_MIGRATION_COPY');
-      const restored = migrateState(backup.state || backup, backup.clientProfiles || backup.state?.clientProfiles || {}, { strict: true });
+      const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, { strict: true });
       if (!saveState(restored)) return;
       app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(MIGRATION_SAFETY_KEY); } catch {}
       $('#settingsDialog').close(); render(); window.alert('Les données présentes avant la mise à jour ont été récupérées et adaptées à cette version.');
@@ -2179,11 +2768,13 @@
     app.ui.reloadingForUpdate = true; worker.postMessage({ type: 'SKIP_WAITING' });
   }
 
-  function saveOpenFormDrafts() {
-    if ($('#appointmentDialog')?.open) saveAppointmentDraft();
-    if ($('#clientDialog')?.open) saveClientDraft();
-    if ($('#blockDialog')?.open) saveBlockDraft();
-  }
+ function saveOpenFormDrafts() {
+   if ($('#appointmentDialog')?.open) saveAppointmentDraft();
+   if ($('#clientDialog')?.open) saveClientDraft();
+   if ($('#blockDialog')?.open) saveBlockDraft();
+   if ($('#expenseDialog')?.open) saveExpenseDraft();
+    if ($('#expenseCategoriesDialog')?.open) saveExpenseCategoryDraft();
+ }
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
@@ -2191,7 +2782,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=12.1.1', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=12.2', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -2214,12 +2805,14 @@
     if (target.dataset.close) { requestDialogClose(target.dataset.close); return; }
     if (target.dataset.mode) { setMode(target.dataset.mode); return; }
     if (target.dataset.screen) { showScreen(target.dataset.screen); return; }
-    if (target.dataset.reportPeriod) { app.ui.reportMode = target.dataset.reportPeriod; renderReport(); return; }
+    if (target.dataset.reportPeriod) { if (app.ui.reportTab === 'expenses') app.ui.expenseReportMode = target.dataset.reportPeriod; else app.ui.reportMode = target.dataset.reportPeriod; renderReport(); return; }
     if (target.dataset.reportTab) { app.ui.reportTab = target.dataset.reportTab; renderReport(); return; }
+    if (target.dataset.expenseView) { app.ui.expenseReportView = target.dataset.expenseView; renderReport(); return; }
     if (target.id === 'backToAgenda') { showScreen('agenda'); return; }
     if (target.id === 'addAppointment') { openQuickAdd(); return; }
     if (target.id === 'quickAddAppointment') { $('#quickAddDialog').close(); openAppointment(null, { date: app.ui.quickAddDate, time: app.ui.quickAddTime }); return; }
     if (target.id === 'quickAddBlock') { $('#quickAddDialog').close(); openBlock(null, { date: app.ui.quickAddDate, time: app.ui.quickAddTime }); return; }
+    if (target.id === 'quickAddExpense') { $('#quickAddDialog').close(); openExpense(null, { date: app.ui.quickAddDate }); return; }
     if (target.id === 'resumeDraft') { resumeLatestDraft(); return; }
     if (target.id === 'discardDraft') { if (window.confirm('Supprimer cette saisie en cours ?')) clearFormDraft(); return; }
     if (target.id === 'previousPeriod') { app.ui.selectedDate = addDays(app.ui.selectedDate, -7); app.ui.weekStart = mondayOf(app.ui.selectedDate); renderAgenda(); return; }
@@ -2231,8 +2824,8 @@
     if (target.id === 'todayButton') { app.ui.selectedDate = startOfDay(new Date()); app.ui.weekStart = mondayOf(app.ui.selectedDate); renderAgenda(); return; }
     if (target.id === 'currentWeekButton') { app.ui.selectedDate = startOfDay(new Date()); app.ui.weekStart = mondayOf(app.ui.selectedDate); renderAgenda(); return; }
     if (target.id === 'reportToday') { app.ui.reportDate = startOfDay(new Date()); renderReport(); return; }
-    if (target.id === 'previousReport') { app.ui.reportDate = app.ui.reportMode === 'week' ? addDays(app.ui.reportDate, -7) : app.ui.reportMode === 'year' ? localDate(app.ui.reportDate.getFullYear() - 1, 0, 1) : localDate(app.ui.reportDate.getFullYear(), app.ui.reportDate.getMonth() - 1, 1); renderReport(); return; }
-    if (target.id === 'nextReport') { app.ui.reportDate = app.ui.reportMode === 'week' ? addDays(app.ui.reportDate, 7) : app.ui.reportMode === 'year' ? localDate(app.ui.reportDate.getFullYear() + 1, 0, 1) : localDate(app.ui.reportDate.getFullYear(), app.ui.reportDate.getMonth() + 1, 1); renderReport(); return; }
+    if (target.id === 'previousReport') { shiftReportDate(-1); renderReport(); return; }
+    if (target.id === 'nextReport') { shiftReportDate(1); renderReport(); return; }
     if (target.id === 'exportReportCsv') { exportReportCsv(); return; }
     if (target.id === 'routeDay') { openRouteDay(); return; }
     if (target.id === 'dayReview') { openDayReview(app.ui.selectedDate); return; }
@@ -2248,14 +2841,16 @@
     }
     if (target.id === 'deleteBlock') {
       const id = $('#blockId').value;
-      if (id && window.confirm('Supprimer cette indisponibilité ?')) {
+      if (id && window.confirm('Supprimer cet événement personnel ?')) {
         const previousState = cloneState(app.state); app.state.blocks = app.state.blocks.filter(block => block.id !== id);
-        if (!saveState()) app.state = previousState; else { clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, 'Indisponibilité supprimée'); }
+        if (!saveState()) app.state = previousState; else { clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, 'Événement personnel supprimé'); }
       }
       return;
     }
     if (target.id === 'changeConflict') { $('#conflictDialog').close(); app.ui.pendingDraft = null; setAppointmentSaving(false); return; }
     if (target.id === 'confirmConflict') { const draft = app.ui.pendingDraft; $('#conflictDialog').close(); app.ui.pendingDraft = null; if (draft) commitDraftWithWarnings(draft); else setAppointmentSaving(false); return; }
+    if (target.id === 'changeBlockConflict') { $('#blockConflictDialog').close(); app.ui.pendingBlockConflict = null; setBlockSaving(false); return; }
+    if (target.id === 'confirmBlockConflict') { const block = app.ui.pendingBlockConflict; $('#blockConflictDialog').close(); app.ui.pendingBlockConflict = null; if (block) commitBlock(block); else setBlockSaving(false); return; }
     if (target.id === 'changeDuplicate') { $('#duplicateClientDialog').close(); app.ui.pendingDuplicate = null; setAppointmentSaving(false); return; }
     if (target.id === 'createDuplicate') {
       const pending = app.ui.pendingDuplicate; $('#duplicateClientDialog').close(); app.ui.pendingDuplicate = null;
@@ -2280,11 +2875,16 @@
     if (target.id === 'addReviewSupplement') { addReviewSupplementRow(); return; }
     if (target.id === 'addSupplementType') { openSupplementType(); return; }
     if (target.id === 'addBadge') { openBadge(); return; }
+    if (target.id === 'manageExpenseCategories') { openExpenseCategories(); return; }
+    if (target.id === 'deleteExpense') { deleteExpense(); return; }
+    if (target.id === 'deleteExpenseCategory') { deleteExpenseCategory(); return; }
+    if (target.id === 'editAppointmentContact') { const client = app.ui.formClientId ? clientById(app.ui.formClientId) : null; syncAppointmentContactSummary(client, true); $('#phone').focus(); return; }
+    if (target.id === 'toggleAppointmentAdjustments') { setAppointmentAdjustments(!app.ui.appointmentAdjustmentsExpanded); return; }
+    if (target.id === 'changeProfileBadge') { $('#profileBadgeSummary').hidden = true; $('#profileBadgeField').hidden = false; $('#profileBadge').focus(); return; }
     if (target.id === 'deleteBadge') { deleteBadge(); return; }
     if (target.id === 'saveClientSettings') { saveClientSettings(); return; }
     if (target.id === 'saveReminderSettings') { saveReminderSettings(); return; }
     if (target.id === 'settingsBack') { showSettingsPage('home'); return; }
-    if (target.id === 'settingsOpenReport') { app.ui.settingsDirty = false; $('#settingsDialog').close(); showScreen('report'); return; }
     if (target.id === 'applyLateBadge') { settleLateBadgePrompt('apply'); return; }
     if (target.id === 'dismissLateBadge') { settleLateBadgePrompt('dismiss'); return; }
     if (target.id === 'disableLateBadge') { settleLateBadgePrompt('disable'); return; }
@@ -2303,6 +2903,13 @@
     if (target.dataset.editService) { const service = serviceById(target.dataset.editService); if (service) openService(service); return; }
     if (target.dataset.editSupplementType) { const type = supplementTypeById(target.dataset.editSupplementType); if (type) openSupplementType(type); return; }
     if (target.dataset.editBadge) { const badge = badgeById(target.dataset.editBadge); if (badge) openBadge(badge); return; }
+    if (target.dataset.editExpense) { const expense = app.state.expenses.find(item => item.id === target.dataset.editExpense); if (expense) openExpense(expense); return; }
+    if (target.dataset.editExpenseCategory) {
+      if ($('#expenseCategoryId').value === target.dataset.editExpenseCategory) return;
+      if (formHasChanges('expenseCategoriesDialog')) requestExpenseCategoryChange(target.dataset.editExpenseCategory);
+      else editExpenseCategory(target.dataset.editExpenseCategory);
+      return;
+    }
     if (target.dataset.editLinked) { const appointment = app.state.appointments.find(item => item.id === target.dataset.editLinked); if (appointment) { saveAppointmentDraft(); $('#appointmentDialog').close(); openAppointment(appointment); } return; }
     if (target.dataset.repeatFrom) { const appointment = app.state.appointments.find(item => item.id === target.dataset.repeatFrom); if (appointment) { saveClientDraft(); $('#clientDialog').close(); openAppointment(null, { from: appointment }); } return; }
     if (target.dataset.waze) { openWaze(decodeURIComponent(target.dataset.waze)); return; }
@@ -2332,12 +2939,15 @@
     continueDraftSubmission(draft);
   });
   $('#blockForm').addEventListener('submit', event => { event.preventDefault(); saveBlock(); });
+  $('#expenseForm').addEventListener('submit', event => { event.preventDefault(); saveExpense(); });
+  $('#expenseCategoryForm').addEventListener('submit', event => { event.preventDefault(); saveExpenseCategory(); });
   $('#clientForm').addEventListener('submit', event => {
-    event.preventDefault(); if (app.ui.clientSaving || !$('#clientForm').reportValidity()) return; app.ui.clientSaving = true;
-    const client = clientById($('#profileKey').value); if (!client) { app.ui.clientSaving = false; return; }
+   event.preventDefault(); if (app.ui.clientSaving || !$('#clientForm').reportValidity()) return; app.ui.clientSaving = true;
+    $('#clientSubmitButton').disabled = true;
+    const client = clientById($('#profileKey').value); if (!client) { app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
     const previousState = cloneState(app.state); client.name = $('#profileName').value.trim(); client.phone = $('#profilePhone').value.trim(); client.contactVia = $('#profileContactVia').value; client.badgeId = $('#profileBadge').value; client.address = $('#profileAddress').value.trim(); client.notes = $('#profileNotes').value.trim(); client.updatedAt = new Date().toISOString();
-    if (!saveState()) { app.state = previousState; app.ui.clientSaving = false; return; }
-    app.ui.clientSaving = false; clearFormDraft('client'); $('#clientDialog').close(); render();
+    if (!saveState()) { app.state = previousState; app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
+    app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; clearFormDraft('client'); $('#clientDialog').close(); render(); showSuccess('Fiche cliente enregistrée');
   });
   $('#serviceForm').addEventListener('submit', event => { event.preventDefault(); saveService(); });
   $('#supplementTypeForm').addEventListener('submit', event => { event.preventDefault(); saveSupplementType(); });
@@ -2346,11 +2956,12 @@
   $('#clientName').addEventListener('input', event => {
     const exact = app.state.clients.filter(client => normaliseName(client.name) === normaliseName(event.target.value));
     if (exact.length === 1) fillFromClient(exact[0]);
-    else { app.ui.formClientId = null; renderSelectedClientInfo(null); renderSuggestions(); }
+    else { app.ui.formClientId = null; app.ui.appointmentContactExpanded = true; renderSelectedClientInfo(null); renderSuggestions(); }
   });
   $('#clientName').addEventListener('blur', () => setTimeout(() => { $('#clientSuggestions').hidden = true; }, 150));
-  $('#serviceSelect').addEventListener('change', applyServicePreset);
-  $('#price').addEventListener('input', updateAppointmentTotal);
+ $('#serviceSelect').addEventListener('change', applyServicePreset);
+  $('#service').addEventListener('input', updateAppointmentTotal);
+ $('#price').addEventListener('input', updateAppointmentTotal);
   $('#supplementRows').addEventListener('input', updateAppointmentTotal);
   $('#supplementRows').addEventListener('change', event => { if (event.target.matches('[data-supplement-type]')) applySupplementDefaultPrice(event.target); else updateAppointmentTotal(); });
   $('#reviewFinancialPrice').addEventListener('input', updateReviewFinancialTotal);
@@ -2359,41 +2970,50 @@
   $('#paymentStatus').addEventListener('change', syncPaymentFields);
   $('#status').addEventListener('change', () => { syncStatusFields(); updateConflictHint(); });
   $('#date').addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); });
-  ['#time', '#duration'].forEach(selector => $(selector).addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); }));
+  ['#time', '#duration'].forEach(selector => $(selector).addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); updateAppointmentServiceSummary(); }));
   ['timeHour', 'timeMinute'].forEach(id => $(`#${id}`).addEventListener('change', () => syncTimePicker('time')));
   ['repeatTimeHour', 'repeatTimeMinute'].forEach(id => $(`#${id}`).addEventListener('change', () => { app.ui.repeatTimeEdited = true; syncTimePicker('repeatTime'); }));
   $('#address').addEventListener('input', updateConflictHint);
   $('#repeatWeeks').addEventListener('change', () => { app.ui.repeatDateEdited = false; app.ui.repeatTimeEdited = false; syncRepeatDate(true); });
   $('#repeatDate').addEventListener('input', () => { app.ui.repeatDateEdited = true; syncRepeatDate(false); });
   $('#repeatTime').addEventListener('input', () => { app.ui.repeatTimeEdited = true; syncRepeatDate(false); });
-  $('#blockAllDay').addEventListener('change', syncBlockAllDay);
+ $('#blockAllDay').addEventListener('change', syncBlockAllDay);
+  $('#blockAppointments').addEventListener('change', syncBlockModePreview);
   $('#blockAllDayDate').addEventListener('input', () => {
     $('#blockAllDayEndDate').min = $('#blockAllDayDate').value || '';
     $('#blockValidation').hidden = true;
   });
-  $('#blockAllDayEndDate').addEventListener('input', () => { $('#blockValidation').hidden = true; });
+ $('#blockAllDayEndDate').addEventListener('input', () => { $('#blockValidation').hidden = true; });
+  ['#blockStartDate', '#blockStartTime', '#blockEndDate', '#blockEndTime'].forEach(selector => $(selector).addEventListener('input', () => { $('#blockValidation').hidden = true; }));
   $('#workingHoursEditor').addEventListener('change', event => {
     app.ui.settingsDirty = true; const match = event.target.id?.match(/^workEnabled-(\d)$/); if (match) syncWorkingHoursRow(Number(match[1]));
   });
   $('#clientSearch').addEventListener('input', renderClients);
   $('#clientFilter').addEventListener('change', renderClients);
-  $('#profileAddress').addEventListener('input', event => { $('#profileWaze').hidden = !event.target.value.trim(); });
+ $('#profileAddress').addEventListener('input', event => { $('#profileWaze').hidden = !event.target.value.trim(); });
+  $('#profileBadge').addEventListener('change', () => syncProfileBadgeSummary(true));
+  $('#badgeName').addEventListener('input', updateBadgePreview);
+  $('#badgeSymbol').addEventListener('input', updateBadgePreview);
   $('#lateCancellationThreshold').addEventListener('input', () => { app.ui.settingsDirty = true; });
   $('#lateCancellationPromptEnabled').addEventListener('change', () => { app.ui.settingsDirty = true; });
   $('#backupReminderDays').addEventListener('change', () => { app.ui.settingsDirty = true; });
   $('#importData').addEventListener('change', event => importData(event.target.files[0]));
-  $('#conflictDialog').addEventListener('cancel', () => { app.ui.pendingDraft = null; setAppointmentSaving(false); });
+ $('#conflictDialog').addEventListener('cancel', () => { app.ui.pendingDraft = null; setAppointmentSaving(false); });
+  $('#blockConflictDialog').addEventListener('cancel', () => { app.ui.pendingBlockConflict = null; setBlockSaving(false); });
   $('#duplicateClientDialog').addEventListener('cancel', () => { app.ui.pendingDuplicate = null; setAppointmentSaving(false); });
   $('#lateBadgeDialog').addEventListener('cancel', event => { event.preventDefault(); settleLateBadgePrompt('dismiss'); });
   let draftTimer = null;
   $('#appointmentForm').addEventListener('input', () => { clearTimeout(draftTimer); draftTimer = setTimeout(saveAppointmentDraft, 250); });
   $('#appointmentForm').addEventListener('change', () => { clearTimeout(draftTimer); draftTimer = setTimeout(saveAppointmentDraft, 100); });
-  let clientDraftTimer = null, blockDraftTimer = null;
+  let clientDraftTimer = null, blockDraftTimer = null, expenseDraftTimer = null, expenseCategoryDraftTimer = null;
   $('#clientForm').addEventListener('input', () => { clearTimeout(clientDraftTimer); clientDraftTimer = setTimeout(saveClientDraft, 150); });
   $('#clientForm').addEventListener('change', () => { clearTimeout(clientDraftTimer); clientDraftTimer = setTimeout(saveClientDraft, 80); });
   $('#blockForm').addEventListener('input', () => { clearTimeout(blockDraftTimer); blockDraftTimer = setTimeout(saveBlockDraft, 150); });
-  $('#blockForm').addEventListener('change', () => { clearTimeout(blockDraftTimer); blockDraftTimer = setTimeout(saveBlockDraft, 80); });
-  ['appointmentDialog', 'clientDialog', 'blockDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'dayReviewDialog'].forEach(dialogId => {
+ $('#blockForm').addEventListener('change', () => { clearTimeout(blockDraftTimer); blockDraftTimer = setTimeout(saveBlockDraft, 80); });
+  $('#expenseForm').addEventListener('input', () => { clearTimeout(expenseDraftTimer); expenseDraftTimer = setTimeout(saveExpenseDraft, 150); });
+ $('#expenseForm').addEventListener('change', () => { clearTimeout(expenseDraftTimer); expenseDraftTimer = setTimeout(saveExpenseDraft, 80); });
+  $('#expenseCategoryForm').addEventListener('input', () => { clearTimeout(expenseCategoryDraftTimer); expenseCategoryDraftTimer = setTimeout(saveExpenseCategoryDraft, 150); });
+  ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'dayReviewDialog'].forEach(dialogId => {
     $(`#${dialogId}`).addEventListener('cancel', event => { event.preventDefault(); requestDialogClose(dialogId); });
   });
   $('#unsavedChangesDialog').addEventListener('cancel', event => { event.preventDefault(); resolveUnsavedClose('continue'); });

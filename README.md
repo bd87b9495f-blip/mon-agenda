@@ -1,70 +1,100 @@
-# Mon agenda — version 12.1.1 bêta
+# Mon agenda — version 12.2 bêta
 
-Application personnelle et gratuite pour organiser les rendez-vous d’une prothésiste ongulaire. Elle s’installe sur l’écran d’accueil de l’iPhone, fonctionne hors connexion après une première ouverture en ligne et conserve les données uniquement dans le navigateur de l’appareil.
+Application personnelle et gratuite pour organiser une activité de prothésiste ongulaire. Elle s’installe sur l’écran d’accueil de l’iPhone, fonctionne hors connexion après une première ouverture en ligne et conserve les données professionnelles dans le navigateur de l’appareil.
 
-## Correctif 12.1.1
+## Nouveautés de la version 12.2
 
-- une indisponibilité cochée **Toute la journée** accepte désormais un jour de fin facultatif ;
-- jour de fin vide : seul le jour de début est bloqué ;
-- jour de fin renseigné : tous les jours de la période sont bloqués, date de fin comprise ;
-- la période est prise en compte dans les vues Jour, Semaine et Mois, les conflits, les brouillons et les sauvegardes.
+### Une prise de rendez-vous plus simple
 
-## Nouveautés de la version 12.1
+- après le choix de la prestation, la durée et le tarif sont regroupés dans un résumé compact ; le bouton **Ajuster** permet toujours une modification exceptionnelle ;
+- les coordonnées d’une cliente existante sont résumées sans encombrer le formulaire et restent modifiables ;
+- les formulaires longs sont découpés en sections, avec une barre d’action accessible et des boutons plus explicites ;
+- les zones tactiles, les contrastes et les états sélectionnés ont été harmonisés pour améliorer la lisibilité sur l’iPhone ;
+- les réglages sont regroupés en six rubriques : agenda, prestations, suppléments, clientes, données et à propos.
 
-- avertissement avant de fermer une saisie modifiée, avec les choix **Enregistrer**, **Quitter sans enregistrer** ou **Continuer** ;
-- prix par défaut configurable pour chaque nature de supplément, rempli automatiquement puis modifiable dans le rendez-vous ;
-- davantage de symboles et de couleurs pour les repères clientes ;
-- vue Semaine en sept colonnes rendue plus compacte et plus lisible sur l’iPhone ;
-- modification du prix et des suppléments directement depuis la fin de journée, avec mise à jour des bilans et de l’historique ;
-- sauvegardes JSON et exports CSV proposés via la feuille de partage de l’iPhone lorsque celle-ci est disponible ;
-- raccourci « Bloquer un créneau » conservé uniquement dans le bouton central **+** ;
-- migration automatique des données de la version précédente, avec copie locale de sécurité.
+### Repères clientes avec les emojis de l’iPhone
 
-## Fonctions principales
+- chaque repère possède un nom et un emoji saisi directement avec le clavier de l’iPhone ;
+- le repère reste visible dans la fiche cliente, la sélection d’une cliente et le planning ;
+- les anciens symboles sont conservés lors de la migration et peuvent ensuite être remplacés par un emoji ;
+- les couleurs de prestations restent indépendantes des repères clientes.
 
-- vues Jour, Semaine et Mois, jours fériés et week-ends identifiables ;
-- heure de la première et de la dernière cliente dans le résumé du jour ;
-- vue Semaine compacte sur sept jours, avec les rendez-vous placés selon leur heure et leur durée ;
-- création réorganisée : cliente, téléphone/contact, prestation, date/heure, durée, statut, adresse et notes ;
+### Événements personnels
+
+L’ancienne fonction **Bloquer un créneau** devient **Événement personnel** : rendez-vous médical, déplacement, congés, information familiale ou toute autre occupation non professionnelle.
+
+- événement sur une journée entière ou sur plusieurs journées entières ;
+- événement avec une date et une heure de début et de fin, y compris sur deux jours différents ;
+- choix **Bloquer les rendez-vous clients** activable ou désactivable pour chaque événement ;
+- les événements bloquants participent aux alertes de conflit, mais il reste possible d’enregistrer volontairement le rendez-vous ;
+- les événements informatifs restent visibles sans rendre le créneau indisponible ;
+- plusieurs événements personnels peuvent se chevaucher ;
+- les événements sur plusieurs jours sont présentés comme des bandeaux continus dans la vue Mois ;
+- une adresse facultative peut être utilisée pour ouvrir l’itinéraire ;
+- les anciens créneaux bloqués sont automatiquement convertis en événements personnels bloquants.
+
+Les événements personnels n’entrent jamais dans les revenus, paiements, heures de prestation ou statistiques clientes.
+
+### Suivi informatif des dépenses
+
+Le bouton central **+** permet maintenant d’ajouter une dépense liée à l’activité :
+
+- catégorie personnalisable ;
+- contenu ou articles facultatifs ;
+- fournisseur facultatif ;
+- date et montant ;
+- modification ou suppression ultérieure depuis le bilan.
+
+La rubrique **Dépenses** du bilan propose des vues Jour, Mois et Année, une liste chronologique, les totaux, le nombre d’achats, la moyenne et une répartition par catégorie. Les dépenses sont volontairement séparées des revenus : elles sont affichées à titre informatif et ne sont jamais déduites du chiffre d’affaires.
+
+## Fonctions conservées et améliorées
+
+- vues Jour, Semaine et Mois, avec jours fériés et week-ends identifiables ;
 - heures proposées par pas de 5 minutes, tout en préservant les anciennes heures ;
-- conflit détaillé avant validation, avec possibilité de conserver le rendez-vous ;
-- suppléments multiples et personnalisables, inclus dans tous les totaux ;
-- badges clientes personnalisables et suggestion de vigilance après plusieurs annulations tardives ;
-- paiement laissé « À vérifier » à la création, puis validation depuis la fin de journée ;
-- relances de paiement visibles sur l’accueil ;
-- bilans semaine, mois et année, heures travaillées et export CSV ;
-- filtres dans la clientèle, historique des rendez-vous et des modifications ;
-- réglages rangés par catégories ;
-- sauvegardes compatibles avec les anciennes versions et copie de sécurité avant migration/restauration ;
-- brouillons des rendez-vous, clientes et indisponibilités ;
-- assistant IA retiré pour alléger l’application.
+- avertissements de conflit détaillés et possibilité d’enregistrer malgré le conflit ;
+- suppléments multiples, prix proposés par défaut et montants modifiables par rendez-vous ;
+- ajustement du prix et des suppléments depuis la fin de journée ;
+- paiement laissé **À vérifier** à la création puis validé depuis la fin de journée ;
+- bilans d’activité Semaine, Mois et Année et exports CSV séparés ;
+- historique des rendez-vous, filtres clientes, annulations tardives et suggestion de vigilance ;
+- confirmation avant de quitter une saisie modifiée, brouillons locaux et protection contre les doubles appuis ;
+- sauvegardes JSON, aperçu avant restauration et copie locale de sécurité avant une migration ou une restauration ;
+- fonctionnement hors ligne, sans publicité, analyseur externe ni assistant IA.
+
+## Compatibilité et migration
+
+La version 12.2 adapte automatiquement les données des versions précédentes :
+
+- rendez-vous, clientes, paiements, prestations, suppléments, repères et réglages sont conservés ;
+- les anciens créneaux bloqués deviennent des événements personnels avec le blocage des rendez-vous activé ;
+- les anciens repères conservent leur symbole jusqu’à leur prochaine modification ;
+- les nouvelles catégories de dépenses sont ajoutées sans modifier les revenus existants ;
+- une copie locale de sécurité est créée avant l’adaptation des données.
+
+Une migration ne remplace pas une sauvegarde personnelle. Avant la mise à jour, utilise toujours **Réglages → Données et sauvegardes → Sauvegarder dans Fichiers**.
 
 ## Installer ou mettre à jour avec GitHub Pages
 
-Lis le fichier `GUIDE-MISE-A-JOUR.md` fourni avec cette version. Avant toute mise à jour, ouvre l’application sur l’iPhone et utilise **Réglages → Données et sauvegardes → Sauvegarder dans Fichiers**.
+Lis le fichier `GUIDE-MISE-A-JOUR.md` fourni avec cette version. Après l’envoi des fichiers sur GitHub, attends une à deux minutes puis ouvre :
 
-Après l’envoi des fichiers sur GitHub, attends une à deux minutes puis ouvre :
+`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.2`
 
-`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.1.1`
-
-L’application propose ensuite d’appliquer la nouvelle version. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.1.1 bêta` est affiché.
+Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.2 bêta` est affiché.
 
 ## Données et confidentialité
 
-- Les clientes, rendez-vous, paiements, indisponibilités, prestations, suppléments, badges et réglages restent sur l’iPhone.
+- Les clientes, rendez-vous, paiements, événements personnels, dépenses et réglages restent sur l’iPhone.
 - GitHub Pages héberge seulement les fichiers de l’application et ne reçoit pas la base de données.
 - Ne dépose jamais un fichier de sauvegarde JSON dans le dépôt GitHub : il contient tes données professionnelles.
-- Une mise à jour du code ne supprime pas les données locales. La version 12.1.1 adapte automatiquement les données des versions précédentes.
-- Une restauration réimporte les données dans la version actuelle : les anciens champs sont adaptés et les nouveaux champs prennent leurs valeurs par défaut.
-- Les sauvegardes ne sont pas automatiques. Exporte-en régulièrement et choisis un emplacement personnel sûr dans l’application Fichiers.
+- Les sauvegardes et exports peuvent être envoyés vers la feuille de partage iOS ; la destination reste choisie par l’utilisatrice dans l’application Fichiers.
+- Waze nécessite une connexion et reçoit l’adresse uniquement lorsque le bouton d’itinéraire est utilisé.
 
-## Limites assumées
+## Limites importantes
 
 - Les données ne sont pas synchronisées entre plusieurs appareils.
-- Désinstaller l’application, supprimer les données Safari ou réinitialiser l’iPhone peut effacer les données locales ; la sauvegarde JSON est donc indispensable.
-- iOS laisse toujours l’utilisatrice choisir la destination d’un export : l’application ne peut ni imposer ni mémoriser silencieusement un dossier.
-- Waze nécessite une connexion et reçoit l’adresse uniquement lorsque le bouton d’itinéraire est utilisé.
-- GitHub Pages doit rester public avec un compte gratuit, mais aucune donnée cliente n’est placée dans les fichiers publiés.
+- Désinstaller l’application, effacer les données Safari ou réinitialiser l’iPhone peut supprimer les données locales.
+- Ne supprime pas l’application et n’efface pas ses données pour forcer une mise à jour : utilise le bandeau de mise à jour et conserve une sauvegarde JSON récente.
+- iOS ne permet pas à une application web d’imposer ou de mémoriser silencieusement un dossier d’export.
 
 ## Fichiers utiles
 
