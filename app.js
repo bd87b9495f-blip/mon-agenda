@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.1 bêta';
+  const APP_VERSION = '12.1.1 bêta';
   const CURRENT_DATA_VERSION = 13;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
@@ -267,7 +267,11 @@
     const startDate = pickDate(raw?.startDate || raw?.date);
     if (!validDate(startDate)) return null;
     const details = { address: boundedText(raw?.address || raw?.location, LIMITS.shortText), notes: boundedText(raw?.notes || raw?.comment || raw?.commentaire) };
-    if (allDay) return { id: String(raw.id || uuid()), allDay: true, startDate, startTime: '00:00', endDate: startDate, endTime: '00:00', reason: boundedText(raw.reason || raw.label || 'Créneau bloqué', LIMITS.shortText) || 'Créneau bloqué', ...details };
+    if (allDay) {
+      const endDate = raw?.endDate ? pickDate(raw.endDate) : startDate;
+      if (!validDate(endDate) || endDate < startDate) return null;
+      return { id: String(raw.id || uuid()), allDay: true, startDate, startTime: '00:00', endDate, endTime: '00:00', reason: boundedText(raw.reason || raw.label || 'Créneau bloqué', LIMITS.shortText) || 'Créneau bloqué', ...details };
+    }
     const endDate = pickDate(raw?.endDate || startDate), startTime = validTime(raw?.startTime) ? raw.startTime : '09:00', endTime = validTime(raw?.endTime) ? raw.endTime : '10:00';
     if (!validDate(endDate) || dateTimeMs(endDate, endTime) <= dateTimeMs(startDate, startTime)) return null;
     return { id: String(raw.id || uuid()), allDay: false, startDate, startTime, endDate, endTime, reason: boundedText(raw.reason || raw.label || 'Créneau bloqué', LIMITS.shortText) || 'Créneau bloqué', ...details };
@@ -612,7 +616,7 @@
     }
     if (kind === 'block') {
       const draft = blockFormDraft(), values = draft?.values; if (!values) { clearFormDraft('block'); return; }
-      const existing = app.state.blocks.find(block => block.id === values.id); openBlock(existing || null, { date: values.startDate, time: values.startTime }); app.ui.editingBlockId = existing?.id || null; $('#blockId').value = values.id || existing?.id || $('#blockId').value; $('#blockAllDay').checked = values.allDay; $('#blockAllDayDate').value = values.startDate; $('#blockStartDate').value = values.startDate; $('#blockStartTime').value = values.startTime; $('#blockEndDate').value = values.endDate; $('#blockEndTime').value = values.endTime; $('#blockReason').value = values.reason; $('#blockAddress').value = values.address; $('#blockNotes').value = values.notes; syncBlockAllDay(); return;
+      const existing = app.state.blocks.find(block => block.id === values.id); openBlock(existing || null, { date: values.startDate, time: values.startTime }); app.ui.editingBlockId = existing?.id || null; $('#blockId').value = values.id || existing?.id || $('#blockId').value; $('#blockAllDay').checked = values.allDay; $('#blockAllDayDate').value = values.startDate; $('#blockAllDayEndDate').value = values.endDate && values.endDate !== values.startDate ? values.endDate : ''; $('#blockStartDate').value = values.startDate; $('#blockStartTime').value = values.startTime; $('#blockEndDate').value = values.endDate || values.startDate; $('#blockEndTime').value = values.endTime; $('#blockReason').value = values.reason; $('#blockAddress').value = values.address; $('#blockNotes').value = values.notes; syncBlockAllDay(); return;
     }
     resumeAppointmentDraft();
   }
@@ -752,7 +756,8 @@
 
   function blockBounds(block) {
     const start = dateTimeMs(block.startDate, block.allDay ? '00:00' : block.startTime);
-    const end = block.allDay ? dateTimeMs(dateKey(addDays(parseDate(block.startDate), 1)), '00:00') : dateTimeMs(block.endDate, block.endTime);
+    const inclusiveEnd = parseDate(block.endDate) || parseDate(block.startDate);
+    const end = block.allDay ? dateTimeMs(dateKey(addDays(inclusiveEnd, 1)), '00:00') : dateTimeMs(block.endDate, block.endTime);
     return { start, end };
   }
 
@@ -1008,7 +1013,7 @@
     }).join('');
     const allDay = days.map(day => {
       const { meta } = day, blocks = day.blocks.filter(block => block.allDay);
-      const content = `${meta.holiday ? `<span class="week-holiday-chip" title="${escapeHtml(meta.holiday.label)}">${escapeHtml(meta.holiday.label)}</span>` : ''}${blocks.map(block => `<button class="week-all-day-block" data-edit-block="${escapeHtml(block.id)}" title="${escapeHtml(block.reason)}" aria-label="Indisponibilité : ${escapeHtml(block.reason)}">⊘ ${escapeHtml(block.reason)}</button>`).join('')}`;
+      const content = `${meta.holiday ? `<span class="week-holiday-chip" title="${escapeHtml(meta.holiday.label)}">${escapeHtml(meta.holiday.label)}</span>` : ''}${blocks.map(block => `<button class="week-all-day-block" data-edit-block="${escapeHtml(block.id)}" title="${escapeHtml(`${block.reason} · ${blockDisplayLabel(block)}`)}" aria-label="Indisponibilité : ${escapeHtml(block.reason)}, ${escapeHtml(blockDisplayLabel(block))}">⊘ ${escapeHtml(block.reason)}</button>`).join('')}`;
       return `<div class="week-all-day-cell ${meta.weekend ? 'weekend' : ''} ${meta.holiday ? 'holiday' : ''}">${content}</div>`;
     }).join('');
     const hourLabels = Array.from({ length: totalHours + 1 }, (_, index) => `<span style="top:${index * WEEK_HOUR_HEIGHT}px">${pad(firstHour + index)}h</span>`).join('');
@@ -1051,7 +1056,11 @@
   }
 
   function blockDisplayLabel(block) {
-    if (block.allDay) return 'Toute la journée';
+    if (block.allDay) {
+      if (!block.endDate || block.endDate === block.startDate) return 'Toute la journée';
+      const start = parseDate(block.startDate), end = parseDate(block.endDate);
+      return `Du ${format(start, { day: 'numeric', month: 'short' })} au ${format(end, { day: 'numeric', month: 'short' })} · journées entières`;
+    }
     if (block.startDate === block.endDate) return `${block.startTime} – ${block.endTime}`;
     return `${format(parseDate(block.startDate), { day: 'numeric', month: 'short' })} ${block.startTime} → ${format(parseDate(block.endDate), { day: 'numeric', month: 'short' })} ${block.endTime}`;
   }
@@ -1069,7 +1078,7 @@
     $('#holidayBanner').innerHTML = parts.length ? `<div class="calendar-banner ${blocks.length ? 'blocked' : ''}">${parts.join(' &nbsp; · &nbsp; ')}</div>` : '';
     const allDay = blocks.filter(block => block.allDay), target = $('#dayAllDayBlocks');
     target.hidden = !allDay.length;
-    target.innerHTML = allDay.map(block => `<button data-edit-block="${escapeHtml(block.id)}"><span>Journée entière</span><strong>⊘ ${escapeHtml(block.reason)}</strong>${block.address ? `<small>${escapeHtml(block.address)}</small>` : ''}</button>`).join('');
+    target.innerHTML = allDay.map(block => `<button data-edit-block="${escapeHtml(block.id)}"><span>${escapeHtml(blockDisplayLabel(block))}</span><strong>⊘ ${escapeHtml(block.reason)}</strong>${block.address ? `<small>${escapeHtml(block.address)}</small>` : ''}</button>`).join('');
   }
 
   function renderDaySummary() {
@@ -1680,24 +1689,33 @@
   }
 
   function syncBlockAllDay() {
-    const allDay = $('#blockAllDay').checked;
-    $('#blockTimeFields').hidden = allDay; $('#blockAllDayDateField').hidden = !allDay;
+    const allDay = $('#blockAllDay').checked, start = $('#blockAllDayDate'), end = $('#blockAllDayEndDate');
+    if (allDay) {
+      if (validDate($('#blockStartDate').value)) start.value = $('#blockStartDate').value;
+      if (validDate($('#blockEndDate').value) && $('#blockEndDate').value !== start.value) end.value = $('#blockEndDate').value;
+      else end.value = '';
+    } else if (validDate(start.value)) {
+      $('#blockStartDate').value = start.value;
+      $('#blockEndDate').value = validDate(end.value) ? end.value : start.value;
+    }
+    end.min = start.value || '';
+    $('#blockTimeFields').hidden = allDay; $('#blockAllDayDateFields').hidden = !allDay;
     ['#blockStartDate', '#blockStartTime', '#blockEndDate', '#blockEndTime'].forEach(selector => { $(selector).disabled = allDay; });
-    $('#blockAllDayDate').disabled = !allDay;
+    start.disabled = !allDay; end.disabled = !allDay;
   }
 
   function resetBlockForm() {
-    $('#blockForm').reset(); app.ui.editingBlockId = null; $('#blockId').value = ''; $('#blockAllDay').checked = false; $('#blockAllDayDate').value = dateKey(app.ui.selectedDate); $('#blockStartDate').value = dateKey(app.ui.selectedDate); $('#blockEndDate').value = dateKey(app.ui.selectedDate); $('#blockStartTime').value = '09:00'; $('#blockEndTime').value = '10:00'; $('#blockAddress').value = ''; $('#blockNotes').value = ''; $('#blockValidation').hidden = true; $('#deleteBlock').hidden = true; setBlockSaving(false); syncBlockAllDay();
+    $('#blockForm').reset(); app.ui.editingBlockId = null; $('#blockId').value = ''; $('#blockAllDay').checked = false; $('#blockAllDayDate').value = dateKey(app.ui.selectedDate); $('#blockAllDayEndDate').value = ''; $('#blockStartDate').value = dateKey(app.ui.selectedDate); $('#blockEndDate').value = dateKey(app.ui.selectedDate); $('#blockStartTime').value = '09:00'; $('#blockEndTime').value = '10:00'; $('#blockAddress').value = ''; $('#blockNotes').value = ''; $('#blockValidation').hidden = true; $('#deleteBlock').hidden = true; setBlockSaving(false); syncBlockAllDay();
   }
 
   function openBlock(block = null, defaults = {}) {
     resetBlockForm();
     $('#blockFormTitle').textContent = block ? 'Modifier l’indisponibilité' : 'Ajouter une indisponibilité';
     if (block) {
-      app.ui.editingBlockId = block.id; $('#blockId').value = block.id; $('#blockAllDay').checked = block.allDay; $('#blockAllDayDate').value = block.startDate; $('#blockStartDate').value = block.startDate; $('#blockEndDate').value = block.endDate; $('#blockStartTime').value = block.startTime; $('#blockEndTime').value = block.endTime; $('#blockReason').value = block.reason; $('#blockAddress').value = block.address || ''; $('#blockNotes').value = block.notes || ''; $('#deleteBlock').hidden = false; syncBlockAllDay();
+      app.ui.editingBlockId = block.id; $('#blockId').value = block.id; $('#blockAllDay').checked = block.allDay; $('#blockAllDayDate').value = block.startDate; $('#blockAllDayEndDate').value = block.endDate !== block.startDate ? block.endDate : ''; $('#blockStartDate').value = block.startDate; $('#blockEndDate').value = block.endDate; $('#blockStartTime').value = block.startTime; $('#blockEndTime').value = block.endTime; $('#blockReason').value = block.reason; $('#blockAddress').value = block.address || ''; $('#blockNotes').value = block.notes || ''; $('#deleteBlock').hidden = false; syncBlockAllDay();
     } else {
       const date = validDate(defaults.date) ? defaults.date : dateKey(app.ui.selectedDate), time = validTime(defaults.time) ? defaults.time : '09:00';
-      $('#blockId').value = uuid(); $('#blockAllDayDate').value = date; $('#blockStartDate').value = date; $('#blockEndDate').value = date; $('#blockStartTime').value = time; $('#blockEndTime').value = timeText(toMinutes(time) + 60);
+      $('#blockId').value = uuid(); $('#blockAllDayDate').value = date; $('#blockAllDayEndDate').value = ''; $('#blockStartDate').value = date; $('#blockEndDate').value = date; $('#blockStartTime').value = time; $('#blockEndTime').value = timeText(toMinutes(time) + 60);
     }
     app.ui.blockDraftBaseline = JSON.stringify(blockDraft());
     $('#blockDialog').showModal(); captureFormBaseline('blockDialog');
@@ -1712,7 +1730,8 @@
   }
 
   function blockDraft() {
-    const allDay = $('#blockAllDay').checked, startDate = allDay ? $('#blockAllDayDate').value : $('#blockStartDate').value, endDate = allDay ? startDate : $('#blockEndDate').value;
+    const allDay = $('#blockAllDay').checked, startDate = allDay ? $('#blockAllDayDate').value : $('#blockStartDate').value;
+    const endDate = allDay ? ($('#blockAllDayEndDate').value || startDate) : $('#blockEndDate').value;
     return { id: app.ui.editingBlockId || $('#blockId').value || uuid(), allDay, startDate, startTime: allDay ? '00:00' : $('#blockStartTime').value, endDate, endTime: allDay ? '00:00' : $('#blockEndTime').value, reason: $('#blockReason').value.trim() || 'Créneau bloqué', address: $('#blockAddress').value.trim(), notes: $('#blockNotes').value.trim() };
   }
 
@@ -1725,9 +1744,11 @@
     if (app.ui.blockSaving) return;
     setBlockSaving(true);
     const block = blockDraft(), validation = $('#blockValidation');
-    if (!validDate(block.startDate) || !validDate(block.endDate) || (!block.allDay && (!validTime(block.startTime) || !validTime(block.endTime) || dateTimeMs(block.endDate, block.endTime) <= dateTimeMs(block.startDate, block.startTime)))) {
-      validation.hidden = false; validation.textContent = 'La fin doit être après le début du créneau.'; setBlockSaving(false); return;
-    }
+    let error = '';
+    if (!validDate(block.startDate)) error = block.allDay ? 'Choisis le jour de début.' : 'Choisis le jour et l’heure de début.';
+    else if (!validDate(block.endDate) || (block.allDay && block.endDate < block.startDate)) error = 'Le jour de fin doit être identique ou postérieur au jour de début.';
+    else if (!block.allDay && (!validTime(block.startTime) || !validTime(block.endTime) || dateTimeMs(block.endDate, block.endTime) <= dateTimeMs(block.startDate, block.startTime))) error = 'La fin doit être après le début du créneau.';
+    if (error) { validation.hidden = false; validation.textContent = error; setBlockSaving(false); return; }
     const overlaps = activeAppointmentsOverlappingBlock(block);
     const bounds = blockBounds(block), otherBlocks = app.state.blocks.filter(item => item.id !== block.id).filter(item => { const other = blockBounds(item); return intersects(bounds.start, bounds.end, other.start, other.end); });
     if ((overlaps.length || otherBlocks.length) && !window.confirm(`Cette indisponibilité chevauche ${overlaps.length ? `${overlaps.length} rendez-vous` : ''}${overlaps.length && otherBlocks.length ? ' et ' : ''}${otherBlocks.length ? `${otherBlocks.length} autre${otherBlocks.length > 1 ? 's' : ''} indisponibilité${otherBlocks.length > 1 ? 's' : ''}` : ''}. La conserver quand même ?`)) { setBlockSaving(false); return; }
@@ -2170,7 +2191,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=12.1', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=12.1.1', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -2346,6 +2367,11 @@
   $('#repeatDate').addEventListener('input', () => { app.ui.repeatDateEdited = true; syncRepeatDate(false); });
   $('#repeatTime').addEventListener('input', () => { app.ui.repeatTimeEdited = true; syncRepeatDate(false); });
   $('#blockAllDay').addEventListener('change', syncBlockAllDay);
+  $('#blockAllDayDate').addEventListener('input', () => {
+    $('#blockAllDayEndDate').min = $('#blockAllDayDate').value || '';
+    $('#blockValidation').hidden = true;
+  });
+  $('#blockAllDayEndDate').addEventListener('input', () => { $('#blockValidation').hidden = true; });
   $('#workingHoursEditor').addEventListener('change', event => {
     app.ui.settingsDirty = true; const match = event.target.id?.match(/^workEnabled-(\d)$/); if (match) syncWorkingHoursRow(Number(match[1]));
   });

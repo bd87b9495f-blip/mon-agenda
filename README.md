@@ -1,6 +1,13 @@
-# Mon agenda — version 12.1 bêta
+# Mon agenda — version 12.1.1 bêta
 
 Application personnelle et gratuite pour organiser les rendez-vous d’une prothésiste ongulaire. Elle s’installe sur l’écran d’accueil de l’iPhone, fonctionne hors connexion après une première ouverture en ligne et conserve les données uniquement dans le navigateur de l’appareil.
+
+## Correctif 12.1.1
+
+- une indisponibilité cochée **Toute la journée** accepte désormais un jour de fin facultatif ;
+- jour de fin vide : seul le jour de début est bloqué ;
+- jour de fin renseigné : tous les jours de la période sont bloqués, date de fin comprise ;
+- la période est prise en compte dans les vues Jour, Semaine et Mois, les conflits, les brouillons et les sauvegardes.
 
 ## Nouveautés de la version 12.1
 
@@ -38,16 +45,16 @@ Lis le fichier `GUIDE-MISE-A-JOUR.md` fourni avec cette version. Avant toute mis
 
 Après l’envoi des fichiers sur GitHub, attends une à deux minutes puis ouvre :
 
-`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.1`
+`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.1.1`
 
-L’application propose ensuite d’appliquer la nouvelle version. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.1 bêta` est affiché.
+L’application propose ensuite d’appliquer la nouvelle version. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.1.1 bêta` est affiché.
 
 ## Données et confidentialité
 
 - Les clientes, rendez-vous, paiements, indisponibilités, prestations, suppléments, badges et réglages restent sur l’iPhone.
 - GitHub Pages héberge seulement les fichiers de l’application et ne reçoit pas la base de données.
 - Ne dépose jamais un fichier de sauvegarde JSON dans le dépôt GitHub : il contient tes données professionnelles.
-- Une mise à jour du code ne supprime pas les données locales. La version 12.1 migre automatiquement les données des versions précédentes.
+- Une mise à jour du code ne supprime pas les données locales. La version 12.1.1 adapte automatiquement les données des versions précédentes.
 - Une restauration réimporte les données dans la version actuelle : les anciens champs sont adaptés et les nouveaux champs prennent leurs valeurs par défaut.
 - Les sauvegardes ne sont pas automatiques. Exporte-en régulièrement et choisis un emplacement personnel sûr dans l’application Fichiers.
 
