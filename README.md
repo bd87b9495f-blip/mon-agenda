@@ -1,8 +1,16 @@
-# Mon agenda — version 12.3 bêta
+# Mon agenda — version 12.3.1 bêta
 
 Application personnelle et gratuite pour organiser une activité de prothésiste ongulaire. Elle s’installe sur l’écran d’accueil de l’iPhone, fonctionne hors connexion après une première ouverture en ligne et conserve les données professionnelles dans le navigateur de l’appareil.
 
-## Nouveautés de la version 12.3
+## Correctifs et améliorations de la version 12.3.1
+
+- suppression de la fausse alerte d’espace insuffisant qui pouvait apparaître au démarrage de la version 12.3 ;
+- les événements sur une journée entière ou plusieurs jours ne modifient plus le zoom des vues Jour et Semaine ;
+- nouvelle organisation du Bilan, guidée par période, sujet et filtre ;
+- classements des prestations et suppléments remplacés par des listes lisibles et tactiles, avec nombre et montant encaissé ;
+- navigation cohérente par jour, semaine, mois ou année dans les trois rubriques du Bilan.
+
+## Nouveautés introduites en version 12.3
 
 ### Planning Jour et Semaine centré sur le travail
 
@@ -14,8 +22,8 @@ Application personnelle et gratuite pour organiser une activité de prothésiste
 ### Bilans par prestation et supplément
 
 - filtre du bilan par type de prestation ;
-- tableau des prestations avec le nombre réalisé et le prix de base encaissé ;
-- tableau distinct des suppléments avec le nombre d’utilisations et le montant encaissé ;
+- classement des prestations avec le nombre réalisé et le prix de base encaissé ;
+- classement distinct des suppléments avec le nombre d’utilisations et le montant encaissé ;
 - tri par nombre réalisé ou par montant encaissé ;
 - accès au détail des rendez-vous depuis chaque ligne ;
 - le nombre suit la date du rendez-vous, tandis que l’argent suit la date du paiement. Un rendez-vous de juin payé en juillet compte donc en juin, mais son encaissement apparaît en juillet.
@@ -71,7 +79,7 @@ Le bouton central **+** permet maintenant d’ajouter une dépense liée à l’
 - date et montant ;
 - modification ou suppression ultérieure depuis le bilan.
 
-La rubrique **Dépenses** du bilan propose des vues Jour, Mois et Année, une liste chronologique, les totaux, le nombre d’achats, la moyenne et une répartition par catégorie. Les dépenses sont volontairement séparées des revenus : elles sont affichées à titre informatif et ne sont jamais déduites du chiffre d’affaires.
+La rubrique **Dépenses** du bilan propose des vues Jour, Semaine, Mois et Année, une liste chronologique, les totaux, le nombre d’achats, la moyenne et une répartition par catégorie. Les dépenses sont volontairement séparées des revenus : elles sont affichées à titre informatif et ne sont jamais déduites du chiffre d’affaires.
 
 ## Fonctions conservées et améliorées
 
@@ -81,7 +89,7 @@ La rubrique **Dépenses** du bilan propose des vues Jour, Mois et Année, une li
 - suppléments multiples, prix proposés par défaut et montants modifiables par rendez-vous ;
 - ajustement du prix et des suppléments depuis la fin de journée ;
 - paiement laissé **À vérifier** à la création puis validé depuis la fin de journée ;
-- bilans d’activité Semaine, Mois et Année et exports CSV séparés ;
+- bilans par Jour, Semaine, Mois et Année et exports CSV séparés ;
 - historique des rendez-vous, filtres clientes, annulations tardives et suggestion de vigilance ;
 - confirmation avant de quitter une saisie modifiée, brouillons locaux et protection contre les doubles appuis ;
 - sauvegardes JSON, aperçu avant restauration et copie locale de sécurité avant une migration ou une restauration ;
@@ -89,7 +97,7 @@ La rubrique **Dépenses** du bilan propose des vues Jour, Mois et Année, une li
 
 ## Compatibilité et migration
 
-La version 12.3 conserve le schéma de données sécurisé de la version 12.2 et adapte automatiquement les données des versions plus anciennes :
+La version 12.3.1 conserve le schéma de données sécurisé de la version 12.2 et adapte automatiquement les données des versions plus anciennes :
 
 - rendez-vous, clientes, paiements, prestations, suppléments, repères et réglages sont conservés ;
 - les anciens créneaux bloqués deviennent des événements personnels avec le blocage des rendez-vous activé ;
@@ -103,9 +111,9 @@ Une migration ne remplace pas une sauvegarde personnelle. Avant la mise à jour,
 
 Lis le fichier `GUIDE-MISE-A-JOUR.md` fourni avec cette version. Après l’envoi des fichiers sur GitHub, attends une à deux minutes puis ouvre :
 
-`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.3`
+`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.3.1`
 
-Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.3 bêta` est affiché.
+Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.3.1 bêta` est affiché.
 
 ## Données et confidentialité
 

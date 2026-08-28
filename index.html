@@ -8,9 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-    <link rel="manifest" href="manifest.webmanifest?v=12.3">
+    <link rel="manifest" href="manifest.webmanifest?v=12.3.1">
     <link rel="apple-touch-icon" href="icon-180.png">
-    <link rel="stylesheet" href="style.css?v=12.3">
+    <link rel="stylesheet" href="style.css?v=12.3.1">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -89,15 +89,27 @@
     </main>
 
     <main class="report-screen" id="reportScreen" hidden>
-      <header class="app-header"><p class="eyebrow">Mes chiffres</p><div class="header-row"><h1>Bilan</h1><button class="text-button" id="reportToday">Aujourd’hui</button></div></header>
-      <section class="report-switch" aria-label="Période du bilan"><button class="report-period-button" data-report-period="day" hidden>Jour</button><button class="report-period-button active" data-report-period="week">Semaine</button><button class="report-period-button" data-report-period="month">Mois</button><button class="report-period-button" data-report-period="year">Année</button></section>
-      <div class="period-nav report-nav"><button class="round-button" id="previousReport" aria-label="Période précédente">‹</button><strong id="reportPeriodLabel"></strong><button class="round-button" id="nextReport" aria-label="Période suivante">›</button></div>
-      <div class="report-heading-actions"><section class="report-tabs" aria-label="Type de bilan"><button class="report-tab active" data-report-tab="activity">Activité</button><button class="report-tab" data-report-tab="payments">Paiements</button><button class="report-tab" data-report-tab="expenses">Dépenses</button></section><button id="exportReportCsv" class="secondary-button">Exporter CSV</button></div>
-      <section id="reportAnalysisTools" class="report-analysis-tools" aria-label="Filtres du bilan">
-        <label class="field compact-field">Prestation<select id="reportServiceFilter"><option value="all">Toutes les prestations</option></select></label>
-        <div class="report-sort-control"><span>Classer les tableaux</span><div role="group" aria-label="Classement des prestations et suppléments"><button type="button" class="active" data-report-sort="count" aria-pressed="true">Par nombre</button><button type="button" data-report-sort="paid" aria-pressed="false">Par montant</button></div></div>
+      <header class="app-header report-header"><p class="eyebrow">Mes chiffres</p><div class="header-row"><h1>Bilan</h1><button class="text-button" id="reportToday">Cette semaine</button></div><p>Choisis une période, puis les chiffres que tu veux comprendre.</p></header>
+      <section class="report-control-card" aria-label="Réglages du bilan">
+        <div class="report-control-section">
+          <div class="report-control-title"><span>1</span><div><strong>Période</strong><small>Jour, semaine, mois ou année</small></div></div>
+          <section class="report-switch" aria-label="Période du bilan"><button class="report-period-button" data-report-period="day">Jour</button><button class="report-period-button active" data-report-period="week">Semaine</button><button class="report-period-button" data-report-period="month">Mois</button><button class="report-period-button" data-report-period="year">Année</button></section>
+          <div class="period-nav report-nav"><button class="round-button" id="previousReport" aria-label="Période précédente">‹</button><strong id="reportPeriodLabel"></strong><button class="round-button" id="nextReport" aria-label="Période suivante">›</button></div>
+        </div>
+        <div class="report-control-section">
+          <div class="report-control-title"><span>2</span><div><strong>Voir</strong><small>Un seul sujet à la fois</small></div></div>
+          <section class="report-tabs" aria-label="Type de bilan"><button class="report-tab active" data-report-tab="activity">Prestations</button><button class="report-tab" data-report-tab="payments">Encaissements</button><button class="report-tab" data-report-tab="expenses">Dépenses</button></section>
+        </div>
+        <section id="reportAnalysisTools" class="report-control-section report-analysis-tools" aria-label="Filtres du bilan">
+          <div class="report-control-title"><span>3</span><div><strong id="reportAnalysisTitle">Affiner le classement</strong><small id="reportAnalysisHelp">Filtre et ordre d’affichage</small></div></div>
+          <div class="report-analysis-grid">
+            <label class="field compact-field">Afficher<select id="reportServiceFilter"><option value="all">Toutes les prestations</option></select></label>
+            <div class="report-sort-control" id="reportSortControl"><span>Classer par</span><div role="group" aria-label="Classement des prestations et suppléments"><button type="button" class="active" data-report-sort="count" aria-pressed="true">Nombre</button><button type="button" data-report-sort="paid" aria-pressed="false">Montant</button></div></div>
+          </div>
+        </section>
       </section>
       <section id="reportContent" class="report-content"></section>
+      <footer class="report-footer-actions"><button id="exportReportCsv" class="secondary-button">Exporter le bilan</button><small>Crée un fichier CSV utilisable dans un tableur.</small></footer>
     </main>
 
     <nav class="bottom-bar" aria-label="Navigation"><button class="nav-item active" data-screen="agenda"><span aria-hidden="true">▦</span>Agenda</button><button class="nav-item" data-screen="clients"><span aria-hidden="true">♙</span>Clientes</button><button class="add-button" id="addAppointment" aria-label="Ajouter">+</button><button class="nav-item" data-screen="report"><span aria-hidden="true">◫</span>Bilan</button><button class="nav-item" data-screen="settings"><span aria-hidden="true">⚙</span>Réglages</button></nav>
@@ -242,6 +254,6 @@
 
     <section id="successToast" class="success-toast" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span><strong id="successMessage">Enregistré</strong></section>
     <section id="undoToast" class="undo-toast" role="status" aria-live="polite" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
-    <script src="app.js?v=12.3"></script>
+    <script src="app.js?v=12.3.1"></script>
   </body>
 </html>

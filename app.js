@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.3 bêta';
+  const APP_VERSION = '12.3.1 bêta';
   const CURRENT_DATA_VERSION = 14;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
@@ -612,13 +612,16 @@
     return migrateState({ appointments: legacyAppointments }, legacyProfiles);
   }
 
+  let dataIndexes = null;
+  function invalidateDataIndexes() { dataIndexes = null; }
+
   const app = {
     state: loadState(),
     ui: {
       screen: 'agenda', mode: 'day', selectedDate: startOfDay(new Date()), weekStart: mondayOf(new Date()),
       monthDate: localDate(new Date().getFullYear(), new Date().getMonth(), 1), overviewWeekStart: null,
       editingAppointmentId: null, editingBlockId: null, pendingDraft: null, formClientId: null, formServiceColor: 'rose', repeatDateEdited: false, repeatTimeEdited: false,
-      reportMode: 'week', expenseReportMode: 'month', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()), reportServiceFilter: 'all', reportSort: 'count',
+      reportMode: 'week', expenseReportMode: 'week', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()), reportServiceFilter: 'all', reportSort: 'count',
       reviewDate: startOfDay(new Date()), reviewPendingId: null,
      quickAddDate: todayKey(), quickAddTime: '10:00', pendingDuplicate: null,
      appointmentSaving: false, blockSaving: false, expenseSaving: false, clientSaving: false, serviceSaving: false, supplementSaving: false, badgeSaving: false, undo: null, undoTimer: null, successTimer: null,
@@ -631,11 +634,12 @@
   };
   const cloneState = state => JSON.parse(JSON.stringify(state));
   const saveState = (state = app.state, silent = false) => {
-    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); invalidateDataIndexes(); hideUndo(); return true; }
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
     catch {
       if (!silent) window.alert('Impossible d’enregistrer sur cet appareil. Tes changements n’ont pas été appliqués. Libère un peu d’espace, puis réessaie.');
       return false;
     }
+    invalidateDataIndexes(); hideUndo(); return true;
   };
   saveState();
   if (startupLoadWarning) setTimeout(() => window.alert(startupLoadWarning), 0);
@@ -959,9 +963,6 @@
       .some(dialogId => $(`#${dialogId}`)?.open && formHasChanges(dialogId));
   }
 
-  let dataIndexes = null;
-  function invalidateDataIndexes() { dataIndexes = null; }
-
   function currentDataIndexes() {
     const { state } = app;
     if (dataIndexes?.state === state
@@ -1099,6 +1100,15 @@
     return { firstHour, lastHour };
   }
 
+  function timedBlockAffectsTimelineZoom(block, date) {
+    if (!block || block.allDay) return false;
+    const startDay = dayOrdinal(block.startDate), endDay = dayOrdinal(block.endDate);
+    const wallClockDuration = (endDay - startDay) * 1440 + toMinutes(block.endTime) - toMinutes(block.startTime);
+    if (!Number.isFinite(wallClockDuration) || wallClockDuration >= 1440) return false;
+    const segment = blockSegment(block, date);
+    return Boolean(segment && !(segment.startMinutes === 0 && segment.endMinutes === 1440));
+  }
+
   function timelineHourRangeForDay(date, appointments = appointmentsForDate(dateKey(date)), blocks = blocksOnDate(date)) {
     const hours = workHoursFor(date), fallback = configuredWorkingRange();
     const starts = [], ends = [];
@@ -1110,7 +1120,7 @@
     appointments.filter(activeAppointment).forEach(appointment => {
       starts.push(toMinutes(appointment.time)); ends.push(toMinutes(appointment.time) + Number(appointment.duration || 0));
     });
-    blocks.filter(block => !block.allDay).forEach(block => {
+    blocks.filter(block => timedBlockAffectsTimelineZoom(block, date)).forEach(block => {
       const segment = blockSegment(block, date); if (!segment) return;
       starts.push(segment.startMinutes); ends.push(segment.endMinutes);
     });
@@ -1127,7 +1137,7 @@
       day.appointments.filter(activeAppointment).forEach(appointment => {
         starts.push(toMinutes(appointment.time)); ends.push(toMinutes(appointment.time) + Number(appointment.duration || 0));
       });
-      day.blocks.filter(block => !block.allDay).forEach(block => {
+      day.blocks.filter(block => timedBlockAffectsTimelineZoom(block, day.date)).forEach(block => {
         const segment = blockSegment(block, day.date); if (!segment) return;
         starts.push(segment.startMinutes); ends.push(segment.endMinutes);
       });
@@ -1811,19 +1821,28 @@
   }
 
   function categoryReportTable(title, rows, kind) {
-    if (!rows.length) return `<section class="report-panel"><h2>${escapeHtml(title)}</h2><p class="empty-report">Aucune donnée sur cette période.</p></section>`;
+    const description = kind === 'service' ? 'Nombre réalisé et prix de base encaissé, hors suppléments.' : 'Nombre d’utilisations et montant encaissé, séparés des prestations.';
+    const heading = `<div class="report-panel-heading"><p class="eyebrow">Classement</p><h2>${escapeHtml(title)}</h2><p>${description}</p></div>`;
+    if (!rows.length) return `<section class="report-panel category-report-panel">${heading}<p class="empty-report">Aucune donnée sur cette période.</p></section>`;
     const maximumCount = Math.max(...rows.map(row => row.count)), maximumPaid = Math.max(...rows.map(row => row.paid));
-    const body = rows.map(row => {
-      const badges = [row.count > 0 && row.count === maximumCount ? (kind === 'service' ? 'Plus réalisée' : 'Plus utilisé') : '', row.paid > 0 && row.paid === maximumPaid ? 'Plus encaissé' : ''].filter(Boolean).join(' · ');
+    const maximum = app.ui.reportSort === 'paid' ? maximumPaid : maximumCount;
+    const body = rows.map((row, index) => {
+      const badges = rows.length > 1 ? [row.count > 0 && row.count === maximumCount ? (kind === 'service' ? 'Plus réalisée' : 'Plus utilisé') : '', row.paid > 0 && row.paid === maximumPaid ? 'Plus encaissé' : ''].filter(Boolean).join(' · ') : '';
       const label = `${row.label}, ${row.count} réalisé${row.count > 1 ? 's' : ''}, ${money(row.paid) || '0 €'} encaissé`;
-      return `<tr><th scope="row"><button type="button" class="report-category-button" data-report-detail-kind="${kind}" data-report-detail-key="${escapeHtml(row.key)}" aria-label="Voir le détail : ${escapeHtml(label)}"><strong>${kind === 'service' ? `<span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}" aria-hidden="true"></span>` : ''}${escapeHtml(row.label)}</strong>${badges ? `<small>${escapeHtml(badges)}</small>` : ''}</button></th><td class="${row.count ? '' : 'report-empty-cell'}">${row.count}</td><td class="${row.paid ? '' : 'report-empty-cell'}">${money(row.paid) || '0 €'}</td></tr>`;
+      const value = app.ui.reportSort === 'paid' ? row.paid : row.count, width = maximum > 0 ? Math.max(value > 0 ? 4 : 0, value / maximum * 100) : 0;
+      const countLabel = kind === 'service' ? `prestation${row.count > 1 ? 's' : ''}` : `utilisation${row.count > 1 ? 's' : ''}`;
+      return `<button type="button" class="report-category-button" data-report-detail-kind="${kind}" data-report-detail-key="${escapeHtml(row.key)}" aria-label="Voir le détail : ${escapeHtml(label)}"><span class="report-category-rank" aria-hidden="true">${index + 1}</span><span class="report-category-main"><strong>${kind === 'service' ? `<span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}" aria-hidden="true"></span>` : ''}${escapeHtml(row.label)}</strong><span class="report-category-values"><span><b>${row.count}</b> ${countLabel}</span><span><b>${money(row.paid) || '0 €'}</b> encaissé</span></span>${badges ? `<small class="report-category-badges">${escapeHtml(badges)}</small>` : ''}<span class="report-category-bar" aria-hidden="true"><i style="--bar-width:${width.toFixed(1)}%"></i></span></span><span class="report-category-chevron" aria-hidden="true">›</span></button>`;
     }).join('');
-    return `<section class="report-panel category-report-panel"><h2>${escapeHtml(title)}</h2><div class="report-table-wrap"><table class="category-report-table"><caption class="sr-only">${escapeHtml(title)} : nombre réalisé et montant encaissé</caption><thead><tr><th scope="col">Catégorie</th><th scope="col">Réalisé</th><th scope="col">Encaissé</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+    return `<section class="report-panel category-report-panel">${heading}<div class="category-report-list">${body}</div></section>`;
   }
 
   function renderReportAnalysisTools(expensesTab) {
     const tools = $('#reportAnalysisTools'); tools.hidden = expensesTab;
     if (expensesTab) return;
+    const activityTab = app.ui.reportTab === 'activity';
+    $('#reportAnalysisTitle').textContent = activityTab ? 'Affiner le classement' : 'Filtrer les encaissements';
+    $('#reportAnalysisHelp').textContent = activityTab ? 'Choisis une prestation et l’ordre du classement' : 'Limite les montants à une prestation';
+    $('#reportSortControl').hidden = !activityTab;
     const categories = reportServiceCategories();
     if (app.ui.reportServiceFilter !== 'all' && !categories.some(category => category.key === app.ui.reportServiceFilter)) app.ui.reportServiceFilter = 'all';
     $('#reportServiceFilter').innerHTML = `<option value="all">Toutes les prestations</option>${categories.map(category => `<option value="${escapeHtml(category.key)}" ${category.key === app.ui.reportServiceFilter ? 'selected' : ''}>${escapeHtml(category.label)}</option>`).join('')}`;
@@ -1833,40 +1852,42 @@
   function renderReport() {
     const mode = currentReportMode(), { start, end } = reportRange(mode), expensesTab = app.ui.reportTab === 'expenses';
     $('#reportPeriodLabel').textContent = mode === 'day' ? format(start, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : mode === 'week' ? `${format(start, { day: 'numeric', month: 'short' })} – ${format(addDays(end, -1), { day: 'numeric', month: 'short' })}` : mode === 'year' ? String(start.getFullYear()) : format(start, { month: 'long', year: 'numeric' });
-    $$('.report-period-button').forEach(button => { const allowed = expensesTab ? button.dataset.reportPeriod !== 'week' : button.dataset.reportPeriod !== 'day'; button.hidden = !allowed; const active = allowed && button.dataset.reportPeriod === mode; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
+    $$('.report-period-button').forEach(button => { button.hidden = false; const active = button.dataset.reportPeriod === mode; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
     $$('.report-tab').forEach(button => { const active = button.dataset.reportTab === app.ui.reportTab; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
+    $('#reportToday').textContent = mode === 'day' ? 'Aujourd’hui' : mode === 'week' ? 'Cette semaine' : mode === 'month' ? 'Ce mois' : 'Cette année';
     renderReportAnalysisTools(expensesTab);
-    $('#exportReportCsv').textContent = expensesTab ? 'Exporter les dépenses' : 'Exporter CSV';
+    $('#exportReportCsv').textContent = expensesTab ? 'Exporter les dépenses' : 'Exporter ce bilan';
     if (expensesTab) { renderExpensesReport(start, end); return; }
     if (app.ui.reportTab === 'activity') renderActivityReport(start, end); else renderPaymentsReport(start, end);
-    if (mode === 'year') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start, app.ui.reportServiceFilter));
+    if (mode === 'year' && app.ui.reportTab === 'activity') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start, app.ui.reportServiceFilter));
   }
 
   function renderExpensesReport(start, end) {
     const expenses = expensesForRange(start, end), summary = expenseSummary(expenses), globalActive = app.ui.expenseReportView === 'global';
     const switcher = `<section class="expense-view-switch" aria-label="Présentation des dépenses"><button class="${globalActive ? 'active' : ''}" data-expense-view="global" aria-pressed="${globalActive}">Vue globale</button><button class="${globalActive ? '' : 'active'}" data-expense-view="categories" aria-pressed="${!globalActive}">Par catégorie</button></section>`;
-    const note = '<p class="information-note expense-separate-note"><span>i</span><strong>Information uniquement : les revenus encaissés ne sont pas diminués par les dépenses.</strong></p>';
+    const note = '<p class="report-definition">Les dépenses restent séparées des revenus encaissés : aucun calcul de bénéfice n’est appliqué.</p>';
+    const highlight = `<section class="report-highlight expense"><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>sur la période choisie</small></section>`;
     if (globalActive) {
       const rows = [...expenses].reverse().map(expense => `<button class="expense-row" data-edit-expense="${escapeHtml(expense.id)}"><span class="expense-row-date">${format(parseDate(expense.date), { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(expenseCategoryLabel(expense))}</strong><small>${escapeHtml([expense.details, expense.supplier].filter(Boolean).join(' · ') || 'Aucun détail')}</small></span><b>${money(expense.amount)} ›</b></button>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
-      $('#reportContent').innerHTML = `${switcher}${note}<section class="metrics-grid expense-metrics"><article><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>sans déduction des revenus</small></article><article><span>Nombre</span><strong>${summary.count}</strong><small>achat${summary.count > 1 ? 's' : ''} enregistré${summary.count > 1 ? 's' : ''}</small></article><article><span>Montant moyen</span><strong>${money(summary.average) || '0 €'}</strong><small>moyenne des dépenses</small></article></section><section class="report-panel"><h2>Historique des dépenses</h2>${rows}</section>`;
+      $('#reportContent').innerHTML = `${highlight}<section class="metrics-grid expense-metrics"><article><span>Nombre</span><strong>${summary.count}</strong><small>achat${summary.count > 1 ? 's' : ''} enregistré${summary.count > 1 ? 's' : ''}</small></article><article><span>Montant moyen</span><strong>${money(summary.average) || '0 €'}</strong><small>par dépense</small></article></section>${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Détail</p><h2>Historique des dépenses</h2></div>${rows}</section>`;
       return;
     }
     const groups = aggregateExpensesByCategory(expenses), maximum = Math.max(1, ...groups.map(group => group.total));
     const rows = groups.map((group, index) => `<article class="expense-category-row"><div class="expense-category-heading"><span><strong>${escapeHtml(group.label)}</strong><small>${group.count} dépense${group.count > 1 ? 's' : ''}</small></span><b>${money(group.total)}</b></div><div class="expense-category-bar"><span style="--bar-width:${Math.max(2, group.total / maximum * 100).toFixed(1)}%;--expense-bar-index:${index % 7}"></span></div></article>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
-    $('#reportContent').innerHTML = `${switcher}${note}<section class="metrics-grid expense-metrics"><article><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>${summary.count} dépense${summary.count > 1 ? 's' : ''}</small></article></section><section class="report-panel"><h2>Dépenses par catégorie</h2>${rows}</section>`;
+    $('#reportContent').innerHTML = `${highlight}${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Répartition</p><h2>Dépenses par catégorie</h2><p>${summary.count} dépense${summary.count > 1 ? 's' : ''} enregistrée${summary.count > 1 ? 's' : ''}</p></div>${rows}</section>`;
   }
 
   function annualBreakdown(yearStart, serviceFilter = 'all') {
     const rows = Array.from({ length: 12 }, (_, monthIndex) => {
       const start = localDate(yearStart.getFullYear(), monthIndex, 1), end = localDate(yearStart.getFullYear(), monthIndex + 1, 1);
       const inMonth = appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment, serviceFilter);
-      const appointments = app.state.appointments.filter(inMonth), active = appointments.filter(activeAppointment), clients = new Set(active.map(item => item.clientId));
-      const minutes = active.filter(item => appointmentEnd(item) <= Date.now()).reduce((sum, item) => sum + Number(item.duration || 0), 0);
+      const appointments = app.state.appointments.filter(inMonth), active = appointments.filter(activeAppointment), performed = active.filter(item => appointmentEnd(item) <= Date.now()), clients = new Set(performed.map(item => item.clientId));
+      const minutes = performed.reduce((sum, item) => sum + Number(item.duration || 0), 0);
       const collected = app.state.appointments.filter(item => matchesReportService(item, serviceFilter) && paidInRange(item, start, end)).reduce((sum, item) => sum + appointmentTotal(item), 0);
       const pending = active.filter(item => item.paymentStatus === 'pending').reduce((sum, item) => sum + appointmentTotal(item), 0);
-      return `<tr><th>${format(start, { month: 'long' })}</th><td>${active.length}</td><td>${clients.size}</td><td>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</td><td>${money(collected) || '0 €'}</td><td>${money(pending) || '0 €'}</td></tr>`;
+      return `<article class="annual-row"><strong>${format(start, { month: 'long' })}</strong><span class="annual-row-values"><span><b>${performed.length}</b> réalisées</span><span><b>${clients.size}</b> clientes</span><span><b>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</b> effectuées</span><span><b>${money(collected) || '0 €'}</b> encaissé${pending ? ` · ${money(pending)} à régler` : ''}</span></span></article>`;
     }).join('');
-    return `<section class="report-panel annual-panel"><h2>Détail des 12 mois</h2><div class="report-table-wrap"><table><thead><tr><th>Mois</th><th>RDV</th><th>Clientes</th><th>Heures</th><th>Encaissé</th><th>À régler</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+    return `<section class="report-panel annual-panel"><div class="report-panel-heading"><p class="eyebrow">Année complète</p><h2>Détail mois par mois</h2><p>Prestations réalisées et paiements encaissés à leur date réelle.</p></div><div class="annual-list">${rows}</div></section>`;
   }
 
   function csvCell(value) {
@@ -1897,14 +1918,15 @@
 
   function renderActivityReport(start, end) {
     const inRange = appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment);
-    const appointments = app.state.appointments.filter(inRange), active = appointments.filter(activeAppointment), clientIds = new Set(active.map(appointment => appointment.clientId));
+    const appointments = app.state.appointments.filter(inRange), active = appointments.filter(activeAppointment), performed = active.filter(appointment => appointmentEnd(appointment) <= Date.now()), clientIds = new Set(performed.map(appointment => appointment.clientId));
     const newClients = [...clientIds].filter(clientId => { const first = clientFirstVisit(clientId); return first && inRange(first); }).length;
     const cancelled = appointments.filter(appointment => appointment.status === 'cancelled').length, noShows = appointments.filter(appointment => appointment.status === 'no_show').length;
-    const workedMinutes = active.filter(appointment => appointmentEnd(appointment) <= Date.now()).reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
+    const workedMinutes = performed.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     const plannedMinutes = active.filter(appointment => appointmentEnd(appointment) > Date.now()).reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
-    const completed = appointments.filter(appointment => appointment.status === 'completed').length, analysis = aggregateReportCategories(start, end);
+    const paid = app.state.appointments.filter(appointment => matchesReportService(appointment) && paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0), analysis = aggregateReportCategories(start, end);
     const filterLabel = selectedServiceCategory()?.label;
-    $('#reportContent').innerHTML = `<section class="metrics-grid"><article><span>Rendez-vous</span><strong>${active.length}</strong><small>${completed} terminé${completed > 1 ? 's' : ''}</small></article><article><span>Clientes</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>Heures travaillées</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} encore planifiées` : 'hors annulations et absences'}</small></article><article class="metric-alert"><span>Annulées</span><strong>${cancelled}</strong><small>${noShows} absence${noShows > 1 ? 's' : ''}</small></article></section><p class="analysis-note">Le nombre suit la date du rendez-vous réalisé. L’encaissement suit la date du paiement${filterLabel ? ` pour « ${escapeHtml(filterLabel)} »` : ''}. Les prix de base et les suppléments restent séparés.</p>${categoryReportTable('Prestations par catégorie', analysis.services, 'service')}${categoryReportTable('Suppléments par catégorie', analysis.supplements, 'supplement')}`;
+    const plannedCount = active.length - performed.length;
+    $('#reportContent').innerHTML = `<section class="report-highlight"><span>Vue d’ensemble${filterLabel ? ` · ${escapeHtml(filterLabel)}` : ''}</span><div class="report-highlight-pair"><div><strong>${performed.length}</strong><small>prestation${performed.length > 1 ? 's' : ''} réalisée${performed.length > 1 ? 's' : ''}</small></div><div><strong>${money(paid) || '0 €'}</strong><small>encaissé</small></div></div></section><section class="metrics-grid"><article><span>Temps effectué</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article><span>Clientes reçues</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>À venir</span><strong>${plannedCount}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} planifiées` : 'rien de planifié'}</small></article></section>${cancelled || noShows ? `<p class="report-secondary-line"><span>${cancelled} annulée${cancelled > 1 ? 's' : ''}</span><span>${noShows} absence${noShows > 1 ? 's' : ''}</span></p>` : ''}<p class="report-definition">Le nombre suit la date du rendez-vous réalisé. L’encaissement suit la date du paiement. Les prix de base et les suppléments sont présentés séparément.</p>${categoryReportTable('Prestations', analysis.services, 'service')}${categoryReportTable('Suppléments', analysis.supplements, 'supplement')}`;
   }
 
   function renderPaymentsReport(start, end) {
@@ -1916,7 +1938,7 @@
       const client = clientFor(appointment), label = appointment.paymentStatus === 'pending' ? 'À régler' : 'À vérifier';
       return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)} · ${label}</small></span><b>${money(appointmentTotal(appointment)) || 'À définir'} <i>›</i></b></button>`;
     }).join('') || '<p class="empty-report">Aucun paiement à suivre sur cette période.</p>';
-    $('#reportContent').innerHTML = `<section class="metrics-grid payments"><article class="metric-paid"><span>Encaissé</span><strong>${money(paid) || '0 €'}</strong><small>selon la date de paiement</small></article><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-review"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><section class="report-panel"><h2>Paiements à suivre</h2>${rows}</section>`;
+    $('#reportContent').innerHTML = `<section class="report-highlight paid"><span>Encaissé sur la période</span><strong>${money(paid) || '0 €'}</strong><small>chaque paiement est compté à sa date d’encaissement</small></section><section class="metrics-grid payments"><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-alert"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><p class="report-definition">Exemple : un rendez-vous de juin payé en juillet apparaît dans l’encaissement de juillet.</p><section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">À traiter</p><h2>Paiements à suivre</h2></div>${rows}</section>`;
   }
 
   function supplementsMatchingKey(appointment, key) {
@@ -3075,7 +3097,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=12.3', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=12.3.1', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -3098,7 +3120,7 @@
     if (target.dataset.close) { requestDialogClose(target.dataset.close); return; }
     if (target.dataset.mode) { setMode(target.dataset.mode); return; }
     if (target.dataset.screen) { showScreen(target.dataset.screen); return; }
-    if (target.dataset.reportPeriod) { if (app.ui.reportTab === 'expenses') app.ui.expenseReportMode = target.dataset.reportPeriod; else app.ui.reportMode = target.dataset.reportPeriod; renderReport(); return; }
+    if (target.dataset.reportPeriod) { app.ui.reportMode = target.dataset.reportPeriod; app.ui.expenseReportMode = target.dataset.reportPeriod; renderReport(); return; }
     if (target.dataset.reportTab) { app.ui.reportTab = target.dataset.reportTab; renderReport(); return; }
     if (target.dataset.reportSort) { app.ui.reportSort = target.dataset.reportSort === 'paid' ? 'paid' : 'count'; renderReport(); return; }
     if (target.dataset.reportDetailKind) { openReportDetail(target.dataset.reportDetailKind, target.dataset.reportDetailKey); return; }
