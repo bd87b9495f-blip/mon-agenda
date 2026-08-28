@@ -1,8 +1,34 @@
-# Mon agenda — version 12.2 bêta
+# Mon agenda — version 12.3 bêta
 
 Application personnelle et gratuite pour organiser une activité de prothésiste ongulaire. Elle s’installe sur l’écran d’accueil de l’iPhone, fonctionne hors connexion après une première ouverture en ligne et conserve les données professionnelles dans le navigateur de l’appareil.
 
-## Nouveautés de la version 12.2
+## Nouveautés de la version 12.3
+
+### Planning Jour et Semaine centré sur le travail
+
+- la frise commence et se termine automatiquement autour des horaires de travail configurés ;
+- un rendez-vous client actif ou un événement personnel horaire situé hors horaires agrandit exceptionnellement la frise ;
+- un événement personnel sur une journée entière ou plusieurs journées n’agrandit jamais la frise jusqu’à minuit ;
+- les rendez-vous annulés et les absences restent visibles sans imposer à eux seuls une plage horaire plus large.
+
+### Bilans par prestation et supplément
+
+- filtre du bilan par type de prestation ;
+- tableau des prestations avec le nombre réalisé et le prix de base encaissé ;
+- tableau distinct des suppléments avec le nombre d’utilisations et le montant encaissé ;
+- tri par nombre réalisé ou par montant encaissé ;
+- accès au détail des rendez-vous depuis chaque ligne ;
+- le nombre suit la date du rendez-vous, tandis que l’argent suit la date du paiement. Un rendez-vous de juin payé en juillet compte donc en juin, mais son encaissement apparaît en juillet.
+
+### Recherche, sauvegardes et confort
+
+- recherche globale des rendez-vous par cliente, téléphone, prestation, note, date ou statut ;
+- vérification d’un fichier de sauvegarde sans restaurer ni modifier les données en cours ;
+- nouvelle icône de sauvegarde représentant un document enregistré dans Fichiers ;
+- index internes pour accélérer les recherches et les consultations répétées ;
+- améliorations d’accessibilité : libellés explicites, contraste renforcé et respect de la réduction des animations.
+
+## Fonctions introduites en version 12.2
 
 ### Une prise de rendez-vous plus simple
 
@@ -63,7 +89,7 @@ La rubrique **Dépenses** du bilan propose des vues Jour, Mois et Année, une li
 
 ## Compatibilité et migration
 
-La version 12.2 adapte automatiquement les données des versions précédentes :
+La version 12.3 conserve le schéma de données sécurisé de la version 12.2 et adapte automatiquement les données des versions plus anciennes :
 
 - rendez-vous, clientes, paiements, prestations, suppléments, repères et réglages sont conservés ;
 - les anciens créneaux bloqués deviennent des événements personnels avec le blocage des rendez-vous activé ;
@@ -77,9 +103,9 @@ Une migration ne remplace pas une sauvegarde personnelle. Avant la mise à jour,
 
 Lis le fichier `GUIDE-MISE-A-JOUR.md` fourni avec cette version. Après l’envoi des fichiers sur GitHub, attends une à deux minutes puis ouvre :
 
-`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.2`
+`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.3`
 
-Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.2 bêta` est affiché.
+Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.3 bêta` est affiché.
 
 ## Données et confidentialité
 

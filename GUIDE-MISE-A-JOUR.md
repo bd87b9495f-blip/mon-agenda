@@ -1,6 +1,6 @@
-# Mettre Mon agenda à jour vers la version 12.2 bêta
+# Mettre Mon agenda à jour vers la version 12.3 bêta
 
-La version 12.2 adapte automatiquement les données existantes. Pour rester protégée en cas d’interruption ou de problème propre à l’iPhone, effectue néanmoins la sauvegarde ci-dessous avant de remplacer les fichiers.
+La version 12.3 reprend les données existantes sans les réinitialiser. Pour rester protégée en cas d’interruption ou de problème propre à l’iPhone, effectue néanmoins la sauvegarde ci-dessous avant de remplacer les fichiers.
 
 ## 1. Créer une sauvegarde avant la mise à jour
 
@@ -13,9 +13,9 @@ Ne place jamais ce fichier JSON sur GitHub : il contient tes données profession
 
 ## 2. Remplacer les fichiers sur le PC
 
-1. Décompresse l’archive de la version 12.2.
+1. Décompresse l’archive de la version 12.3.
 2. Dans GitHub Desktop, sélectionne le dépôt `mon-agenda`, puis clique sur **Show in Explorer**.
-3. Copie tous les fichiers de la version 12.2 dans ce dossier et accepte leur remplacement.
+3. Copie tous les fichiers de la version 12.3 dans ce dossier et accepte leur remplacement.
 4. Supprime ces anciens fichiers s’ils sont encore présents :
    - `assistant.js`
    - `client-ui.js`
@@ -30,16 +30,16 @@ Ne place jamais ce fichier JSON sur GitHub : il contient tes données profession
 1. Reviens dans GitHub Desktop.
 2. Vérifie que les changements concernent uniquement les fichiers de l’application.
 3. Vérifie qu’aucun fichier de sauvegarde `.json` ni export `.csv` personnel n’apparaît.
-4. Dans **Summary**, écris `Version 12.2 beta`.
+4. Dans **Summary**, écris `Version 12.3 beta`.
 5. Clique sur **Commit to main**, puis sur **Push origin**.
 
 ## 4. Appliquer la mise à jour sur l’iPhone
 
 1. Attends une à deux minutes après le Push.
-2. Dans Safari, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=12.2`.
+2. Dans Safari, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=12.3`.
 3. Accepte le bandeau **Nouvelle version disponible** lorsqu’il apparaît.
 4. Ferme puis relance Mon agenda depuis l’écran d’accueil.
-5. Ouvre **Réglages → À propos** et vérifie `Mon agenda · version 12.2 bêta`.
+5. Ouvre **Réglages → À propos** et vérifie `Mon agenda · version 12.3 bêta`.
 
 Ne désinstalle pas l’application et n’efface pas les données Safari pour actualiser le cache. Si l’ancienne version reste affichée, rouvre d’abord le lien ci-dessus dans Safari, laisse la page ouverte quelques secondes et relance l’application.
 
@@ -57,12 +57,15 @@ La migration ajoute aussi les catégories de dépenses proposées par défaut. E
 
 1. Ouvre un ancien rendez-vous et vérifie la cliente, la prestation, le prix, les suppléments et le paiement.
 2. Dans une fiche cliente, ajoute ou modifie un repère avec un emoji du clavier de l’iPhone.
-3. Crée un **Événement personnel** sur une journée, puis vérifie qu’il apparaît dans le planning.
-4. Crée un événement informatif avec **Bloquer les rendez-vous clients** désactivé et vérifie qu’il n’empêche pas l’ajout d’un rendez-vous.
-5. Si tu avais un ancien créneau bloqué, vérifie qu’il apparaît comme événement personnel bloquant.
-6. Ajoute une petite dépense d’essai et vérifie-la dans **Bilans → Dépenses**, sans modification du chiffre d’affaires.
-7. Vérifie les vues Jour, Semaine et Mois, notamment l’affichage d’un événement personnel sur plusieurs jours.
-8. Lance une nouvelle sauvegarde et choisis son emplacement dans l’application Fichiers.
+3. Dans les vues **Jour** et **Semaine**, vérifie que la frise est centrée sur tes horaires de travail.
+4. Crée temporairement un rendez-vous ou un événement personnel horaire hors horaires : la frise doit s’agrandir pour le montrer.
+5. Crée un événement personnel sur une journée entière : il doit apparaître sans agrandir la frise jusqu’à 00:00.
+6. Dans **Bilans → Activité**, teste le filtre par prestation, les deux tris et le détail d’une ligne.
+7. Vérifie avec un rendez-vous d’un mois payé le mois suivant que le nombre reste au mois du rendez-vous et l’encaissement au mois du paiement.
+8. Vérifie que les suppléments apparaissent dans leur tableau séparé.
+9. Utilise la loupe pour retrouver un ancien rendez-vous.
+10. Dans **Réglages → Données et sauvegardes**, sélectionne une sauvegarde avec **Vérifier une sauvegarde** et confirme que rien n’a été restauré.
+11. Lance une nouvelle sauvegarde avec la nouvelle icône et choisis son emplacement dans l’application Fichiers.
 
 ## 7. En cas de problème
 

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.2 bêta';
+  const APP_VERSION = '12.3 bêta';
   const CURRENT_DATA_VERSION = 14;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
@@ -39,6 +39,8 @@
   const EXPENSE_CATEGORY_DRAFT_KEY = 'nail-planner-expense-category-draft-v14';
   const CORRUPT_STATE_KEY = 'nail-planner-unreadable-state-v14';
   const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
+  const SEARCH_RESULT_LIMIT = 100;
+  const REPORT_DETAIL_LIMIT = 250;
   const LIMITS = { clients: 20000, appointments: 100000, blocks: 20000, expenses: 50000, settingsItems: 500, text: 5000, shortText: 200, duration: 24 * 60, amount: 1000000 };
   const HOUR_HEIGHT = 68;
   const WEEK_HOUR_HEIGHT = 44;
@@ -50,6 +52,7 @@
   const METHOD = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
   const CONTACT = { instagram: 'Instagram', messenger: 'Facebook / Messenger', phone: 'Téléphone / SMS', whatsapp: 'WhatsApp', other: 'Autre' };
   const COLORS = ['rose', 'purple', 'orange', 'teal', 'blue', 'green', 'amber', 'coral'];
+  const SAVE_FILE_ICON = '<svg class="interface-icon file-save-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg>';
   const DAYS = [
     { key: 1, label: 'Lundi', short: 'Lun' }, { key: 2, label: 'Mardi', short: 'Mar' },
     { key: 3, label: 'Mercredi', short: 'Mer' }, { key: 4, label: 'Jeudi', short: 'Jeu' },
@@ -615,7 +618,7 @@
       screen: 'agenda', mode: 'day', selectedDate: startOfDay(new Date()), weekStart: mondayOf(new Date()),
       monthDate: localDate(new Date().getFullYear(), new Date().getMonth(), 1), overviewWeekStart: null,
       editingAppointmentId: null, editingBlockId: null, pendingDraft: null, formClientId: null, formServiceColor: 'rose', repeatDateEdited: false, repeatTimeEdited: false,
-      reportMode: 'week', expenseReportMode: 'month', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()),
+      reportMode: 'week', expenseReportMode: 'month', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()), reportServiceFilter: 'all', reportSort: 'count',
       reviewDate: startOfDay(new Date()), reviewPendingId: null,
      quickAddDate: todayKey(), quickAddTime: '10:00', pendingDuplicate: null,
      appointmentSaving: false, blockSaving: false, expenseSaving: false, clientSaving: false, serviceSaving: false, supplementSaving: false, badgeSaving: false, undo: null, undoTimer: null, successTimer: null,
@@ -623,12 +626,12 @@
       updateRegistration: null, reloadingForUpdate: false, settingsPage: 'home', settingsDirty: false,
       editingSupplementTypeId: null, editingBadgeId: null, editingExpenseId: null, pendingLateBadgeClientId: null, pendingBlockConflict: null,
       appointmentDraftBaseline: '', clientDraftBaseline: '', blockDraftBaseline: '', expenseDraftBaseline: '',
-      formBaselines: {}, pendingUnsavedClose: null, reviewFinancialDraft: null
+      formBaselines: {}, pendingUnsavedClose: null, reviewFinancialDraft: null, appointmentSearchTimer: null
     }
   };
   const cloneState = state => JSON.parse(JSON.stringify(state));
   const saveState = (state = app.state, silent = false) => {
-    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); hideUndo(); return true; }
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); invalidateDataIndexes(); hideUndo(); return true; }
     catch {
       if (!silent) window.alert('Impossible d’enregistrer sur cet appareil. Tes changements n’ont pas été appliqués. Libère un peu d’espace, puis réessaie.');
       return false;
@@ -956,17 +959,54 @@
       .some(dialogId => $(`#${dialogId}`)?.open && formHasChanges(dialogId));
   }
 
-  const clientById = id => app.state.clients.find(client => client.id === id) || null;
+  let dataIndexes = null;
+  function invalidateDataIndexes() { dataIndexes = null; }
+
+  function currentDataIndexes() {
+    const { state } = app;
+    if (dataIndexes?.state === state
+      && dataIndexes.clients === state.clients
+      && dataIndexes.appointments === state.appointments
+      && dataIndexes.services === state.settings.services
+      && dataIndexes.supplementTypes === state.settings.supplementTypes
+      && dataIndexes.clientBadges === state.settings.clientBadges
+      && dataIndexes.expenseCategories === state.settings.expenseCategories) return dataIndexes;
+    const appointmentsByDate = new Map(), appointmentsByClient = new Map();
+    state.appointments.forEach(appointment => {
+      const dateItems = appointmentsByDate.get(appointment.date) || []; dateItems.push(appointment); appointmentsByDate.set(appointment.date, dateItems);
+      const clientItems = appointmentsByClient.get(appointment.clientId) || []; clientItems.push(appointment); appointmentsByClient.set(appointment.clientId, clientItems);
+    });
+    appointmentsByDate.forEach(items => items.sort((one, two) => one.time.localeCompare(two.time) || appointmentTimestamp(one) - appointmentTimestamp(two)));
+    appointmentsByClient.forEach(items => items.sort((one, two) => appointmentTimestamp(two) - appointmentTimestamp(one)));
+    const clientById = new Map(state.clients.map(item => [item.id, item]));
+    dataIndexes = {
+      state, clients: state.clients, appointments: state.appointments, services: state.settings.services,
+      supplementTypes: state.settings.supplementTypes, clientBadges: state.settings.clientBadges, expenseCategories: state.settings.expenseCategories,
+      clientById, serviceById: new Map(state.settings.services.map(item => [item.id, item])),
+      appointmentById: new Map(state.appointments.map(item => [item.id, item])),
+      supplementTypeById: new Map(state.settings.supplementTypes.map(item => [item.id, item])), badgeById: new Map(state.settings.clientBadges.map(item => [item.id, item])),
+      expenseCategoryById: new Map(state.settings.expenseCategories.map(item => [item.id, item])), appointmentsByDate, appointmentsByClient,
+      appointmentSearchTextById: new Map(state.appointments.map(appointment => [appointment.id, appointmentSearchText(appointment, clientById.get(appointment.clientId))])), sortedAppointments: null
+    };
+    return dataIndexes;
+  }
+
+  const clientById = id => currentDataIndexes().clientById.get(id) || null;
+  const appointmentById = id => currentDataIndexes().appointmentById.get(id) || null;
   const clientFor = appointment => clientById(appointment.clientId) || { id: '', name: 'Cliente supprimée', phone: '', address: '', notes: '', badgeId: '', contactVia: '' };
-  const serviceById = id => app.state.settings.services.find(service => service.id === id) || null;
+  const serviceById = id => currentDataIndexes().serviceById.get(id) || null;
   const serviceByName = name => app.state.settings.services.find(service => normaliseName(service.name) === normaliseName(name)) || null;
-  const badgeById = id => app.state.settings.clientBadges.find(badge => badge.id === id) || null;
-  const supplementTypeById = id => app.state.settings.supplementTypes.find(type => type.id === id) || null;
-  const expenseCategoryById = id => app.state.settings.expenseCategories.find(category => category.id === id) || null;
+  const badgeById = id => currentDataIndexes().badgeById.get(id) || null;
+  const supplementTypeById = id => currentDataIndexes().supplementTypeById.get(id) || null;
+  const expenseCategoryById = id => currentDataIndexes().expenseCategoryById.get(id) || null;
   const appointmentAddress = appointment => boundedText(appointment?.address || clientFor(appointment).address, LIMITS.shortText);
-  const appointmentsForDate = key => app.state.appointments.filter(appointment => appointment.date === key).sort((a, b) => a.time.localeCompare(b.time));
+  const appointmentsForDate = key => currentDataIndexes().appointmentsByDate.get(key) || [];
   const activeAppointmentsForDate = key => appointmentsForDate(key).filter(activeAppointment);
-  const sortedAppointments = () => [...app.state.appointments].sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
+  const sortedAppointments = () => {
+    const indexes = currentDataIndexes();
+    indexes.sortedAppointments ||= [...app.state.appointments].sort((one, two) => appointmentTimestamp(one) - appointmentTimestamp(two));
+    return indexes.sortedAppointments;
+  };
   const dayStartMs = date => dateTimeMs(dateKey(date), '00:00');
   const dayEndMs = date => dayStartMs(addDays(date, 1));
 
@@ -1038,6 +1078,62 @@
   function workHoursLabel(hours) {
     if (!hours.enabled) return 'Repos';
     return `${hours.start} – ${hours.end}${hours.breakStart && hours.breakEnd ? ` · pause ${hours.breakStart}–${hours.breakEnd}` : ''}`;
+  }
+
+  function configuredWorkingRange(hoursByDay = app.state.settings.workingHours) {
+    const ranges = Object.values(hoursByDay || {}).filter(hours => hours?.enabled && validTime(hours.start) && validTime(hours.end) && toMinutes(hours.end) > toMinutes(hours.start));
+    if (!ranges.length) return { startMinutes: 8 * 60, endMinutes: 20 * 60, fallback: true };
+    return {
+      startMinutes: Math.min(...ranges.map(hours => toMinutes(hours.start))),
+      endMinutes: Math.max(...ranges.map(hours => toMinutes(hours.end))),
+      fallback: false
+    };
+  }
+
+  function roundedTimelineRange(starts, ends, fallback = configuredWorkingRange()) {
+    const validStarts = starts.filter(Number.isFinite), validEnds = ends.filter(Number.isFinite);
+    const earliest = validStarts.length ? Math.min(...validStarts) : fallback.startMinutes;
+    const latest = validEnds.length ? Math.max(...validEnds) : fallback.endMinutes;
+    const firstHour = Math.max(0, Math.min(23, Math.floor(earliest / 60)));
+    const lastHour = Math.max(firstHour + 1, Math.min(24, Math.ceil(latest / 60)));
+    return { firstHour, lastHour };
+  }
+
+  function timelineHourRangeForDay(date, appointments = appointmentsForDate(dateKey(date)), blocks = blocksOnDate(date)) {
+    const hours = workHoursFor(date), fallback = configuredWorkingRange();
+    const starts = [], ends = [];
+    if (hours.enabled && validTime(hours.start) && validTime(hours.end) && toMinutes(hours.end) > toMinutes(hours.start)) {
+      starts.push(toMinutes(hours.start)); ends.push(toMinutes(hours.end));
+    } else {
+      starts.push(fallback.startMinutes); ends.push(fallback.endMinutes);
+    }
+    appointments.filter(activeAppointment).forEach(appointment => {
+      starts.push(toMinutes(appointment.time)); ends.push(toMinutes(appointment.time) + Number(appointment.duration || 0));
+    });
+    blocks.filter(block => !block.allDay).forEach(block => {
+      const segment = blockSegment(block, date); if (!segment) return;
+      starts.push(segment.startMinutes); ends.push(segment.endMinutes);
+    });
+    return roundedTimelineRange(starts, ends, fallback);
+  }
+
+  function timelineHourRangeForWeek(days) {
+    const fallback = configuredWorkingRange(), starts = [], ends = [];
+    let hasVisibleWorkingHours = false;
+    days.forEach(day => {
+      if (day.hours?.enabled && validTime(day.hours.start) && validTime(day.hours.end) && toMinutes(day.hours.end) > toMinutes(day.hours.start)) {
+        hasVisibleWorkingHours = true; starts.push(toMinutes(day.hours.start)); ends.push(toMinutes(day.hours.end));
+      }
+      day.appointments.filter(activeAppointment).forEach(appointment => {
+        starts.push(toMinutes(appointment.time)); ends.push(toMinutes(appointment.time) + Number(appointment.duration || 0));
+      });
+      day.blocks.filter(block => !block.allDay).forEach(block => {
+        const segment = blockSegment(block, day.date); if (!segment) return;
+        starts.push(segment.startMinutes); ends.push(segment.endMinutes);
+      });
+    });
+    if (!hasVisibleWorkingHours) { starts.push(fallback.startMinutes); ends.push(fallback.endMinutes); }
+    return roundedTimelineRange(starts, ends, fallback);
   }
 
   function outsideWorkHours(draft) {
@@ -1143,7 +1239,7 @@
     const reminderDays = Number(app.state.settings.backupReminderDays) || 7;
     const late = !Number.isFinite(lastTime) || Date.now() - lastTime > reminderDays * 24 * 60 * 60 * 1000;
     $('#backupNotice').hidden = !late;
-    $('#backupNotice').textContent = last ? '⇩ Pense à sauvegarder tes données' : '⇩ Fais une première sauvegarde de tes données';
+    $('#backupNotice').innerHTML = `${SAVE_FILE_ICON}<span>${last ? 'Pense à sauvegarder tes données' : 'Fais une première sauvegarde de tes données'}</span>`;
   }
 
   function renderUnclosedDayNotice() {
@@ -1256,18 +1352,7 @@
       const key = dateKey(date);
       return { date, key, meta: dateMeta(date), hours: workHoursFor(date), appointments: appointmentsForDate(key), blocks: blocksOnDate(date) };
     });
-    const timedSegments = days.flatMap(day => day.blocks.filter(block => !block.allDay).map(block => ({ ...day, block, segment: blockSegment(block, day.date) })).filter(item => item.segment));
-    const allAppointments = days.flatMap(day => day.appointments);
-    const starts = allAppointments.map(appointment => toMinutes(appointment.time)).concat(timedSegments.map(item => item.segment.startMinutes));
-    const ends = allAppointments.map(appointment => toMinutes(appointment.time) + Number(appointment.duration || 0)).concat(timedSegments.map(item => item.segment.endMinutes));
-    days.forEach(day => {
-      if (!day.hours.enabled || !validTime(day.hours.start) || !validTime(day.hours.end)) return;
-      starts.push(toMinutes(day.hours.start)); ends.push(toMinutes(day.hours.end));
-    });
-    const earliest = starts.length ? starts.reduce((minimum, value) => Math.min(minimum, value), starts[0]) : 9 * 60;
-    const latest = ends.length ? ends.reduce((maximum, value) => Math.max(maximum, value), ends[0]) : 19 * 60;
-    const firstHour = Math.max(0, Math.floor(earliest / 60));
-    const lastHour = Math.min(24, Math.ceil(latest / 60));
+    const { firstHour, lastHour } = timelineHourRangeForWeek(days);
     const totalHours = Math.max(1, lastHour - firstHour), height = totalHours * WEEK_HOUR_HEIGHT;
     const header = days.map(day => {
       const { date, key, meta } = day, flag = meta.holiday ? 'Férié' : meta.weekend ? 'WE' : '';
@@ -1407,12 +1492,7 @@
   function renderDayTimeline() {
     const date = app.ui.selectedDate, appointments = appointmentsForDate(dateKey(date)), blocks = blocksOnDate(date);
     const timedBlocks = blocks.map(block => ({ block, segment: blockSegment(block, date) })).filter(item => item.segment && !item.block.allDay);
-    const itemStarts = appointments.map(appointment => toMinutes(appointment.time)).concat(timedBlocks.map(item => item.segment.startMinutes));
-    const itemEnds = appointments.map(appointment => toMinutes(appointment.time) + Number(appointment.duration || 0)).concat(timedBlocks.map(item => item.segment.endMinutes));
-    if (sameDay(date, new Date())) {
-      const now = new Date().getHours() * 60 + new Date().getMinutes(); itemStarts.push(now); itemEnds.push(now);
-    }
-    const firstHour = Math.floor(Math.min(8 * 60, ...itemStarts) / 60), lastHour = Math.ceil(Math.max(20 * 60, ...itemEnds) / 60), totalHours = Math.max(1, lastHour - firstHour);
+    const { firstHour, lastHour } = timelineHourRangeForDay(date, appointments, blocks), totalHours = Math.max(1, lastHour - firstHour);
     const lines = Array.from({ length: totalHours + 1 }, (_, index) => `<span class="timeline-hour" style="top:${index * HOUR_HEIGHT}px">${pad(firstHour + index)}:00</span><i class="timeline-line" style="top:${index * HOUR_HEIGHT}px"></i>`).join('');
     const empty = Array.from({ length: totalHours }, (_, index) => `<button class="timeline-empty" data-create-time="${pad(firstHour + index)}:00" style="top:${index * HOUR_HEIGHT}px;height:${HOUR_HEIGHT}px" aria-label="Ajouter un rendez-vous à ${pad(firstHour + index)} h"></button>`).join('');
     const layouts = timelineLayouts([
@@ -1534,7 +1614,7 @@
     target.innerHTML = `<div class="week-overview-header"><h2>Semaine du ${format(app.ui.overviewWeekStart, { day: 'numeric', month: 'long' })}</h2><button class="text-button" data-close-overview>Retour au mois</button></div><div class="week-overview-list">${buildWeekCards(app.ui.overviewWeekStart)}</div>`;
   }
 
-  function clientHistory(clientId) { return app.state.appointments.filter(appointment => appointment.clientId === clientId).sort((a, b) => appointmentTimestamp(b) - appointmentTimestamp(a)); }
+  function clientHistory(clientId) { return currentDataIndexes().appointmentsByClient.get(clientId) || []; }
   function clientFirstVisit(clientId) { return [...clientHistory(clientId)].reverse().find(activeAppointment) || null; }
 
   function renderClients() {
@@ -1561,6 +1641,51 @@
       const latest = lastFor(client.id), history = historyFor(client.id), noShows = history.filter(appointment => appointment.status === 'no_show').length, late = history.filter(appointment => appointment.status === 'cancelled' && appointment.lateCancellation === true).length;
       return `<button class="client-card" data-client="${escapeHtml(client.id)}"><span class="client-initial">${escapeHtml(client.name[0]?.toUpperCase() || '?')}</span><span><h3>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</h3><p>${latest ? `Dernier RDV · ${format(parseDate(latest.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(latest.service)}` : 'Aucun rendez-vous réalisé'}${client.contactVia ? ` · ${escapeHtml(CONTACT[client.contactVia])}` : ''}${noShows ? ` · ${noShows} absence${noShows > 1 ? 's' : ''}` : ''}${late ? ` · ${late} annulation${late > 1 ? 's' : ''} tardive${late > 1 ? 's' : ''}` : ''}</p></span><span class="chevron">›</span></button>`;
     }).join('') : '<section class="empty-message"><h2>Aucune cliente trouvée</h2><p>Essaie un autre nom ou retire le filtre.</p></section>';
+  }
+
+  function appointmentSearchText(appointment, suppliedClient = null) {
+    const client = suppliedClient || { name: 'Cliente supprimée', phone: '' }, [year = '', month = '', day = ''] = String(appointment.date || '').split('-');
+    const dateVariants = [appointment.date, `${day}/${month}/${year}`, `${day}-${month}-${year}`].join(' ');
+    return normaliseName([
+      client.name, client.phone, appointment.service, appointment.notes, appointment.address,
+      appointment.cancellationReason, STATUS[appointment.status], PAYMENT[appointment.paymentStatus], dateVariants
+    ].filter(Boolean).join(' '));
+  }
+
+  function searchAppointments(query, limit = SEARCH_RESULT_LIMIT) {
+    const term = normaliseName(boundedText(query, LIMITS.shortText));
+    if (term.length < 2) return { results: [], total: 0, truncated: false };
+    const terms = term.split(' ').filter(Boolean), searchTextById = currentDataIndexes().appointmentSearchTextById;
+    const matches = app.state.appointments.filter(appointment => {
+      const haystack = String(searchTextById.get(appointment.id) || '');
+      return terms.every(token => haystack.includes(token));
+    });
+    const now = Date.now();
+    matches.sort((one, two) => {
+      const oneFuture = appointmentEnd(one) >= now, twoFuture = appointmentEnd(two) >= now;
+      if (oneFuture !== twoFuture) return oneFuture ? -1 : 1;
+      return oneFuture ? appointmentTimestamp(one) - appointmentTimestamp(two) : appointmentTimestamp(two) - appointmentTimestamp(one);
+    });
+    const maximum = Math.max(1, Math.min(500, Number(limit) || SEARCH_RESULT_LIMIT));
+    return { results: matches.slice(0, maximum), total: matches.length, truncated: matches.length > maximum };
+  }
+
+  function renderAppointmentSearchResults() {
+    const query = $('#appointmentSearchInput').value, target = $('#appointmentSearchResults'), counter = $('#appointmentSearchCount');
+    if (normaliseName(query).length < 2) { counter.textContent = ''; target.innerHTML = '<p class="empty-report">Saisis au moins deux caractères pour commencer.</p>'; return; }
+    const found = searchAppointments(query);
+    counter.textContent = found.total ? `${found.total} rendez-vous trouvé${found.total > 1 ? 's' : ''}${found.truncated ? ` · ${found.results.length} affichés` : ''}` : 'Aucun rendez-vous trouvé';
+    target.innerHTML = found.results.map(appointment => {
+      const client = clientFor(appointment), parsed = parseDate(appointment.date), note = boundedText(appointment.notes, 80);
+      return `<button type="button" class="search-result-button" data-edit="${escapeHtml(appointment.id)}"><span class="search-result-date">${format(parsed, { day: 'numeric', month: 'short' })}<br>${appointment.time}</span><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}${note ? ` · ${escapeHtml(note)}` : ''}</small></span><b>${money(appointmentTotal(appointment)) || '—'} ›</b></button>`;
+    }).join('') || '<p class="empty-report">Essaie un autre nom, une prestation ou une date.</p>';
+  }
+
+  function openAppointmentSearch() {
+    clearTimeout(app.ui.appointmentSearchTimer); app.ui.appointmentSearchTimer = null;
+    $('#appointmentSearchInput').value = ''; $('#appointmentSearchCount').textContent = '';
+    $('#appointmentSearchResults').innerHTML = '<p class="empty-report">Saisis au moins deux caractères pour commencer.</p>';
+    $('#appointmentSearchDialog').showModal(); $('#appointmentSearchInput').focus();
   }
 
   function reportRange(mode = app.ui.reportMode) {
@@ -1601,16 +1726,120 @@
     return [...groups.values()].sort((one, two) => two.total - one.total || one.label.localeCompare(two.label, 'fr'));
   }
 
+  function serviceReportKey(appointment) {
+    const id = String(appointment?.serviceId || '').trim();
+    return id ? `id:${encodeURIComponent(id)}` : `name:${encodeURIComponent(normaliseName(appointment?.service || 'Prestation'))}`;
+  }
+
+  function supplementReportKey(supplement) {
+    const id = String(supplement?.typeId || '').trim();
+    return id ? `id:${encodeURIComponent(id)}` : `name:${encodeURIComponent(normaliseName(supplement?.label || 'Supplément'))}`;
+  }
+
+  function reportServiceCategories() {
+    const categories = new Map();
+    app.state.settings.services.forEach(service => categories.set(`id:${encodeURIComponent(service.id)}`, { key: `id:${encodeURIComponent(service.id)}`, label: service.name, color: service.color || 'rose' }));
+    app.state.appointments.forEach(appointment => {
+      const key = serviceReportKey(appointment), existing = categories.get(key);
+      if (!existing) categories.set(key, { key, label: appointment.service || 'Prestation', color: appointment.serviceColor || 'rose' });
+    });
+    return [...categories.values()].sort((one, two) => one.label.localeCompare(two.label, 'fr', { sensitivity: 'base' }));
+  }
+
+  function selectedServiceCategory() {
+    return reportServiceCategories().find(category => category.key === app.ui.reportServiceFilter) || null;
+  }
+
+  function matchesReportService(appointment, filter = app.ui.reportServiceFilter) {
+    return filter === 'all' || serviceReportKey(appointment) === filter;
+  }
+
+  function dateInRange(value, start, end) {
+    const date = parseDate(value); return Boolean(date && date >= start && date < end);
+  }
+
+  function appointmentPaymentDate(appointment) {
+    return parseDate(appointment?.paymentDate || appointment?.date);
+  }
+
+  function performedInRange(appointment, start, end) {
+    return activeAppointment(appointment) && dateInRange(appointment.date, start, end) && appointmentEnd(appointment) <= Date.now();
+  }
+
+  function paidInRange(appointment, start, end) {
+    const paidDate = appointmentPaymentDate(appointment);
+    return activeAppointment(appointment) && appointment.paymentStatus === 'paid' && paidDate && paidDate >= start && paidDate < end;
+  }
+
+  function aggregateReportCategories(start, end, serviceFilter = app.ui.reportServiceFilter) {
+    const services = new Map(), supplements = new Map();
+    const ensureService = appointment => {
+      const key = serviceReportKey(appointment), configured = serviceById(appointment.serviceId), existing = services.get(key);
+      if (existing) return existing;
+      const row = { key, label: configured?.name || appointment.service || 'Prestation', color: configured?.color || appointment.serviceColor || 'rose', count: 0, paid: 0 };
+      services.set(key, row); return row;
+    };
+    const ensureSupplement = supplement => {
+      const key = supplementReportKey(supplement), configured = supplementTypeById(supplement.typeId), existing = supplements.get(key);
+      if (existing) return existing;
+      const row = { key, label: configured?.name || supplement.label || 'Supplément', count: 0, paid: 0 };
+      supplements.set(key, row); return row;
+    };
+    app.state.appointments.forEach(appointment => {
+      if (!activeAppointment(appointment) || !matchesReportService(appointment, serviceFilter)) return;
+      const performed = performedInRange(appointment, start, end), paid = paidInRange(appointment, start, end);
+      if (!performed && !paid) return;
+      const serviceRow = ensureService(appointment);
+      if (performed) serviceRow.count += 1;
+      if (paid) serviceRow.paid = numericAmount(serviceRow.paid + numericAmount(appointment.price));
+      (appointment.supplements || []).forEach(supplement => {
+        const row = ensureSupplement(supplement);
+        if (performed) row.count += 1;
+        if (paid) row.paid = numericAmount(row.paid + numericAmount(supplement.amount));
+      });
+    });
+    if (serviceFilter !== 'all' && !services.has(serviceFilter)) {
+      const selected = selectedServiceCategory();
+      if (selected) services.set(serviceFilter, { ...selected, count: 0, paid: 0 });
+    }
+    const sorter = (one, two) => {
+      const primary = app.ui.reportSort === 'paid' ? two.paid - one.paid : two.count - one.count;
+      const secondary = app.ui.reportSort === 'paid' ? two.count - one.count : two.paid - one.paid;
+      return primary || secondary || one.label.localeCompare(two.label, 'fr', { sensitivity: 'base' });
+    };
+    return { services: [...services.values()].sort(sorter), supplements: [...supplements.values()].sort(sorter) };
+  }
+
+  function categoryReportTable(title, rows, kind) {
+    if (!rows.length) return `<section class="report-panel"><h2>${escapeHtml(title)}</h2><p class="empty-report">Aucune donnée sur cette période.</p></section>`;
+    const maximumCount = Math.max(...rows.map(row => row.count)), maximumPaid = Math.max(...rows.map(row => row.paid));
+    const body = rows.map(row => {
+      const badges = [row.count > 0 && row.count === maximumCount ? (kind === 'service' ? 'Plus réalisée' : 'Plus utilisé') : '', row.paid > 0 && row.paid === maximumPaid ? 'Plus encaissé' : ''].filter(Boolean).join(' · ');
+      const label = `${row.label}, ${row.count} réalisé${row.count > 1 ? 's' : ''}, ${money(row.paid) || '0 €'} encaissé`;
+      return `<tr><th scope="row"><button type="button" class="report-category-button" data-report-detail-kind="${kind}" data-report-detail-key="${escapeHtml(row.key)}" aria-label="Voir le détail : ${escapeHtml(label)}"><strong>${kind === 'service' ? `<span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}" aria-hidden="true"></span>` : ''}${escapeHtml(row.label)}</strong>${badges ? `<small>${escapeHtml(badges)}</small>` : ''}</button></th><td class="${row.count ? '' : 'report-empty-cell'}">${row.count}</td><td class="${row.paid ? '' : 'report-empty-cell'}">${money(row.paid) || '0 €'}</td></tr>`;
+    }).join('');
+    return `<section class="report-panel category-report-panel"><h2>${escapeHtml(title)}</h2><div class="report-table-wrap"><table class="category-report-table"><caption class="sr-only">${escapeHtml(title)} : nombre réalisé et montant encaissé</caption><thead><tr><th scope="col">Catégorie</th><th scope="col">Réalisé</th><th scope="col">Encaissé</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+  }
+
+  function renderReportAnalysisTools(expensesTab) {
+    const tools = $('#reportAnalysisTools'); tools.hidden = expensesTab;
+    if (expensesTab) return;
+    const categories = reportServiceCategories();
+    if (app.ui.reportServiceFilter !== 'all' && !categories.some(category => category.key === app.ui.reportServiceFilter)) app.ui.reportServiceFilter = 'all';
+    $('#reportServiceFilter').innerHTML = `<option value="all">Toutes les prestations</option>${categories.map(category => `<option value="${escapeHtml(category.key)}" ${category.key === app.ui.reportServiceFilter ? 'selected' : ''}>${escapeHtml(category.label)}</option>`).join('')}`;
+    $$('[data-report-sort]').forEach(button => { const active = button.dataset.reportSort === app.ui.reportSort; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
+  }
+
   function renderReport() {
     const mode = currentReportMode(), { start, end } = reportRange(mode), expensesTab = app.ui.reportTab === 'expenses';
     $('#reportPeriodLabel').textContent = mode === 'day' ? format(start, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : mode === 'week' ? `${format(start, { day: 'numeric', month: 'short' })} – ${format(addDays(end, -1), { day: 'numeric', month: 'short' })}` : mode === 'year' ? String(start.getFullYear()) : format(start, { month: 'long', year: 'numeric' });
     $$('.report-period-button').forEach(button => { const allowed = expensesTab ? button.dataset.reportPeriod !== 'week' : button.dataset.reportPeriod !== 'day'; button.hidden = !allowed; const active = allowed && button.dataset.reportPeriod === mode; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
     $$('.report-tab').forEach(button => { const active = button.dataset.reportTab === app.ui.reportTab; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
+    renderReportAnalysisTools(expensesTab);
     $('#exportReportCsv').textContent = expensesTab ? 'Exporter les dépenses' : 'Exporter CSV';
     if (expensesTab) { renderExpensesReport(start, end); return; }
-    const byAppointmentDate = appointment => { const date = parseDate(appointment.date); return date >= start && date < end; };
-    if (app.ui.reportTab === 'activity') renderActivityReport(byAppointmentDate); else renderPaymentsReport(byAppointmentDate, start, end);
-    if (mode === 'year') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start));
+    if (app.ui.reportTab === 'activity') renderActivityReport(start, end); else renderPaymentsReport(start, end);
+    if (mode === 'year') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start, app.ui.reportServiceFilter));
   }
 
   function renderExpensesReport(start, end) {
@@ -1627,15 +1856,13 @@
     $('#reportContent').innerHTML = `${switcher}${note}<section class="metrics-grid expense-metrics"><article><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>${summary.count} dépense${summary.count > 1 ? 's' : ''}</small></article></section><section class="report-panel"><h2>Dépenses par catégorie</h2>${rows}</section>`;
   }
 
-  function annualBreakdown(yearStart) {
+  function annualBreakdown(yearStart, serviceFilter = 'all') {
     const rows = Array.from({ length: 12 }, (_, monthIndex) => {
       const start = localDate(yearStart.getFullYear(), monthIndex, 1), end = localDate(yearStart.getFullYear(), monthIndex + 1, 1);
-      const inMonth = appointment => { const date = parseDate(appointment.date); return date >= start && date < end; };
+      const inMonth = appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment, serviceFilter);
       const appointments = app.state.appointments.filter(inMonth), active = appointments.filter(activeAppointment), clients = new Set(active.map(item => item.clientId));
       const minutes = active.filter(item => appointmentEnd(item) <= Date.now()).reduce((sum, item) => sum + Number(item.duration || 0), 0);
-      const collected = app.state.appointments.filter(item => {
-        const paidDate = parseDate(item.paymentDate); return item.paymentStatus === 'paid' && paidDate && paidDate >= start && paidDate < end;
-      }).reduce((sum, item) => sum + appointmentTotal(item), 0);
+      const collected = app.state.appointments.filter(item => matchesReportService(item, serviceFilter) && paidInRange(item, start, end)).reduce((sum, item) => sum + appointmentTotal(item), 0);
       const pending = active.filter(item => item.paymentStatus === 'pending').reduce((sum, item) => sum + appointmentTotal(item), 0);
       return `<tr><th>${format(start, { month: 'long' })}</th><td>${active.length}</td><td>${clients.size}</td><td>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</td><td>${money(collected) || '0 €'}</td><td>${money(pending) || '0 €'}</td></tr>`;
     }).join('');
@@ -1657,7 +1884,7 @@
       const blob = new Blob([`\ufeff${header.map(csvCell).join(';')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
       return shareOrDownload(blob, `depenses-${mode}-${label}.csv`, 'Dépenses Mon agenda');
     }
-    const { start, end } = reportRange(app.ui.reportMode), appointments = app.state.appointments.filter(item => { const date = parseDate(item.date); return date >= start && date < end; }).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
+    const { start, end } = reportRange(app.ui.reportMode), appointments = app.state.appointments.filter(item => dateInRange(item.date, start, end) && matchesReportService(item)).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
     const header = ['Date', 'Heure', 'Cliente', 'Téléphone', 'Contact via', 'Prestation', 'Durée (min)', 'Prix de base', 'Suppléments', 'Total', 'Statut', 'Paiement', 'Date paiement', 'Date relance'];
     const rows = appointments.map(appointment => {
       const client = clientFor(appointment), supplementText = normaliseSupplements(appointment.supplements).map(item => `${item.label}: ${numericAmount(item.amount).toFixed(2)} €`).join(' | ');
@@ -1668,24 +1895,21 @@
     await shareOrDownload(blob, `bilan-${app.ui.reportMode}-${label}.csv`, 'Bilan Mon agenda');
   }
 
-  function renderActivityReport(inRange) {
+  function renderActivityReport(start, end) {
+    const inRange = appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment);
     const appointments = app.state.appointments.filter(inRange), active = appointments.filter(activeAppointment), clientIds = new Set(active.map(appointment => appointment.clientId));
     const newClients = [...clientIds].filter(clientId => { const first = clientFirstVisit(clientId); return first && inRange(first); }).length;
     const cancelled = appointments.filter(appointment => appointment.status === 'cancelled').length, noShows = appointments.filter(appointment => appointment.status === 'no_show').length;
-    const services = new Map();
     const workedMinutes = active.filter(appointment => appointmentEnd(appointment) <= Date.now()).reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     const plannedMinutes = active.filter(appointment => appointmentEnd(appointment) > Date.now()).reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
-    active.forEach(appointment => { const row = services.get(appointment.service) || { count: 0, total: 0, color: appointment.serviceColor || 'rose' }; row.count += 1; row.total += appointmentTotal(appointment); services.set(appointment.service, row); });
-    const serviceRows = [...services.entries()].sort((a, b) => b[1].count - a[1].count).map(([name, row]) => `<article class="report-row"><span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}"></span><span><strong>${escapeHtml(name)}</strong><small>${row.count} prestation${row.count > 1 ? 's' : ''}${row.total ? ` · ${money(row.total)}` : ''}</small></span></article>`).join('') || '<p class="empty-report">Aucune prestation sur cette période.</p>';
-    $('#reportContent').innerHTML = `<section class="metrics-grid"><article><span>Rendez-vous</span><strong>${active.length}</strong><small>${appointments.filter(appointment => appointment.status === 'completed').length} terminé${appointments.filter(appointment => appointment.status === 'completed').length > 1 ? 's' : ''}</small></article><article><span>Clientes</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>Heures travaillées</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} encore planifiées` : 'hors annulations et absences'}</small></article><article class="metric-alert"><span>Annulées</span><strong>${cancelled}</strong><small>${noShows} absence${noShows > 1 ? 's' : ''}</small></article></section><section class="report-panel"><h2>Prestations prévues</h2>${serviceRows}</section>`;
+    const completed = appointments.filter(appointment => appointment.status === 'completed').length, analysis = aggregateReportCategories(start, end);
+    const filterLabel = selectedServiceCategory()?.label;
+    $('#reportContent').innerHTML = `<section class="metrics-grid"><article><span>Rendez-vous</span><strong>${active.length}</strong><small>${completed} terminé${completed > 1 ? 's' : ''}</small></article><article><span>Clientes</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>Heures travaillées</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} encore planifiées` : 'hors annulations et absences'}</small></article><article class="metric-alert"><span>Annulées</span><strong>${cancelled}</strong><small>${noShows} absence${noShows > 1 ? 's' : ''}</small></article></section><p class="analysis-note">Le nombre suit la date du rendez-vous réalisé. L’encaissement suit la date du paiement${filterLabel ? ` pour « ${escapeHtml(filterLabel)} »` : ''}. Les prix de base et les suppléments restent séparés.</p>${categoryReportTable('Prestations par catégorie', analysis.services, 'service')}${categoryReportTable('Suppléments par catégorie', analysis.supplements, 'supplement')}`;
   }
 
-  function renderPaymentsReport(inRange, start, end) {
-    const appointments = app.state.appointments.filter(inRange), active = appointments.filter(activeAppointment), planned = active.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
-    const paid = app.state.appointments.filter(appointment => {
-      const paymentDate = parseDate(appointment.paymentDate || appointment.date);
-      return activeAppointment(appointment) && appointment.paymentStatus === 'paid' && paymentDate >= start && paymentDate < end;
-    }).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+  function renderPaymentsReport(start, end) {
+    const appointments = app.state.appointments.filter(appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment)), active = appointments.filter(activeAppointment), planned = active.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+    const paid = app.state.appointments.filter(appointment => matchesReportService(appointment) && paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     const pending = active.filter(appointment => appointment.paymentStatus === 'pending'), pendingTotal = pending.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     const unreviewed = active.filter(appointment => appointment.paymentStatus === 'unreviewed');
     const rows = [...pending, ...unreviewed].sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b)).map(appointment => {
@@ -1693,6 +1917,42 @@
       return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)} · ${label}</small></span><b>${money(appointmentTotal(appointment)) || 'À définir'} <i>›</i></b></button>`;
     }).join('') || '<p class="empty-report">Aucun paiement à suivre sur cette période.</p>';
     $('#reportContent').innerHTML = `<section class="metrics-grid payments"><article class="metric-paid"><span>Encaissé</span><strong>${money(paid) || '0 €'}</strong><small>selon la date de paiement</small></article><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-review"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><section class="report-panel"><h2>Paiements à suivre</h2>${rows}</section>`;
+  }
+
+  function supplementsMatchingKey(appointment, key) {
+    return (appointment?.supplements || []).filter(supplement => supplementReportKey(supplement) === key);
+  }
+
+  function reportDetailRows(appointments, kind, key, mode) {
+    const limited = appointments.slice(0, REPORT_DETAIL_LIMIT);
+    const rows = limited.map(appointment => {
+      const client = clientFor(appointment), paidDate = appointmentPaymentDate(appointment), displayDate = mode === 'paid' ? paidDate : parseDate(appointment.date);
+      const matchedSupplements = kind === 'supplement' ? supplementsMatchingKey(appointment, key) : [];
+      const amount = kind === 'service' ? numericAmount(appointment.price) : matchedSupplements.reduce((sum, item) => sum + numericAmount(item.amount), 0);
+      const details = mode === 'paid'
+        ? `RDV du ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}${kind === 'supplement' && matchedSupplements.length > 1 ? ` · ${matchedSupplements.length} lignes` : ''}`
+        : `${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}${kind === 'supplement' && matchedSupplements.length > 1 ? ` · ${matchedSupplements.length} lignes` : ''}`;
+      return `<button type="button" class="report-detail-row" data-edit="${escapeHtml(appointment.id)}"><span class="report-detail-date">${mode === 'paid' ? 'Payé<br>' : ''}${format(displayDate, { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>${money(amount) || '0 €'} ›</b></button>`;
+    }).join('');
+    const overflow = appointments.length > limited.length ? `<p class="report-detail-overflow">${appointments.length - limited.length} autre${appointments.length - limited.length > 1 ? 's' : ''} résultat${appointments.length - limited.length > 1 ? 's' : ''}. Affine la période pour tout afficher.</p>` : '';
+    return (rows || '<p class="empty-report">Aucun rendez-vous correspondant.</p>') + overflow;
+  }
+
+  function openReportDetail(kind, key) {
+    if (!['service', 'supplement'].includes(kind) || !key) return;
+    const { start, end } = reportRange(app.ui.reportMode), serviceFilter = app.ui.reportServiceFilter;
+    const kindMatches = appointment => kind === 'service' ? serviceReportKey(appointment) === key : supplementsMatchingKey(appointment, key).length > 0;
+    const baseMatches = appointment => activeAppointment(appointment) && matchesReportService(appointment, serviceFilter) && kindMatches(appointment);
+    const performed = app.state.appointments.filter(appointment => baseMatches(appointment) && performedInRange(appointment, start, end)).sort((one, two) => appointmentTimestamp(two) - appointmentTimestamp(one));
+    const paid = app.state.appointments.filter(appointment => baseMatches(appointment) && paidInRange(appointment, start, end)).sort((one, two) => appointmentPaymentDate(two) - appointmentPaymentDate(one) || appointmentTimestamp(two) - appointmentTimestamp(one));
+    const analysis = aggregateReportCategories(start, end, serviceFilter), row = (kind === 'service' ? analysis.services : analysis.supplements).find(item => item.key === key);
+    const label = row?.label || (kind === 'service' ? 'Prestation' : 'Supplément');
+    const performedCount = kind === 'service' ? performed.length : performed.reduce((sum, appointment) => sum + supplementsMatchingKey(appointment, key).length, 0);
+    const paidTotal = paid.reduce((sum, appointment) => sum + (kind === 'service' ? numericAmount(appointment.price) : supplementsMatchingKey(appointment, key).reduce((value, item) => value + numericAmount(item.amount), 0)), 0);
+    $('#reportDetailTitle').textContent = label;
+    $('#reportDetailSummary').textContent = `${performedCount} ${kind === 'service' ? 'prestation' : 'utilisation'}${performedCount > 1 ? 's' : ''} réalisée${performedCount > 1 ? 's' : ''} · ${money(numericAmount(paidTotal)) || '0 €'} encaissé`;
+    $('#reportDetailContent').innerHTML = `<section class="report-detail-section"><h3>Réalisé pendant la période</h3>${reportDetailRows(performed, kind, key, 'performed')}</section><section class="report-detail-section"><h3>Encaissé pendant la période</h3>${reportDetailRows(paid, kind, key, 'paid')}</section>`;
+    $('#reportDetailDialog').showModal();
   }
 
   function renderScreen() {
@@ -2684,6 +2944,42 @@
     return `Sauvegarde du ${when} · version ${backupVersion(data)}\n${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''} personnel${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}, ${counts.services} prestation${counts.services > 1 ? 's' : ''}.\nLes horaires, repères, catégories et autres réglages sont inclus.\n\nRemplacer les données actuelles ? Une copie de secours sera conservée sur cet appareil.`;
   }
 
+  async function readValidatedBackupFile(file) {
+    if (!file) throw new Error('UNKNOWN_BACKUP');
+    if (Number(file.size) > MAX_BACKUP_BYTES) throw new Error('INVALID_FILE_SIZE');
+    let data = null;
+    try { data = JSON.parse(await file.text()); } catch { throw new Error('INVALID_JSON'); }
+    if (!recognisedBackup(data) || (data.app && data.app !== BACKUP_APP_ID)) throw new Error('UNKNOWN_BACKUP');
+    if (Number(data.backupFormatVersion || 1) > BACKUP_FORMAT_VERSION || backupVersion(data) > CURRENT_DATA_VERSION) throw new Error('FUTURE_BACKUP');
+    const state = migrateState(data, data.clientProfiles || data.state?.clientProfiles || {}, { strict: true });
+    return { data, state };
+  }
+
+  function backupErrorText(error) {
+    if (error?.message === 'FUTURE_BACKUP') return 'Cette sauvegarde vient d’une version plus récente. Mets d’abord l’application à jour.';
+    if (error?.message === 'INVALID_FILE_SIZE') return 'Ce fichier dépasse la taille maximale autorisée de 25 Mo.';
+    if (error?.message === 'INVALID_JSON') return 'Ce fichier n’est pas un document JSON lisible.';
+    if (String(error?.message || '').startsWith('INVALID_')) return 'La sauvegarde contient au moins une donnée incomplète, incohérente ou abîmée.';
+    return 'Ce fichier ne semble pas être une sauvegarde valide de Mon agenda.';
+  }
+
+  async function verifyBackupFile(file) {
+    const input = $('#verifyData'), target = $('#backupVerificationResult');
+    if (!file) return { ok: false, error: 'NO_FILE' };
+    try {
+      const { data, state } = await readValidatedBackupFile(file), counts = backupCounts(state);
+      const exported = data?.exportedAt ? new Date(data.exportedAt) : null;
+      const when = exported && !Number.isNaN(exported.getTime()) ? format(exported, { day: 'numeric', month: 'long', year: 'numeric' }) : 'date inconnue';
+      target.classList.remove('error'); target.hidden = false;
+      target.innerHTML = `<strong>✓ Sauvegarde valide</strong><span>${escapeHtml(when)} · données v${backupVersion(data)}</span><span>${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}.</span><span>Aucune donnée de l’application n’a été modifiée.</span>`;
+      return { ok: true, data, state, counts };
+    } catch (error) {
+      target.classList.add('error'); target.hidden = false;
+      target.innerHTML = `<strong>Vérification impossible</strong><span>${escapeHtml(backupErrorText(error))}</span><span>Les données actuelles n’ont pas été modifiées.</span>`;
+      return { ok: false, error: error?.message || 'UNKNOWN_BACKUP' };
+    } finally { if (input) input.value = ''; }
+  }
+
   async function shareOrDownload(blob, filename, title) {
     let file = null;
     try { file = new File([blob], filename, { type: blob.type || 'application/octet-stream', lastModified: Date.now() }); } catch {}
@@ -2713,11 +3009,7 @@
   async function importData(file) {
     const input = $('#importData'); if (!file) return;
     try {
-      if (Number(file.size) > MAX_BACKUP_BYTES) throw new Error('INVALID_FILE_SIZE');
-      const data = JSON.parse(await file.text());
-      if (!recognisedBackup(data) || (data.app && data.app !== BACKUP_APP_ID)) throw new Error('UNKNOWN_BACKUP');
-      if (Number(data.backupFormatVersion || 1) > BACKUP_FORMAT_VERSION || backupVersion(data) > CURRENT_DATA_VERSION) throw new Error('FUTURE_BACKUP');
-      const migrated = migrateState(data, data.clientProfiles || data.state?.clientProfiles || {}, { strict: true });
+      const { data, state: migrated } = await readValidatedBackupFile(file);
       if (!window.confirm(backupPreview(data, migrated))) return;
       const safety = makeBackupPayload(app.state, 'before-restore');
       try { localStorage.setItem(RESTORE_SAFETY_KEY, JSON.stringify(safety)); }
@@ -2727,6 +3019,7 @@
     } catch (error) {
       if (error?.message === 'FUTURE_BACKUP') window.alert('Cette sauvegarde vient d’une version plus récente. Mets d’abord l’application à jour : tes données actuelles n’ont pas été modifiées.');
       else if (error?.message === 'INVALID_FILE_SIZE') window.alert('Ce fichier est trop volumineux. La taille maximale acceptée est de 25 Mo. Tes données actuelles n’ont pas été modifiées.');
+      else if (error?.message === 'INVALID_JSON') window.alert('Ce fichier JSON est illisible ou incomplet. Tes données actuelles n’ont pas été modifiées.');
       else if (String(error?.message || '').startsWith('INVALID_')) window.alert('La sauvegarde contient au moins une donnée incomplète ou abîmée. Rien n’a été restauré afin d’éviter une perte partielle.');
       else window.alert('Ce fichier ne semble pas être une sauvegarde valide de Mon agenda.');
     } finally { input.value = ''; }
@@ -2782,7 +3075,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=12.2', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=12.3', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -2807,9 +3100,12 @@
     if (target.dataset.screen) { showScreen(target.dataset.screen); return; }
     if (target.dataset.reportPeriod) { if (app.ui.reportTab === 'expenses') app.ui.expenseReportMode = target.dataset.reportPeriod; else app.ui.reportMode = target.dataset.reportPeriod; renderReport(); return; }
     if (target.dataset.reportTab) { app.ui.reportTab = target.dataset.reportTab; renderReport(); return; }
+    if (target.dataset.reportSort) { app.ui.reportSort = target.dataset.reportSort === 'paid' ? 'paid' : 'count'; renderReport(); return; }
+    if (target.dataset.reportDetailKind) { openReportDetail(target.dataset.reportDetailKind, target.dataset.reportDetailKey); return; }
     if (target.dataset.expenseView) { app.ui.expenseReportView = target.dataset.expenseView; renderReport(); return; }
     if (target.id === 'backToAgenda') { showScreen('agenda'); return; }
     if (target.id === 'addAppointment') { openQuickAdd(); return; }
+    if (target.id === 'appointmentSearchButton') { openAppointmentSearch(); return; }
     if (target.id === 'quickAddAppointment') { $('#quickAddDialog').close(); openAppointment(null, { date: app.ui.quickAddDate, time: app.ui.quickAddTime }); return; }
     if (target.id === 'quickAddBlock') { $('#quickAddDialog').close(); openBlock(null, { date: app.ui.quickAddDate, time: app.ui.quickAddTime }); return; }
     if (target.id === 'quickAddExpense') { $('#quickAddDialog').close(); openExpense(null, { date: app.ui.quickAddDate }); return; }
@@ -2898,7 +3194,7 @@
     if (target.dataset.openDay) { app.ui.selectedDate = parseDate(target.dataset.openDay); app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.mode = 'day'; renderAgenda(); return; }
     if (target.dataset.selectWeek) { const date = parseDate(target.dataset.selectWeek); app.ui.overviewWeekStart = mondayOf(date); app.ui.weekStart = mondayOf(date); app.ui.selectedDate = date; renderAgenda(); return; }
     if (target.dataset.closeOverview !== undefined) { app.ui.overviewWeekStart = null; renderAgenda(); return; }
-    if (target.dataset.edit) { const appointment = app.state.appointments.find(item => item.id === target.dataset.edit); if (appointment) { if ($('#todoDialog').open) $('#todoDialog').close(); if ($('#dayReviewDialog').open) $('#dayReviewDialog').close(); openAppointment(appointment); } return; }
+    if (target.dataset.edit) { const appointment = appointmentById(target.dataset.edit); if (appointment) { if ($('#todoDialog').open) $('#todoDialog').close(); if ($('#dayReviewDialog').open) $('#dayReviewDialog').close(); if ($('#appointmentSearchDialog').open) $('#appointmentSearchDialog').close(); if ($('#reportDetailDialog').open) $('#reportDetailDialog').close(); openAppointment(appointment); } return; }
     if (target.dataset.editBlock) { const block = app.state.blocks.find(item => item.id === target.dataset.editBlock); if (block) openBlock(block); return; }
     if (target.dataset.editService) { const service = serviceById(target.dataset.editService); if (service) openService(service); return; }
     if (target.dataset.editSupplementType) { const type = supplementTypeById(target.dataset.editSupplementType); if (type) openSupplementType(type); return; }
@@ -2990,6 +3286,11 @@
   });
   $('#clientSearch').addEventListener('input', renderClients);
   $('#clientFilter').addEventListener('change', renderClients);
+  $('#reportServiceFilter').addEventListener('change', event => { app.ui.reportServiceFilter = event.target.value || 'all'; renderReport(); });
+  $('#appointmentSearchInput').addEventListener('input', () => {
+    clearTimeout(app.ui.appointmentSearchTimer);
+    app.ui.appointmentSearchTimer = setTimeout(() => { app.ui.appointmentSearchTimer = null; renderAppointmentSearchResults(); }, 120);
+  });
  $('#profileAddress').addEventListener('input', event => { $('#profileWaze').hidden = !event.target.value.trim(); });
   $('#profileBadge').addEventListener('change', () => syncProfileBadgeSummary(true));
   $('#badgeName').addEventListener('input', updateBadgePreview);
@@ -2997,6 +3298,7 @@
   $('#lateCancellationThreshold').addEventListener('input', () => { app.ui.settingsDirty = true; });
   $('#lateCancellationPromptEnabled').addEventListener('change', () => { app.ui.settingsDirty = true; });
   $('#backupReminderDays').addEventListener('change', () => { app.ui.settingsDirty = true; });
+  $('#verifyData').addEventListener('change', event => verifyBackupFile(event.target.files[0]));
   $('#importData').addEventListener('change', event => importData(event.target.files[0]));
  $('#conflictDialog').addEventListener('cancel', () => { app.ui.pendingDraft = null; setAppointmentSaving(false); });
   $('#blockConflictDialog').addEventListener('cancel', () => { app.ui.pendingBlockConflict = null; setBlockSaving(false); });
@@ -3013,7 +3315,7 @@
   $('#expenseForm').addEventListener('input', () => { clearTimeout(expenseDraftTimer); expenseDraftTimer = setTimeout(saveExpenseDraft, 150); });
  $('#expenseForm').addEventListener('change', () => { clearTimeout(expenseDraftTimer); expenseDraftTimer = setTimeout(saveExpenseDraft, 80); });
   $('#expenseCategoryForm').addEventListener('input', () => { clearTimeout(expenseCategoryDraftTimer); expenseCategoryDraftTimer = setTimeout(saveExpenseCategoryDraft, 150); });
-  ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'dayReviewDialog'].forEach(dialogId => {
+  ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'dayReviewDialog', 'appointmentSearchDialog', 'reportDetailDialog'].forEach(dialogId => {
     $(`#${dialogId}`).addEventListener('cancel', event => { event.preventDefault(); requestDialogClose(dialogId); });
   });
   $('#unsavedChangesDialog').addEventListener('cancel', event => { event.preventDefault(); resolveUnsavedClose('continue'); });
