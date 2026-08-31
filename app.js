@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.4 bêta';
+  const APP_VERSION = '12.4.1 bêta';
   const CURRENT_DATA_VERSION = 14;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
@@ -553,7 +553,8 @@
       lateCancellationThreshold: Math.min(20, Math.max(1, Number(rawSettings.lateCancellationThreshold) || 3)),
       lateCancellationPromptEnabled: rawSettings.lateCancellationPromptEnabled !== false,
       backupReminderDays: Math.min(90, Math.max(1, Number(rawSettings.backupReminderDays) || 7)),
-      displayDensity: rawSettings.displayDensity === 'compact' ? 'compact' : 'comfortable'
+      displayDensity: rawSettings.displayDensity === 'compact' ? 'compact' : 'comfortable',
+      colorTheme: rawSettings.colorTheme === 'dark' ? 'dark' : 'light'
     };
     const validBadgeIds = new Set(settings.clientBadges.map(badge => badge.id));
     clients.forEach(client => { if (!validBadgeIds.has(client.badgeId)) client.badgeId = ''; });
@@ -625,7 +626,7 @@
       screen: 'agenda', mode: 'day', selectedDate: startOfDay(new Date()), weekStart: mondayOf(new Date()),
       monthDate: localDate(new Date().getFullYear(), new Date().getMonth(), 1), monthDayKey: '', monthReturnKey: '',
       editingAppointmentId: null, editingBlockId: null, pendingDraft: null, formClientId: null, formServiceColor: 'rose', repeatDateEdited: false, repeatTimeEdited: false,
-      reportMode: 'week', expenseReportMode: 'week', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()), reportServiceFilter: 'all', reportSort: 'count',
+      reportMode: 'week', expenseReportMode: 'week', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()), reportSort: 'count',
       reviewDate: startOfDay(new Date()), reviewPendingId: null,
      quickAddDate: todayKey(), quickAddTime: '10:00', pendingDuplicate: null,
      appointmentSaving: false, blockSaving: false, expenseSaving: false, clientSaving: false, serviceSaving: false, supplementSaving: false, badgeSaving: false, undo: null, undoTimer: null, successTimer: null,
@@ -662,6 +663,14 @@
 
   function applyDisplayDensity() {
     if (document.body?.dataset) document.body.dataset.density = app.state.settings.displayDensity || 'comfortable';
+  }
+
+  function applyColorTheme() {
+    const theme = app.state.settings.colorTheme === 'dark' ? 'dark' : 'light';
+    if (document.documentElement?.dataset) document.documentElement.dataset.theme = theme;
+    if (document.body?.dataset) document.body.dataset.theme = theme;
+    const meta = $('#themeColorMeta');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#181316' : '#fbf6f7');
   }
 
   function dayHourHeight() { return app.state.settings.displayDensity === 'compact' ? COMPACT_HOUR_HEIGHT : COMFORTABLE_HOUR_HEIGHT; }
@@ -1273,7 +1282,7 @@
   }
 
   function render() {
-    applyDisplayDensity(); renderFeatureCoach(); renderHeader(); renderScreen();
+    applyColorTheme(); applyDisplayDensity(); renderFeatureCoach(); renderHeader(); renderScreen();
     if (app.ui.screen === 'agenda') renderAgenda();
     else if (app.ui.screen === 'clients') renderClients();
     else if (app.ui.screen === 'report') renderReport();
@@ -1831,24 +1840,6 @@
     return id ? `id:${encodeURIComponent(id)}` : `name:${encodeURIComponent(normaliseName(supplement?.label || 'Supplément'))}`;
   }
 
-  function reportServiceCategories() {
-    const categories = new Map();
-    app.state.settings.services.forEach(service => categories.set(`id:${encodeURIComponent(service.id)}`, { key: `id:${encodeURIComponent(service.id)}`, label: service.name, color: service.color || 'rose' }));
-    app.state.appointments.forEach(appointment => {
-      const key = serviceReportKey(appointment), existing = categories.get(key);
-      if (!existing) categories.set(key, { key, label: appointment.service || 'Prestation', color: appointment.serviceColor || 'rose' });
-    });
-    return [...categories.values()].sort((one, two) => one.label.localeCompare(two.label, 'fr', { sensitivity: 'base' }));
-  }
-
-  function selectedServiceCategory() {
-    return reportServiceCategories().find(category => category.key === app.ui.reportServiceFilter) || null;
-  }
-
-  function matchesReportService(appointment, filter = app.ui.reportServiceFilter) {
-    return filter === 'all' || serviceReportKey(appointment) === filter;
-  }
-
   function dateInRange(value, start, end) {
     const date = parseDate(value); return Boolean(date && date >= start && date < end);
   }
@@ -1866,7 +1857,7 @@
     return activeAppointment(appointment) && appointment.paymentStatus === 'paid' && paidDate && paidDate >= start && paidDate < end;
   }
 
-  function aggregateReportCategories(start, end, serviceFilter = app.ui.reportServiceFilter) {
+  function aggregateReportCategories(start, end) {
     const services = new Map(), supplements = new Map();
     const ensureService = appointment => {
       const key = serviceReportKey(appointment), configured = serviceById(appointment.serviceId), existing = services.get(key);
@@ -1881,7 +1872,7 @@
       supplements.set(key, row); return row;
     };
     app.state.appointments.forEach(appointment => {
-      if (!activeAppointment(appointment) || !matchesReportService(appointment, serviceFilter)) return;
+      if (!activeAppointment(appointment)) return;
       const performed = performedInRange(appointment, start, end), paid = paidInRange(appointment, start, end);
       if (!performed && !paid) return;
       const serviceRow = ensureService(appointment);
@@ -1893,10 +1884,6 @@
         if (paid) row.paid = numericAmount(row.paid + numericAmount(supplement.amount));
       });
     });
-    if (serviceFilter !== 'all' && !services.has(serviceFilter)) {
-      const selected = selectedServiceCategory();
-      if (selected) services.set(serviceFilter, { ...selected, count: 0, paid: 0 });
-    }
     const sorter = (one, two) => {
       const primary = app.ui.reportSort === 'paid' ? two.paid - one.paid : two.count - one.count;
       const secondary = app.ui.reportSort === 'paid' ? two.count - one.count : two.paid - one.paid;
@@ -1921,16 +1908,10 @@
     return `<section class="report-panel category-report-panel">${heading}<div class="category-report-list">${body}</div></section>`;
   }
 
-  function renderReportAnalysisTools(expensesTab) {
-    const tools = $('#reportAnalysisTools'); tools.hidden = expensesTab;
-    if (expensesTab) return;
-    const activityTab = app.ui.reportTab === 'activity';
-    $('#reportAnalysisTitle').textContent = activityTab ? 'Affiner le classement' : 'Filtrer les encaissements';
-    $('#reportAnalysisHelp').textContent = activityTab ? 'Choisis une prestation et l’ordre du classement' : 'Limite les montants à une prestation';
-    $('#reportSortControl').hidden = !activityTab;
-    const categories = reportServiceCategories();
-    if (app.ui.reportServiceFilter !== 'all' && !categories.some(category => category.key === app.ui.reportServiceFilter)) app.ui.reportServiceFilter = 'all';
-    $('#reportServiceFilter').innerHTML = `<option value="all">Toutes les prestations</option>${categories.map(category => `<option value="${escapeHtml(category.key)}" ${category.key === app.ui.reportServiceFilter ? 'selected' : ''}>${escapeHtml(category.label)}</option>`).join('')}`;
+  function renderReportSortTools(expensesTab) {
+    const tools = $('#reportSortTools'), activityTab = app.ui.reportTab === 'activity';
+    tools.hidden = expensesTab || !activityTab;
+    if (tools.hidden) return;
     $$('[data-report-sort]').forEach(button => { const active = button.dataset.reportSort === app.ui.reportSort; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
   }
 
@@ -1946,11 +1927,11 @@
       button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
     });
     $('#reportToday').textContent = mode === 'day' ? 'Aujourd’hui' : mode === 'week' ? 'Cette semaine' : mode === 'month' ? 'Ce mois' : 'Cette année';
-    renderReportAnalysisTools(expensesTab);
+    renderReportSortTools(expensesTab);
     $('#exportReportCsv').textContent = expensesTab ? 'Exporter les dépenses' : 'Exporter ce bilan';
     if (expensesTab) { renderExpensesReport(start, end); return; }
     if (app.ui.reportTab === 'activity') renderActivityReport(start, end); else renderPaymentsReport(start, end);
-    if (mode === 'year' && app.ui.reportTab === 'activity') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start, app.ui.reportServiceFilter));
+    if (mode === 'year' && app.ui.reportTab === 'activity') $('#reportContent').insertAdjacentHTML('beforeend', annualBreakdown(start));
   }
 
   function renderExpensesReport(start, end) {
@@ -1960,21 +1941,23 @@
     const highlight = `<section class="report-highlight expense"><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>sur la période choisie</small></section>`;
     if (globalActive) {
       const rows = [...expenses].reverse().map(expense => `<button class="expense-row" data-edit-expense="${escapeHtml(expense.id)}"><span class="expense-row-date">${format(parseDate(expense.date), { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(expenseCategoryLabel(expense))}</strong><small>${escapeHtml([expense.details, expense.supplier].filter(Boolean).join(' · ') || 'Aucun détail')}</small></span><b>${money(expense.amount)} ›</b></button>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
-      $('#reportContent').innerHTML = `${highlight}<section class="metrics-grid expense-metrics"><article><span>Nombre</span><strong>${summary.count}</strong><small>achat${summary.count > 1 ? 's' : ''} enregistré${summary.count > 1 ? 's' : ''}</small></article><article><span>Montant moyen</span><strong>${money(summary.average) || '0 €'}</strong><small>par dépense</small></article></section>${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Détail</p><h2>Historique des dépenses</h2></div>${rows}</section>`;
+      $('#reportSummary').innerHTML = `${highlight}<section class="metrics-grid expense-metrics"><article><span>Nombre</span><strong>${summary.count}</strong><small>achat${summary.count > 1 ? 's' : ''} enregistré${summary.count > 1 ? 's' : ''}</small></article><article><span>Montant moyen</span><strong>${money(summary.average) || '0 €'}</strong><small>par dépense</small></article></section>`;
+      $('#reportContent').innerHTML = `${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Détail</p><h2>Historique des dépenses</h2></div>${rows}</section>`;
       return;
     }
     const groups = aggregateExpensesByCategory(expenses), maximum = Math.max(1, ...groups.map(group => group.total));
     const rows = groups.map((group, index) => `<article class="expense-category-row"><div class="expense-category-heading"><span><strong>${escapeHtml(group.label)}</strong><small>${group.count} dépense${group.count > 1 ? 's' : ''}</small></span><b>${money(group.total)}</b></div><div class="expense-category-bar"><span style="--bar-width:${Math.max(2, group.total / maximum * 100).toFixed(1)}%;--expense-bar-index:${index % 7}"></span></div></article>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
-    $('#reportContent').innerHTML = `${highlight}${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Répartition</p><h2>Dépenses par catégorie</h2><p>${summary.count} dépense${summary.count > 1 ? 's' : ''} enregistrée${summary.count > 1 ? 's' : ''}</p></div>${rows}</section>`;
+    $('#reportSummary').innerHTML = highlight;
+    $('#reportContent').innerHTML = `${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Répartition</p><h2>Dépenses par catégorie</h2><p>${summary.count} dépense${summary.count > 1 ? 's' : ''} enregistrée${summary.count > 1 ? 's' : ''}</p></div>${rows}</section>`;
   }
 
-  function annualBreakdown(yearStart, serviceFilter = 'all') {
+  function annualBreakdown(yearStart) {
     const rows = Array.from({ length: 12 }, (_, monthIndex) => {
       const start = localDate(yearStart.getFullYear(), monthIndex, 1), end = localDate(yearStart.getFullYear(), monthIndex + 1, 1);
-      const inMonth = appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment, serviceFilter);
+      const inMonth = appointment => dateInRange(appointment.date, start, end);
       const appointments = app.state.appointments.filter(inMonth), active = appointments.filter(activeAppointment), performed = active.filter(item => appointmentEnd(item) <= Date.now()), clients = new Set(performed.map(item => item.clientId));
       const minutes = performed.reduce((sum, item) => sum + Number(item.duration || 0), 0);
-      const collected = app.state.appointments.filter(item => matchesReportService(item, serviceFilter) && paidInRange(item, start, end)).reduce((sum, item) => sum + appointmentTotal(item), 0);
+      const collected = app.state.appointments.filter(item => paidInRange(item, start, end)).reduce((sum, item) => sum + appointmentTotal(item), 0);
       const pending = active.filter(item => item.paymentStatus === 'pending').reduce((sum, item) => sum + appointmentTotal(item), 0);
       return `<article class="annual-row"><strong>${format(start, { month: 'long' })}</strong><span class="annual-row-values"><span><b>${performed.length}</b> réalisées</span><span><b>${clients.size}</b> clientes</span><span><b>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</b> effectuées</span><span><b>${money(collected) || '0 €'}</b> encaissé${pending ? ` · ${money(pending)} à régler` : ''}</span></span></article>`;
     }).join('');
@@ -1996,7 +1979,7 @@
       const blob = new Blob([`\ufeff${header.map(csvCell).join(';')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
       return shareOrDownload(blob, `depenses-${mode}-${label}.csv`, 'Dépenses Mon agenda');
     }
-    const { start, end } = reportRange(app.ui.reportMode), appointments = app.state.appointments.filter(item => dateInRange(item.date, start, end) && matchesReportService(item)).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
+    const { start, end } = reportRange(app.ui.reportMode), appointments = app.state.appointments.filter(item => dateInRange(item.date, start, end)).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
     const header = ['Date', 'Heure', 'Cliente', 'Téléphone', 'Contact via', 'Prestation', 'Durée (min)', 'Prix de base', 'Suppléments', 'Total', 'Statut', 'Paiement', 'Date paiement', 'Date relance'];
     const rows = appointments.map(appointment => {
       const client = clientFor(appointment), supplementText = normaliseSupplements(appointment.supplements).map(item => `${item.label}: ${numericAmount(item.amount).toFixed(2)} €`).join(' | ');
@@ -2008,28 +1991,29 @@
   }
 
   function renderActivityReport(start, end) {
-    const inRange = appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment);
+    const inRange = appointment => dateInRange(appointment.date, start, end);
     const appointments = app.state.appointments.filter(inRange), active = appointments.filter(activeAppointment), performed = active.filter(appointment => appointmentEnd(appointment) <= Date.now()), clientIds = new Set(performed.map(appointment => appointment.clientId));
     const newClients = [...clientIds].filter(clientId => { const first = clientFirstVisit(clientId); return first && inRange(first); }).length;
     const cancelled = appointments.filter(appointment => appointment.status === 'cancelled').length, noShows = appointments.filter(appointment => appointment.status === 'no_show').length;
     const workedMinutes = performed.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     const plannedMinutes = active.filter(appointment => appointmentEnd(appointment) > Date.now()).reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
-    const paid = app.state.appointments.filter(appointment => matchesReportService(appointment) && paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0), analysis = aggregateReportCategories(start, end);
-    const filterLabel = selectedServiceCategory()?.label;
+    const paid = app.state.appointments.filter(appointment => paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0), analysis = aggregateReportCategories(start, end);
     const plannedCount = active.length - performed.length;
-    $('#reportContent').innerHTML = `<section class="report-highlight"><span>Vue d’ensemble${filterLabel ? ` · ${escapeHtml(filterLabel)}` : ''}</span><div class="report-highlight-pair"><div><strong>${performed.length}</strong><small>prestation${performed.length > 1 ? 's' : ''} réalisée${performed.length > 1 ? 's' : ''}</small></div><div><strong>${money(paid) || '0 €'}</strong><small>encaissé</small></div></div></section><section class="metrics-grid"><article><span>Temps effectué</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article><span>Clientes reçues</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>À venir</span><strong>${plannedCount}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} planifiées` : 'rien de planifié'}</small></article></section>${cancelled || noShows ? `<p class="report-secondary-line"><span>${cancelled} annulée${cancelled > 1 ? 's' : ''}</span><span>${noShows} absence${noShows > 1 ? 's' : ''}</span></p>` : ''}<p class="report-definition">Le nombre suit la date du rendez-vous réalisé. L’encaissement suit la date du paiement. Les prix de base et les suppléments sont présentés séparément.</p>${categoryReportTable('Prestations', analysis.services, 'service')}${categoryReportTable('Suppléments', analysis.supplements, 'supplement')}`;
+    $('#reportSummary').innerHTML = `<section class="report-highlight"><span>Résumé de la période</span><div class="report-highlight-pair"><div><strong>${money(paid) || '0 €'}</strong><small>encaissé</small></div><div><strong>${performed.length}</strong><small>prestation${performed.length > 1 ? 's' : ''} réalisée${performed.length > 1 ? 's' : ''}</small></div></div></section><section class="metrics-grid"><article><span>Temps effectué</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article><span>Clientes reçues</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>À venir</span><strong>${plannedCount}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} planifiées` : 'rien de planifié'}</small></article></section>${cancelled || noShows ? `<p class="report-secondary-line"><span>${cancelled} annulée${cancelled > 1 ? 's' : ''}</span><span>${noShows} absence${noShows > 1 ? 's' : ''}</span></p>` : ''}<p class="report-definition">Le nombre suit la date du rendez-vous réalisé. L’encaissement suit la date du paiement.</p>`;
+    $('#reportContent').innerHTML = `${categoryReportTable('Prestations', analysis.services, 'service')}${categoryReportTable('Suppléments', analysis.supplements, 'supplement')}`;
   }
 
   function renderPaymentsReport(start, end) {
-    const appointments = app.state.appointments.filter(appointment => dateInRange(appointment.date, start, end) && matchesReportService(appointment)), active = appointments.filter(activeAppointment), planned = active.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
-    const paid = app.state.appointments.filter(appointment => matchesReportService(appointment) && paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+    const appointments = app.state.appointments.filter(appointment => dateInRange(appointment.date, start, end)), active = appointments.filter(activeAppointment), planned = active.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+    const paid = app.state.appointments.filter(appointment => paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     const pending = active.filter(appointment => appointment.paymentStatus === 'pending'), pendingTotal = pending.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     const unreviewed = active.filter(appointment => appointment.paymentStatus === 'unreviewed');
     const rows = [...pending, ...unreviewed].sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b)).map(appointment => {
       const client = clientFor(appointment), label = appointment.paymentStatus === 'pending' ? 'À régler' : 'À vérifier';
       return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)} · ${label}</small></span><b>${money(appointmentTotal(appointment)) || 'À définir'} <i>›</i></b></button>`;
     }).join('') || '<p class="empty-report">Aucun paiement à suivre sur cette période.</p>';
-    $('#reportContent').innerHTML = `<section class="report-highlight paid"><span>Encaissé sur la période</span><strong>${money(paid) || '0 €'}</strong><small>chaque paiement est compté à sa date d’encaissement</small></section><section class="metrics-grid payments"><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-alert"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><p class="report-definition">Exemple : un rendez-vous de juin payé en juillet apparaît dans l’encaissement de juillet.</p><section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">À traiter</p><h2>Paiements à suivre</h2></div>${rows}</section>`;
+    $('#reportSummary').innerHTML = `<section class="report-highlight paid"><span>Encaissé sur la période</span><strong>${money(paid) || '0 €'}</strong><small>chaque paiement est compté à sa date d’encaissement</small></section><section class="metrics-grid payments"><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-alert"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><p class="report-definition">Exemple : un rendez-vous de juin payé en juillet apparaît dans l’encaissement de juillet.</p>`;
+    $('#reportContent').innerHTML = `<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">À traiter</p><h2>Paiements à suivre</h2></div>${rows}</section>`;
   }
 
   function supplementsMatchingKey(appointment, key) {
@@ -2053,12 +2037,12 @@
 
   function openReportDetail(kind, key) {
     if (!['service', 'supplement'].includes(kind) || !key) return;
-    const { start, end } = reportRange(app.ui.reportMode), serviceFilter = app.ui.reportServiceFilter;
+    const { start, end } = reportRange(app.ui.reportMode);
     const kindMatches = appointment => kind === 'service' ? serviceReportKey(appointment) === key : supplementsMatchingKey(appointment, key).length > 0;
-    const baseMatches = appointment => activeAppointment(appointment) && matchesReportService(appointment, serviceFilter) && kindMatches(appointment);
+    const baseMatches = appointment => activeAppointment(appointment) && kindMatches(appointment);
     const performed = app.state.appointments.filter(appointment => baseMatches(appointment) && performedInRange(appointment, start, end)).sort((one, two) => appointmentTimestamp(two) - appointmentTimestamp(one));
     const paid = app.state.appointments.filter(appointment => baseMatches(appointment) && paidInRange(appointment, start, end)).sort((one, two) => appointmentPaymentDate(two) - appointmentPaymentDate(one) || appointmentTimestamp(two) - appointmentTimestamp(one));
-    const analysis = aggregateReportCategories(start, end, serviceFilter), row = (kind === 'service' ? analysis.services : analysis.supplements).find(item => item.key === key);
+    const analysis = aggregateReportCategories(start, end), row = (kind === 'service' ? analysis.services : analysis.supplements).find(item => item.key === key);
     const label = row?.label || (kind === 'service' ? 'Prestation' : 'Supplément');
     const performedCount = kind === 'service' ? performed.length : performed.reduce((sum, appointment) => sum + supplementsMatchingKey(appointment, key).length, 0);
     const paidTotal = paid.reduce((sum, appointment) => sum + (kind === 'service' ? numericAmount(appointment.price) : supplementsMatchingKey(appointment, key).reduce((value, item) => value + numericAmount(item.amount), 0)), 0);
@@ -2841,6 +2825,7 @@
 
   function renderWorkingHoursEditor() {
     const density = $('#displayDensity'); if (density) density.value = app.state.settings.displayDensity || 'comfortable';
+    const theme = $('#colorTheme'); if (theme) theme.value = app.state.settings.colorTheme === 'dark' ? 'dark' : 'light';
     $('#workingHoursEditor').innerHTML = DAYS.map(day => {
       const hours = app.state.settings.workingHours[day.key];
       const disabled = hours.enabled ? '' : 'disabled';
@@ -2870,7 +2855,8 @@
   function renderSettingsHome() {
     const workingDays = Object.values(app.state.settings.workingHours).filter(hours => hours.enabled).length;
     const density = app.state.settings.displayDensity === 'compact' ? 'compact' : 'confortable';
-    $('#settingsAgendaSummary').textContent = `${workingDays} jour${workingDays > 1 ? 's' : ''} travaillé${workingDays > 1 ? 's' : ''} · affichage ${density}`;
+    const theme = app.state.settings.colorTheme === 'dark' ? 'sombre' : 'clair';
+    $('#settingsAgendaSummary').textContent = `${workingDays} jour${workingDays > 1 ? 's' : ''} travaillé${workingDays > 1 ? 's' : ''} · thème ${theme} · affichage ${density}`;
     $('#settingsServicesSummary').textContent = `${app.state.settings.services.filter(service => service.active).length} prestation(s) disponible(s)`;
     $('#settingsSupplementsSummary').textContent = `${app.state.settings.supplementTypes.filter(type => type.active).length} nature(s) disponible(s)`;
     $('#settingsClientsSummary').textContent = `${app.state.settings.clientBadges.length} repère(s) · seuil ${app.state.settings.lateCancellationThreshold}`;
@@ -2930,10 +2916,12 @@
       if (enabled && (breakStart || breakEnd) && (!validTime(breakStart) || !validTime(breakEnd) || toMinutes(breakStart) >= toMinutes(breakEnd) || toMinutes(breakStart) < toMinutes(start) || toMinutes(breakEnd) > toMinutes(end))) { showAppAlert(`Vérifie la pause du ${DAYS.find(item => item.key === day).label.toLowerCase()}.`); return; }
       hours[day] = { enabled, start: validTime(start) ? start : '09:00', end: validTime(end) ? end : '19:00', breakStart: breakStart || '', breakEnd: breakEnd || '' };
     }
-    const previousHours = app.state.settings.workingHours, previousDensity = app.state.settings.displayDensity;
-    app.state.settings.workingHours = hours; app.state.settings.displayDensity = $('#displayDensity').value === 'compact' ? 'compact' : 'comfortable';
-    if (!saveState()) { app.state.settings.workingHours = previousHours; app.state.settings.displayDensity = previousDensity; return; }
-    app.ui.settingsDirty = false; render(); renderWorkingHoursEditor(); renderSettingsHome(); showAppAlert('Affichage et horaires enregistrés.');
+    const previousHours = app.state.settings.workingHours, previousDensity = app.state.settings.displayDensity, previousTheme = app.state.settings.colorTheme;
+    app.state.settings.workingHours = hours;
+    app.state.settings.displayDensity = $('#displayDensity').value === 'compact' ? 'compact' : 'comfortable';
+    app.state.settings.colorTheme = $('#colorTheme').value === 'dark' ? 'dark' : 'light';
+    if (!saveState()) { app.state.settings.workingHours = previousHours; app.state.settings.displayDensity = previousDensity; app.state.settings.colorTheme = previousTheme; return; }
+    app.ui.settingsDirty = false; render(); renderWorkingHoursEditor(); renderSettingsHome(); showAppAlert('Apparence et horaires enregistrés.');
   }
 
   function openService(service = null) {
@@ -3194,7 +3182,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=12.4', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=12.4.1', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -3413,9 +3401,9 @@
     app.ui.settingsDirty = true; const match = event.target.id?.match(/^workEnabled-(\d)$/); if (match) syncWorkingHoursRow(Number(match[1]));
   });
   $('#displayDensity').addEventListener('change', () => { app.ui.settingsDirty = true; });
+  $('#colorTheme').addEventListener('change', () => { app.ui.settingsDirty = true; });
   $('#clientSearch').addEventListener('input', renderClients);
   $('#clientFilter').addEventListener('change', renderClients);
-  $('#reportServiceFilter').addEventListener('change', event => { app.ui.reportServiceFilter = event.target.value || 'all'; renderReport(); });
   $('#appointmentSearchInput').addEventListener('input', () => {
     clearTimeout(app.ui.appointmentSearchTimer);
     app.ui.appointmentSearchTimer = setTimeout(() => { app.ui.appointmentSearchTimer = null; renderAppointmentSearchResults(); }, 120);

@@ -1,4 +1,4 @@
-# Cahier des charges validé — Mon agenda v12.4 bêta
+# Cahier des charges validé — Mon agenda v12.4.1 bêta
 
 ## 1. Planning Jour et Semaine
 
@@ -10,13 +10,13 @@
 
 ## 2. Analyse des prestations
 
-- Le bilan peut être filtré sur une prestation ou afficher toutes les prestations.
 - Pour chaque prestation, il affiche le nombre réalisé et le prix de base encaissé.
 - Pour chaque nature de supplément, un tableau distinct affiche le nombre d’utilisations et le montant encaissé.
 - Le nombre réalisé suit la date du rendez-vous.
 - Le montant encaissé suit la date du paiement.
 - Exemple attendu : un rendez-vous du 30 juin payé le 2 juillet compte une fois en juin avec 0 € encaissé ; en juillet, il compte zéro fois mais son paiement est encaissé.
 - Les tableaux peuvent être triés par nombre ou par montant, et chaque ligne permet d’ouvrir les rendez-vous sources.
+- Le résumé de la période est affiché avant les commandes de détail, sans filtre par prestation.
 
 ## 3. Sauvegarde et recherche
 
@@ -40,12 +40,13 @@
 - Les messages d’information et d’erreur sont intégrés visuellement à l’application.
 - Le Bilan propose des raccourcis formulés comme des questions métier.
 - Une densité confortable ou compacte peut être choisie pour les vues Jour et Semaine.
-- Le mode sombre suit automatiquement le réglage de l’iPhone.
+- Le thème Clair ou Sombre est choisi manuellement dans les réglages et ne suit pas l’iPhone.
+- Le thème Clair est appliqué par défaut tant que le thème Sombre n’a pas été choisi.
 - Les nouveautés peuvent être expliquées une fois par un guide discret et non bloquant.
 
 ## 6. Qualité attendue
 
 - Le schéma de données v14 et les migrations existantes restent compatibles.
-- Les 67 tests historiques sont conservés, puis complétés par des tests v12.4.
+- Les 67 tests historiques sont conservés, puis complétés par des tests v12.4.1.
 - L’application doit rester utilisable hors connexion, sans bibliothèque distante ni transmission des données métier.
 - Les libellés, zones tactiles, contrastes et animations doivent rester adaptés à l’iPhone.

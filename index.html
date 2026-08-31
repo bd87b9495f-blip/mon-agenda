@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf6f7">
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#181316">
+    <meta id="themeColorMeta" name="theme-color" content="#fbf6f7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-    <link rel="manifest" href="manifest.webmanifest?v=12.4">
+    <link rel="manifest" href="manifest.webmanifest?v=12.4.1">
     <link rel="apple-touch-icon" href="icon-180.png">
-    <link rel="stylesheet" href="style.css?v=12.4">
+    <script>try{const state=JSON.parse(localStorage.getItem('nail-planner-state-v14')||'{}');document.documentElement.dataset.theme=state?.settings?.colorTheme==='dark'?'dark':'light'}catch{document.documentElement.dataset.theme='light'}</script>
+    <link rel="stylesheet" href="style.css?v=12.4.1">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -96,32 +96,26 @@
     </main>
 
     <main class="report-screen" id="reportScreen" hidden>
-      <header class="app-header report-header"><p class="eyebrow">Mes chiffres</p><div class="header-row"><h1>Bilan</h1><button class="text-button" id="reportToday">Cette semaine</button></div><p>Choisis une période, puis les chiffres que tu veux comprendre.</p></header>
-      <section class="report-question-card" aria-label="Questions rapides">
-        <div><p class="eyebrow">Réponse directe</p><h2>Que veux-tu savoir ?</h2></div>
-        <div class="report-question-actions">
-          <button type="button" class="active" data-report-question="count"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7"></path></svg><span>Ce que je fais le plus</span></button>
-          <button type="button" data-report-question="paid"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M14.8 8.6c-.7-.5-1.6-.8-2.6-.8-1.5 0-2.7.8-2.7 2s1.1 1.7 2.7 2.1 2.7.9 2.7 2.2-1.2 2.1-2.9 2.1c-1.1 0-2.1-.3-2.9-1M12 6.3v11.4"></path></svg><span>Ce qui rapporte le plus</span></button>
-          <button type="button" data-report-question="pending"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v11H4zM4 10.5h16"></path><path d="M16.5 4.5v6"></path></svg><span>Ce qu’il reste à encaisser</span></button>
-        </div>
+      <header class="app-header report-header"><p class="eyebrow">Mes chiffres</p><div class="header-row"><h1>Bilan</h1><button class="text-button" id="reportToday">Cette semaine</button></div><p>Choisis une période : le résumé apparaît d’abord, puis le détail.</p></header>
+      <section class="report-control-card report-period-card" aria-label="Période du bilan">
+        <section class="report-switch" aria-label="Période du bilan"><button class="report-period-button" data-report-period="day">Jour</button><button class="report-period-button active" data-report-period="week">Semaine</button><button class="report-period-button" data-report-period="month">Mois</button><button class="report-period-button" data-report-period="year">Année</button></section>
+        <div class="period-nav report-nav"><button class="round-button" id="previousReport" aria-label="Période précédente">‹</button><strong id="reportPeriodLabel"></strong><button class="round-button" id="nextReport" aria-label="Période suivante">›</button></div>
       </section>
-      <section class="report-control-card" aria-label="Réglages du bilan">
-        <div class="report-control-section">
-          <div class="report-control-title"><span>1</span><div><strong>Période</strong><small>Jour, semaine, mois ou année</small></div></div>
-          <section class="report-switch" aria-label="Période du bilan"><button class="report-period-button" data-report-period="day">Jour</button><button class="report-period-button active" data-report-period="week">Semaine</button><button class="report-period-button" data-report-period="month">Mois</button><button class="report-period-button" data-report-period="year">Année</button></section>
-          <div class="period-nav report-nav"><button class="round-button" id="previousReport" aria-label="Période précédente">‹</button><strong id="reportPeriodLabel"></strong><button class="round-button" id="nextReport" aria-label="Période suivante">›</button></div>
-        </div>
-        <div class="report-control-section">
-          <div class="report-control-title"><span>2</span><div><strong>Voir</strong><small>Un seul sujet à la fois</small></div></div>
-          <section class="report-tabs" aria-label="Type de bilan"><button class="report-tab active" data-report-tab="activity">Prestations</button><button class="report-tab" data-report-tab="payments">Encaissements</button><button class="report-tab" data-report-tab="expenses">Dépenses</button></section>
-        </div>
-        <details id="reportAnalysisTools" class="report-control-section report-analysis-tools" aria-label="Filtres du bilan">
-          <summary><div class="report-control-title"><span aria-hidden="true">3</span><div><strong id="reportAnalysisTitle">Affiner le classement</strong><small id="reportAnalysisHelp">Filtre et ordre d’affichage</small></div></div><span class="report-analysis-chevron" aria-hidden="true">⌄</span></summary>
-          <div class="report-analysis-grid report-analysis-body">
-            <label class="field compact-field">Afficher<select id="reportServiceFilter"><option value="all">Toutes les prestations</option></select></label>
-            <div class="report-sort-control" id="reportSortControl"><span>Classer par</span><div role="group" aria-label="Classement des prestations et suppléments"><button type="button" class="active" data-report-sort="count" aria-pressed="true">Nombre</button><button type="button" data-report-sort="paid" aria-pressed="false">Montant</button></div></div>
+      <section id="reportSummary" class="report-summary" aria-label="Résumé du bilan"></section>
+      <section class="report-detail-controls" aria-label="Détail du bilan">
+        <div class="report-detail-heading"><p class="eyebrow">Aller au détail</p><h2>Ce que tu veux consulter</h2></div>
+        <section class="report-tabs" aria-label="Type de bilan"><button class="report-tab active" data-report-tab="activity">Prestations</button><button class="report-tab" data-report-tab="payments">Encaissements</button><button class="report-tab" data-report-tab="expenses">Dépenses</button></section>
+        <div class="report-question-card" aria-label="Accès rapides">
+          <span>Accès rapide</span>
+          <div class="report-question-actions">
+            <button type="button" class="active" data-report-question="count"><span>Plus réalisée</span></button>
+            <button type="button" data-report-question="paid"><span>Plus encaissée</span></button>
+            <button type="button" data-report-question="pending"><span>À encaisser</span></button>
           </div>
-        </details>
+        </div>
+        <div id="reportSortTools" class="report-sort-tools" aria-label="Ordre du classement">
+          <div class="report-sort-control"><span>Classer le détail par</span><div role="group" aria-label="Classement des prestations et suppléments"><button type="button" class="active" data-report-sort="count" aria-pressed="true">Nombre</button><button type="button" data-report-sort="paid" aria-pressed="false">Montant</button></div></div>
+        </div>
       </section>
       <section id="reportContent" class="report-content"></section>
       <footer class="report-footer-actions"><button id="exportReportCsv" class="secondary-button">Exporter le bilan</button><small>Crée un fichier CSV utilisable dans un tableur.</small></footer>
@@ -272,7 +266,7 @@
         <button data-settings-page="data"><span aria-hidden="true"><svg class="interface-icon file-save-icon" viewBox="0 0 24 24" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg></span><span><strong>Données et sauvegardes</strong><small id="settingsDataSummary"></small></span><b>›</b></button>
         <button data-settings-page="about"><span aria-hidden="true">i</span><span><strong>À propos</strong><small>Version et confidentialité</small></span><b>›</b></button>
       </section>
-      <section class="settings-page" data-settings-content="agenda" hidden><div class="settings-card density-settings"><h3>Densité du planning</h3><p>Choisis la hauteur des heures dans les vues Jour et Semaine.</p><label class="field">Affichage<select id="displayDensity"><option value="comfortable">Confortable</option><option value="compact">Compact</option></select></label></div><div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires sont signalés mais restent possibles.</p></div><button class="small-action" id="applyWeekdayHours" type="button">9 h–19 h</button></div><div id="workingHoursEditor" class="working-hours-editor"></div><button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer l’affichage et les horaires</button></section>
+      <section class="settings-page" data-settings-content="agenda" hidden><div class="settings-card density-settings"><h3>Apparence du planning</h3><p>Le thème est choisi ici et ne dépend plus du réglage de l’iPhone.</p><label class="field">Thème<select id="colorTheme"><option value="light">Clair</option><option value="dark">Sombre</option></select></label><label class="field">Affichage<select id="displayDensity"><option value="comfortable">Confortable</option><option value="compact">Compact</option></select></label></div><div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires sont signalés mais restent possibles.</p></div><button class="small-action" id="applyWeekdayHours" type="button">9 h–19 h</button></div><div id="workingHoursEditor" class="working-hours-editor"></div><button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer l’apparence et les horaires</button></section>
       <section class="settings-page" data-settings-content="services" hidden><div class="settings-heading"><div><h3>Prestations</h3><p>Les anciens rendez-vous conservent leur tarif.</p></div><button class="small-action" id="addService" type="button">+ Ajouter</button></div><div id="settingsServiceList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="supplements" hidden><div class="settings-heading"><div><h3>Natures de supplément</h3><p>Définis un prix proposé automatiquement. Il restera modifiable dans chaque rendez-vous.</p></div><button class="small-action" id="addSupplementType" type="button">+ Ajouter</button></div><div id="settingsSupplementList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="clients" hidden><div class="settings-heading"><div><h3>Repères clientes</h3><p>Un nom et un emoji choisi depuis le clavier de l’iPhone.</p></div><button class="small-action" id="addBadge" type="button">+ Ajouter</button></div><div id="settingsBadgeList" class="settings-service-list"></div><div class="settings-card"><h3>Annulations tardives</h3><label class="field">Proposer un repère après<input id="lateCancellationThreshold" type="number" min="1" max="20" inputmode="numeric"></label><label class="check-field"><input id="lateCancellationPromptEnabled" type="checkbox"><span><strong>Afficher la proposition</strong><small>Le repère ne sera jamais appliqué automatiquement.</small></span></label><button id="saveClientSettings" class="primary-button full-width" type="button">Enregistrer les réglages clientes</button></div></section>
@@ -289,6 +283,6 @@
 
     <section id="successToast" class="success-toast" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span><strong id="successMessage">Enregistré</strong></section>
     <section id="undoToast" class="undo-toast" role="status" aria-live="polite" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
-    <script src="app.js?v=12.4"></script>
+    <script src="app.js?v=12.4.1"></script>
   </body>
 </html>

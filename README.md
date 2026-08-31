@@ -1,15 +1,21 @@
-# Mon agenda — version 12.4 bêta
+# Mon agenda — version 12.4.1 bêta
 
 Application personnelle et gratuite pour organiser une activité de prothésiste ongulaire. Elle s’installe sur l’écran d’accueil de l’iPhone, fonctionne hors connexion après une première ouverture en ligne et conserve les données professionnelles dans le navigateur de l’appareil.
 
-## Nouveautés et améliorations de la version 12.4
+## Nouveautés et améliorations de la version 12.4.1
+
+- le thème **Clair** ou **Sombre** se choisit dans **Réglages → Agenda et horaires** et ne dépend plus du réglage de l’iPhone ; le thème Clair est utilisé par défaut ;
+- le Bilan affiche désormais le résumé financier juste après la période, puis regroupe les accès au détail dans un bloc plus lisible ;
+- le filtre par prestation est retiré du Bilan, tandis que les classements, les tris, les suppléments séparés et l’accès aux rendez-vous sources sont conservés.
+
+## Nouveautés introduites en version 12.4
 
 - en vue Mois, un appui sur une date ouvre une grande bulle avec le programme de la journée, les éléments de journée entière en premier et les rendez-vous horaires dans l’ordre ;
 - depuis cette bulle, il est possible d’ajouter directement un rendez-vous ou un événement personnel avec la date déjà remplie, puis de revenir au programme actualisé ;
 - le formulaire de rendez-vous affiche d’abord l’essentiel et range les notes, le paiement, la récurrence et l’historique dans **Plus d’options** ;
 - le Bilan propose trois questions rapides : ce qui est le plus réalisé, ce qui rapporte le plus et ce qui reste à encaisser ;
 - nouvelle navigation avec icônes cohérentes, messages intégrés à l’application et animations discrètes ;
-- choix d’un planning confortable ou compact dans les réglages et adaptation automatique au mode sombre de l’iPhone ;
+- choix d’un planning confortable ou compact dans les réglages ;
 - guide non bloquant lors de la première ouverture de cette version.
 
 ## Nouveautés introduites en version 12.3
@@ -23,7 +29,6 @@ Application personnelle et gratuite pour organiser une activité de prothésiste
 
 ### Bilans par prestation et supplément
 
-- filtre du bilan par type de prestation ;
 - classement des prestations avec le nombre réalisé et le prix de base encaissé ;
 - classement distinct des suppléments avec le nombre d’utilisations et le montant encaissé ;
 - tri par nombre réalisé ou par montant encaissé ;
@@ -99,7 +104,7 @@ La rubrique **Dépenses** du bilan propose des vues Jour, Semaine, Mois et Anné
 
 ## Compatibilité et migration
 
-La version 12.4 conserve le schéma de données sécurisé de la version 12.2 et adapte automatiquement les données des versions plus anciennes :
+La version 12.4.1 conserve le schéma de données sécurisé de la version 12.2 et adapte automatiquement les données des versions plus anciennes :
 
 - rendez-vous, clientes, paiements, prestations, suppléments, repères et réglages sont conservés ;
 - les anciens créneaux bloqués deviennent des événements personnels avec le blocage des rendez-vous activé ;
@@ -113,9 +118,9 @@ Une migration ne remplace pas une sauvegarde personnelle. Avant la mise à jour,
 
 Lis le fichier `GUIDE-MISE-A-JOUR.md` fourni avec cette version. Après l’envoi des fichiers sur GitHub, attends une à deux minutes puis ouvre :
 
-`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.4`
+`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.4.1`
 
-Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.4 bêta` est affiché.
+Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.4.1 bêta` est affiché.
 
 ## Données et confidentialité
 

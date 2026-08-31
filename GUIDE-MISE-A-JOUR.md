@@ -1,6 +1,6 @@
-# Mettre Mon agenda à jour vers la version 12.4 bêta
+# Mettre Mon agenda à jour vers la version 12.4.1 bêta
 
-La version 12.4 reprend les données existantes sans les réinitialiser. Pour rester protégée en cas d’interruption ou de problème propre à l’iPhone, effectue néanmoins la sauvegarde ci-dessous avant de remplacer les fichiers.
+La version 12.4.1 reprend les données existantes sans les réinitialiser. Pour rester protégée en cas d’interruption ou de problème propre à l’iPhone, effectue néanmoins la sauvegarde ci-dessous avant de remplacer les fichiers.
 
 ## 1. Créer une sauvegarde avant la mise à jour
 
@@ -13,9 +13,9 @@ Ne place jamais ce fichier JSON sur GitHub : il contient tes données profession
 
 ## 2. Remplacer les fichiers sur le PC
 
-1. Décompresse l’archive de la version 12.4.
+1. Décompresse l’archive de la version 12.4.1.
 2. Dans GitHub Desktop, sélectionne le dépôt `mon-agenda`, puis clique sur **Show in Explorer**.
-3. Copie tous les fichiers de la version 12.4 dans ce dossier et accepte leur remplacement.
+3. Copie tous les fichiers de la version 12.4.1 dans ce dossier et accepte leur remplacement.
 4. Supprime ces anciens fichiers s’ils sont encore présents :
    - `assistant.js`
    - `client-ui.js`
@@ -30,16 +30,16 @@ Ne place jamais ce fichier JSON sur GitHub : il contient tes données profession
 1. Reviens dans GitHub Desktop.
 2. Vérifie que les changements concernent uniquement les fichiers de l’application.
 3. Vérifie qu’aucun fichier de sauvegarde `.json` ni export `.csv` personnel n’apparaît.
-4. Dans **Summary**, écris `Version 12.4 beta`.
+4. Dans **Summary**, écris `Version 12.4.1 beta`.
 5. Clique sur **Commit to main**, puis sur **Push origin**.
 
 ## 4. Appliquer la mise à jour sur l’iPhone
 
 1. Attends une à deux minutes après le Push.
-2. Dans Safari, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=12.4`.
+2. Dans Safari, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=12.4.1`.
 3. Accepte le bandeau **Nouvelle version disponible** lorsqu’il apparaît.
 4. Ferme puis relance Mon agenda depuis l’écran d’accueil.
-5. Ouvre **Réglages → À propos** et vérifie `Mon agenda · version 12.4 bêta`.
+5. Ouvre **Réglages → À propos** et vérifie `Mon agenda · version 12.4.1 bêta`.
 
 Ne désinstalle pas l’application et n’efface pas les données Safari pour actualiser le cache. Si l’ancienne version reste affichée, rouvre d’abord le lien ci-dessus dans Safari, laisse la page ouverte quelques secondes et relance l’application.
 
@@ -61,10 +61,10 @@ La migration ajoute aussi les catégories de dépenses proposées par défaut. E
 4. Crée temporairement un rendez-vous ou un événement personnel horaire hors horaires : la frise doit s’agrandir pour le montrer.
 5. Crée un événement personnel sur une journée entière : il doit apparaître sans agrandir la frise jusqu’à 00:00.
 6. Dans la vue **Mois**, touche une date, vérifie le contenu de la bulle, puis ajoute un rendez-vous et un événement depuis ses boutons.
-7. Dans **Bilan**, teste les trois questions rapides, le filtre par prestation, les deux tris et le détail d’une ligne.
+7. Dans **Bilan**, vérifie que le résumé apparaît avant le détail, puis teste les trois accès rapides, les deux tris et le détail d’une ligne.
 8. Vérifie avec un rendez-vous d’un mois payé le mois suivant que le nombre reste au mois du rendez-vous et l’encaissement au mois du paiement.
 9. Vérifie que les suppléments apparaissent dans leur classement séparé.
-10. Dans **Réglages → Agenda et horaires**, teste les affichages confortable et compact.
+10. Dans **Réglages → Agenda et horaires**, teste les affichages confortable et compact, puis vérifie que les thèmes Clair et Sombre sont indépendants de l’iPhone.
 11. Utilise la loupe pour retrouver un ancien rendez-vous.
 12. Dans **Réglages → Données et sauvegardes**, sélectionne une sauvegarde avec **Vérifier une sauvegarde** et confirme que rien n’a été restauré.
 13. Lance une nouvelle sauvegarde avec la nouvelle icône et choisis son emplacement dans l’application Fichiers.
