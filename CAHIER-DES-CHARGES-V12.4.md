@@ -1,4 +1,4 @@
-# Cahier des charges validé — Mon agenda v12.3 bêta
+# Cahier des charges validé — Mon agenda v12.4 bêta
 
 ## 1. Planning Jour et Semaine
 
@@ -24,9 +24,28 @@
 - Une sauvegarde JSON peut être vérifiée sans restaurer ni modifier les données actives.
 - Une recherche globale permet de retrouver un rendez-vous par cliente, téléphone, prestation, note, date ou statut.
 
-## 4. Qualité attendue
+## 4. Vue Mois
+
+- Un appui sur un jour ouvre une grande bulle d’information sans remplacer la vue Mois.
+- La bulle affiche la date complète, les événements de journée entière en premier, puis les rendez-vous et événements horaires par ordre chronologique.
+- Chaque élément peut être ouvert pour modification.
+- Deux actions permettent d’ajouter un rendez-vous ou un événement personnel avec la date préremplie.
+- Après une création, une modification ou une annulation de saisie, la bulle revient avec son contenu actualisé.
+- La bulle possède un état vide, un défilement interne, une fermeture explicite et une fermeture par appui hors de la carte.
+
+## 5. Interface et ergonomie
+
+- L’iconographie, les espacements, les couleurs d’état et les actions principales sont harmonisés.
+- Le formulaire de rendez-vous présente l’essentiel en premier et regroupe les champs avancés dans une zone dépliable.
+- Les messages d’information et d’erreur sont intégrés visuellement à l’application.
+- Le Bilan propose des raccourcis formulés comme des questions métier.
+- Une densité confortable ou compacte peut être choisie pour les vues Jour et Semaine.
+- Le mode sombre suit automatiquement le réglage de l’iPhone.
+- Les nouveautés peuvent être expliquées une fois par un guide discret et non bloquant.
+
+## 6. Qualité attendue
 
 - Le schéma de données v14 et les migrations existantes restent compatibles.
-- Les 67 tests historiques sont conservés, puis complétés par des tests v12.3.
+- Les 67 tests historiques sont conservés, puis complétés par des tests v12.4.
 - L’application doit rester utilisable hors connexion, sans bibliothèque distante ni transmission des données métier.
 - Les libellés, zones tactiles, contrastes et animations doivent rester adaptés à l’iPhone.

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'mon-agenda-v12-3-1-beta-1';
+const CACHE_NAME = 'mon-agenda-v12-4-beta-1';
 const APP_SHELL = [
   './',
   './index.html',
-  './style.css?v=12.3.1',
-  './app.js?v=12.3.1',
-  './manifest.webmanifest?v=12.3.1',
+  './style.css?v=12.4',
+  './app.js?v=12.4',
+  './manifest.webmanifest?v=12.4',
   './icon.svg',
   './icon-180.png',
   './icon-192.png',

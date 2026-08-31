@@ -3,14 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#fbf6f7">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf6f7">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#181316">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-    <link rel="manifest" href="manifest.webmanifest?v=12.3.1">
+    <link rel="manifest" href="manifest.webmanifest?v=12.4">
     <link rel="apple-touch-icon" href="icon-180.png">
-    <link rel="stylesheet" href="style.css?v=12.3.1">
+    <link rel="stylesheet" href="style.css?v=12.4">
     <title>Mon agenda</title>
   </head>
   <body>
@@ -31,6 +32,13 @@
       </header>
 
       <button id="updateNotice" class="update-notice" hidden>Nouvelle version disponible <strong>Mettre à jour</strong></button>
+      <section id="featureCoach" class="feature-coach" hidden>
+        <span class="feature-coach-icon" aria-hidden="true">
+          <svg class="interface-icon" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="3"></rect><path d="M7 3.5v4m10-4v4M3.5 10h17M8 14h3v3H8z"></path></svg>
+        </span>
+        <span><strong>Nouveau dans la vue Mois</strong><small>Touche un jour pour voir son programme et ajouter directement un élément.</small></span>
+        <button id="dismissFeatureCoach" type="button" aria-label="Masquer cette nouveauté">×</button>
+      </section>
       <section id="draftNotice" class="draft-notice" hidden>
         <button id="resumeDraft"><span><strong id="draftNoticeTitle">Saisie en cours</strong><small id="draftNoticeText"></small></span><b>Continuer ›</b></button>
         <button id="discardDraft" aria-label="Supprimer le brouillon">×</button>
@@ -58,8 +66,8 @@
         <div class="selected-day-heading"><div><p class="eyebrow">Planning</p><h2 id="selectedDayTitle"></h2></div><button class="text-button" id="todayButton">Aujourd’hui</button></div>
         <section id="daySummary" class="day-summary"></section>
         <section class="day-tools" aria-label="Outils de la journée">
-          <button id="dayReview" class="day-tool"><span>✓</span><strong>Fin de journée</strong><small>Vérifier les paiements</small></button>
-          <button id="routeDay" class="day-tool"><span>⌖</span><strong>Ma tournée</strong><small>Ouvrir les itinéraires</small></button>
+          <button id="dayReview" class="day-tool"><span><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8"></path><circle cx="12" cy="12" r="9"></circle></svg></span><strong>Fin de journée</strong><small>Vérifier les paiements</small></button>
+          <button id="routeDay" class="day-tool"><span><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 19.5c-1.8 0-3-1.4-3-3s1.2-3 3-3h10c1.8 0 3-1.4 3-3s-1.2-3-3-3H8"></path><path d="m8 4-3 3.5L8 11"></path></svg></span><strong>Ma tournée</strong><small>Ouvrir les itinéraires</small></button>
         </section>
         <section id="dayClosureCard" class="day-closure-card" hidden><div><p class="eyebrow">Journée à clôturer</p><strong id="dayClosureText"></strong><small>Vérifie les paiements de cette journée.</small></div></section>
         <section id="dayAllDayBlocks" class="day-all-day-blocks" hidden></section>
@@ -75,21 +83,28 @@
 
       <section id="monthView" class="agenda-view" hidden>
         <div class="period-nav"><button class="round-button" id="previousMonth" aria-label="Mois précédent">‹</button><strong id="monthLabel"></strong><button class="round-button" id="nextMonth" aria-label="Mois suivant">›</button></div>
-        <p class="view-help">Les week-ends, jours fériés et événements personnels sont signalés. Choisis un jour pour afficher sa semaine.</p>
+        <p class="view-help">Touche un jour pour ouvrir son programme, modifier un élément ou en ajouter un.</p>
         <section id="monthGrid" class="month-grid" aria-label="Calendrier mensuel"></section>
-        <section id="weekOverview" hidden aria-label="Vue détaillée de la semaine"></section>
       </section>
     </main>
 
     <main class="client-screen" id="clientsScreen" hidden>
       <header class="app-header"><p class="eyebrow">Ma base</p><div class="header-row"><h1>Mes clientes</h1><button class="text-button" id="backToAgenda">Agenda</button></div></header>
-      <label class="search-field"><span>⌕</span><input id="clientSearch" type="search" placeholder="Rechercher une cliente"></label>
+      <label class="search-field"><span><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="5.8"></circle><path d="m15.2 15.2 4.1 4.1"></path></svg></span><input id="clientSearch" type="search" placeholder="Rechercher une cliente"></label>
       <label class="filter-field">Filtrer<select id="clientFilter"><option value="all">Toutes les clientes</option><option value="badge">Avec un repère</option><option value="late">Annulations tardives</option><option value="pending">Paiement en attente</option><option value="inactive90">Aucun RDV depuis 90 jours</option><option value="inactive180">Aucun RDV depuis 180 jours</option></select></label>
       <section id="clientList" class="client-list"></section>
     </main>
 
     <main class="report-screen" id="reportScreen" hidden>
       <header class="app-header report-header"><p class="eyebrow">Mes chiffres</p><div class="header-row"><h1>Bilan</h1><button class="text-button" id="reportToday">Cette semaine</button></div><p>Choisis une période, puis les chiffres que tu veux comprendre.</p></header>
+      <section class="report-question-card" aria-label="Questions rapides">
+        <div><p class="eyebrow">Réponse directe</p><h2>Que veux-tu savoir ?</h2></div>
+        <div class="report-question-actions">
+          <button type="button" class="active" data-report-question="count"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7"></path></svg><span>Ce que je fais le plus</span></button>
+          <button type="button" data-report-question="paid"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M14.8 8.6c-.7-.5-1.6-.8-2.6-.8-1.5 0-2.7.8-2.7 2s1.1 1.7 2.7 2.1 2.7.9 2.7 2.2-1.2 2.1-2.9 2.1c-1.1 0-2.1-.3-2.9-1M12 6.3v11.4"></path></svg><span>Ce qui rapporte le plus</span></button>
+          <button type="button" data-report-question="pending"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v11H4zM4 10.5h16"></path><path d="M16.5 4.5v6"></path></svg><span>Ce qu’il reste à encaisser</span></button>
+        </div>
+      </section>
       <section class="report-control-card" aria-label="Réglages du bilan">
         <div class="report-control-section">
           <div class="report-control-title"><span>1</span><div><strong>Période</strong><small>Jour, semaine, mois ou année</small></div></div>
@@ -100,19 +115,33 @@
           <div class="report-control-title"><span>2</span><div><strong>Voir</strong><small>Un seul sujet à la fois</small></div></div>
           <section class="report-tabs" aria-label="Type de bilan"><button class="report-tab active" data-report-tab="activity">Prestations</button><button class="report-tab" data-report-tab="payments">Encaissements</button><button class="report-tab" data-report-tab="expenses">Dépenses</button></section>
         </div>
-        <section id="reportAnalysisTools" class="report-control-section report-analysis-tools" aria-label="Filtres du bilan">
-          <div class="report-control-title"><span>3</span><div><strong id="reportAnalysisTitle">Affiner le classement</strong><small id="reportAnalysisHelp">Filtre et ordre d’affichage</small></div></div>
-          <div class="report-analysis-grid">
+        <details id="reportAnalysisTools" class="report-control-section report-analysis-tools" aria-label="Filtres du bilan">
+          <summary><div class="report-control-title"><span aria-hidden="true">3</span><div><strong id="reportAnalysisTitle">Affiner le classement</strong><small id="reportAnalysisHelp">Filtre et ordre d’affichage</small></div></div><span class="report-analysis-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="report-analysis-grid report-analysis-body">
             <label class="field compact-field">Afficher<select id="reportServiceFilter"><option value="all">Toutes les prestations</option></select></label>
             <div class="report-sort-control" id="reportSortControl"><span>Classer par</span><div role="group" aria-label="Classement des prestations et suppléments"><button type="button" class="active" data-report-sort="count" aria-pressed="true">Nombre</button><button type="button" data-report-sort="paid" aria-pressed="false">Montant</button></div></div>
           </div>
-        </section>
+        </details>
       </section>
       <section id="reportContent" class="report-content"></section>
       <footer class="report-footer-actions"><button id="exportReportCsv" class="secondary-button">Exporter le bilan</button><small>Crée un fichier CSV utilisable dans un tableur.</small></footer>
     </main>
 
-    <nav class="bottom-bar" aria-label="Navigation"><button class="nav-item active" data-screen="agenda"><span aria-hidden="true">▦</span>Agenda</button><button class="nav-item" data-screen="clients"><span aria-hidden="true">♙</span>Clientes</button><button class="add-button" id="addAppointment" aria-label="Ajouter">+</button><button class="nav-item" data-screen="report"><span aria-hidden="true">◫</span>Bilan</button><button class="nav-item" data-screen="settings"><span aria-hidden="true">⚙</span>Réglages</button></nav>
+    <nav class="bottom-bar" aria-label="Navigation">
+      <button class="nav-item active" data-screen="agenda"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="3"></rect><path d="M7 3.5v4m10-4v4M3.5 10h17M8 14h3v3H8z"></path></svg></span>Agenda</button>
+      <button class="nav-item" data-screen="clients"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"></circle><path d="M5.5 20c.4-4 2.6-6 6.5-6s6.1 2 6.5 6"></path></svg></span>Clientes</button>
+      <button class="add-button" id="addAppointment" aria-label="Ajouter"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+      <button class="nav-item" data-screen="report"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7"></path></svg></span>Bilan</button>
+      <button class="nav-item" data-screen="settings"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 3.5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.5-6-1.4 1.4M7.4 16.6 6 18m12 0-1.4-1.4M7.4 7.4 6 6"></path></svg></span>Réglages</button>
+    </nav>
+
+    <dialog id="monthDayDialog" class="month-day-dialog" aria-labelledby="monthDayTitle">
+      <div class="month-day-card">
+        <div class="modal-heading"><div><p class="eyebrow">Programme du jour</p><h2 id="monthDayTitle"></h2><p id="monthDaySummary" class="month-day-summary"></p></div><button type="button" class="close-button" id="closeMonthDay" aria-label="Fermer">×</button></div>
+        <section id="monthDayContent" class="month-day-content"></section>
+        <div class="month-day-actions"><button type="button" class="secondary-button" id="monthDayAddBlock"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Ajouter un événement</button><button type="button" class="primary-button" id="monthDayAddAppointment"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Ajouter un RDV</button></div>
+      </div>
+    </dialog>
 
     <dialog id="appointmentDialog" class="modal">
       <form id="appointmentForm" novalidate>
@@ -147,17 +176,22 @@
           <label class="field">Statut<select id="status"><option value="confirmed">Confirmé</option><option value="to_confirm">À confirmer</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option><option value="no_show">Absente</option></select></label>
         </section>
 
-        <section class="form-section optional-section">
-          <div class="form-section-heading simple"><div><h3>Informations utiles</h3><p>Facultatif.</p></div></div>
-          <label class="field">Notes du rendez-vous<textarea id="notes" maxlength="5000" rows="2" placeholder="Couleur, détails de ce rendez-vous…"></textarea></label>
-        </section>
-        <section id="appointmentEditFields" class="edit-only-fields" hidden>
-          <section class="form-subsection payment-section"><p class="form-subsection-title">Paiement</p><label class="field">État du paiement<select id="paymentStatus"><option value="unreviewed">À vérifier</option><option value="paid">Payé</option><option value="pending">À régler</option></select></label><div class="two-columns"><label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label><label class="field" id="paymentMethodField">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label></div><label class="field" id="paymentReminderField" hidden>Date de relance<input id="paymentReminderDate" type="date"></label></section>
-          <section class="form-subsection" id="recurrenceSection"><p class="form-subsection-title">Planifier le prochain rendez-vous</p><div id="linkedNextAppointment" class="linked-next" hidden></div><div id="repeatComposer"><label class="field">Délai habituel<select id="repeatWeeks"><option value="0">Ne pas créer maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label><div class="two-columns" id="repeatScheduleFields" hidden><label class="field">Date du prochain RDV<input id="repeatDate" type="date"></label><label class="field">Heure du prochain RDV<div class="time-picker"><select id="repeatTimeHour" aria-label="Heure du prochain rendez-vous"></select><span>:</span><select id="repeatTimeMinute" aria-label="Minutes du prochain rendez-vous"></select></div><input id="repeatTime" type="time" step="300" hidden></label></div><small class="field-help" id="repeatHelp">La date et l’heure restent modifiables.</small></div></section>
-          <label class="field" id="cancellationReasonField" hidden><span id="cancellationReasonLabel">Motif</span><input id="cancellationReason" maxlength="200" placeholder="Ex. Empêchement…"></label>
-          <label class="check-field" id="lateCancellationField" hidden><input id="lateCancellation" type="checkbox"><span><strong>Annulation tardive</strong><small>Comptabiliser cette annulation dans la fiche cliente.</small></span></label>
-          <section class="form-subsection"><p class="form-subsection-title">Historique des modifications</p><div id="appointmentHistory" class="appointment-history"></div></section>
-        </section>
+        <details id="appointmentAdvanced" class="advanced-options">
+          <summary><span><strong>Plus d’options</strong><small>Notes, paiement, prochain rendez-vous et historique</small></span><span class="advanced-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="advanced-options-content">
+            <section class="form-section optional-section">
+              <div class="form-section-heading simple"><div><h3>Informations utiles</h3><p>Facultatif.</p></div></div>
+              <label class="field">Notes du rendez-vous<textarea id="notes" maxlength="5000" rows="2" placeholder="Couleur, détails de ce rendez-vous…"></textarea></label>
+            </section>
+            <section id="appointmentEditFields" class="edit-only-fields" hidden>
+              <section class="form-subsection payment-section"><p class="form-subsection-title">Paiement</p><label class="field">État du paiement<select id="paymentStatus"><option value="unreviewed">À vérifier</option><option value="paid">Payé</option><option value="pending">À régler</option></select></label><div class="two-columns"><label class="field" id="paymentDateField">Date de paiement<input id="paymentDate" type="date"></label><label class="field" id="paymentMethodField">Moyen de paiement<select id="paymentMethod"><option value="">Non précisé</option><option value="cash">Espèces</option><option value="card">Carte</option><option value="transfer">Virement</option><option value="other">Autre</option></select></label></div><label class="field" id="paymentReminderField" hidden>Date de relance<input id="paymentReminderDate" type="date"></label></section>
+              <section class="form-subsection" id="recurrenceSection"><p class="form-subsection-title">Planifier le prochain rendez-vous</p><div id="linkedNextAppointment" class="linked-next" hidden></div><div id="repeatComposer"><label class="field">Délai habituel<select id="repeatWeeks"><option value="0">Ne pas créer maintenant</option><option value="2">Dans 2 semaines</option><option value="3">Dans 3 semaines</option><option value="4">Dans 4 semaines</option><option value="5">Dans 5 semaines</option></select></label><div class="two-columns" id="repeatScheduleFields" hidden><label class="field">Date du prochain RDV<input id="repeatDate" type="date"></label><label class="field">Heure du prochain RDV<div class="time-picker"><select id="repeatTimeHour" aria-label="Heure du prochain rendez-vous"></select><span>:</span><select id="repeatTimeMinute" aria-label="Minutes du prochain rendez-vous"></select></div><input id="repeatTime" type="time" step="300" hidden></label></div><small class="field-help" id="repeatHelp">La date et l’heure restent modifiables.</small></div></section>
+              <label class="field" id="cancellationReasonField" hidden><span id="cancellationReasonLabel">Motif</span><input id="cancellationReason" maxlength="200" placeholder="Ex. Empêchement…"></label>
+              <label class="check-field" id="lateCancellationField" hidden><input id="lateCancellation" type="checkbox"><span><strong>Annulation tardive</strong><small>Comptabiliser cette annulation dans la fiche cliente.</small></span></label>
+              <section class="form-subsection"><p class="form-subsection-title">Historique des modifications</p><div id="appointmentHistory" class="appointment-history"></div></section>
+            </section>
+          </div>
+        </details>
         <div id="conflictHint" class="conflict-hint" hidden></div>
         <div class="form-actions sticky-form-actions"><button type="button" class="danger-button" id="deleteAppointment" hidden>Supprimer</button><button id="appointmentSubmitButton" class="primary-button" type="submit">Créer le rendez-vous</button></div>
       </form>
@@ -238,7 +272,7 @@
         <button data-settings-page="data"><span aria-hidden="true"><svg class="interface-icon file-save-icon" viewBox="0 0 24 24" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg></span><span><strong>Données et sauvegardes</strong><small id="settingsDataSummary"></small></span><b>›</b></button>
         <button data-settings-page="about"><span aria-hidden="true">i</span><span><strong>À propos</strong><small>Version et confidentialité</small></span><b>›</b></button>
       </section>
-      <section class="settings-page" data-settings-content="agenda" hidden><div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires sont signalés mais restent possibles.</p></div><button class="small-action" id="applyWeekdayHours" type="button">9 h–19 h</button></div><div id="workingHoursEditor" class="working-hours-editor"></div><button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer les horaires</button></section>
+      <section class="settings-page" data-settings-content="agenda" hidden><div class="settings-card density-settings"><h3>Densité du planning</h3><p>Choisis la hauteur des heures dans les vues Jour et Semaine.</p><label class="field">Affichage<select id="displayDensity"><option value="comfortable">Confortable</option><option value="compact">Compact</option></select></label></div><div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires sont signalés mais restent possibles.</p></div><button class="small-action" id="applyWeekdayHours" type="button">9 h–19 h</button></div><div id="workingHoursEditor" class="working-hours-editor"></div><button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer l’affichage et les horaires</button></section>
       <section class="settings-page" data-settings-content="services" hidden><div class="settings-heading"><div><h3>Prestations</h3><p>Les anciens rendez-vous conservent leur tarif.</p></div><button class="small-action" id="addService" type="button">+ Ajouter</button></div><div id="settingsServiceList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="supplements" hidden><div class="settings-heading"><div><h3>Natures de supplément</h3><p>Définis un prix proposé automatiquement. Il restera modifiable dans chaque rendez-vous.</p></div><button class="small-action" id="addSupplementType" type="button">+ Ajouter</button></div><div id="settingsSupplementList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="clients" hidden><div class="settings-heading"><div><h3>Repères clientes</h3><p>Un nom et un emoji choisi depuis le clavier de l’iPhone.</p></div><button class="small-action" id="addBadge" type="button">+ Ajouter</button></div><div id="settingsBadgeList" class="settings-service-list"></div><div class="settings-card"><h3>Annulations tardives</h3><label class="field">Proposer un repère après<input id="lateCancellationThreshold" type="number" min="1" max="20" inputmode="numeric"></label><label class="check-field"><input id="lateCancellationPromptEnabled" type="checkbox"><span><strong>Afficher la proposition</strong><small>Le repère ne sera jamais appliqué automatiquement.</small></span></label><button id="saveClientSettings" class="primary-button full-width" type="button">Enregistrer les réglages clientes</button></div></section>
@@ -251,9 +285,10 @@
     <dialog id="badgeDialog" class="modal"><form id="badgeForm"><div class="modal-heading"><div><p class="eyebrow">Repère cliente</p><h2 id="badgeDialogTitle">Nouveau repère</h2></div><button type="button" class="close-button" data-close="badgeDialog" aria-label="Fermer">×</button></div><input id="badgeId" type="hidden"><section class="form-section"><div class="form-section-heading simple"><div><h3>Nom et emoji</h3><p>L’emoji sera visible discrètement près du nom de la cliente.</p></div></div><label class="field">Nom<input id="badgeName" maxlength="60" required placeholder="Ex. Cliente appréciée"></label><label class="field emoji-field">Emoji<input id="badgeSymbol" maxlength="16" required autocomplete="off" placeholder="Touchez pour choisir un emoji" aria-describedby="badgeEmojiHelp"><small id="badgeEmojiHelp" class="field-help">Ouvre le clavier emoji de l’iPhone et choisis-en un seul.</small></label><div class="emoji-preview"><span id="badgeEmojiPreview" aria-hidden="true">🙂</span><div><strong>Aperçu</strong><small id="badgePreviewName">Nouveau repère</small></div></div></section><div class="form-actions sticky-form-actions"><button id="deleteBadge" class="danger-button" type="button" hidden>Supprimer</button><button id="badgeSubmitButton" class="primary-button" type="submit">Ajouter le repère</button></div></form></dialog>
     <dialog id="lateBadgeDialog" class="modal conflict-modal"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2>Annulations tardives</h2><p id="lateBadgeText"></p><label class="field">Repère proposé<select id="lateBadgeChoice"></select></label><div class="stacked-actions"><button id="applyLateBadge" class="primary-button" type="button">Appliquer ce repère</button><button id="dismissLateBadge" class="secondary-button" type="button">Pas maintenant</button><button id="disableLateBadge" class="text-button" type="button">Ne plus proposer pour cette cliente</button></div></div></dialog>
     <dialog id="unsavedChangesDialog" class="modal conflict-modal"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2>Modifications non enregistrées</h2><p id="unsavedChangesText">Veux-tu enregistrer avant de fermer ?</p><div class="stacked-actions"><button id="unsavedSave" class="primary-button" type="button">Enregistrer et fermer</button><button id="unsavedDiscard" class="secondary-button" type="button">Quitter sans enregistrer</button><button id="unsavedContinue" class="text-button" type="button">Continuer la modification</button></div></div></dialog>
+    <dialog id="appAlertDialog" class="app-alert-dialog" aria-labelledby="appAlertTitle" aria-describedby="appAlertMessage"><div><span id="appAlertIcon" class="app-alert-icon" aria-hidden="true">i</span><h2 id="appAlertTitle">Information</h2><p id="appAlertMessage"></p><button id="appAlertClose" class="primary-button" type="button">Fermer</button></div></dialog>
 
     <section id="successToast" class="success-toast" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span><strong id="successMessage">Enregistré</strong></section>
     <section id="undoToast" class="undo-toast" role="status" aria-live="polite" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
-    <script src="app.js?v=12.3.1"></script>
+    <script src="app.js?v=12.4"></script>
   </body>
 </html>
