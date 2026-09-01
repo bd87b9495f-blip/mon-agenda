@@ -1,146 +1,72 @@
-# Mon agenda — version 12.4.1 bêta
+# Mon agenda — version 12.5 bêta
 
-Application personnelle et gratuite pour organiser une activité de prothésiste ongulaire. Elle s’installe sur l’écran d’accueil de l’iPhone, fonctionne hors connexion après une première ouverture en ligne et conserve les données professionnelles dans le navigateur de l’appareil.
+Application personnelle hors ligne pour organiser une activité de prothésiste ongulaire sur iPhone. Les données professionnelles restent dans le navigateur de l’appareil et ne sont pas envoyées à GitHub.
 
-## Nouveautés et améliorations de la version 12.4.1
+## Priorité de cette version
 
-- le thème **Clair** ou **Sombre** se choisit dans **Réglages → Agenda et horaires** et ne dépend plus du réglage de l’iPhone ; le thème Clair est utilisé par défaut ;
-- le Bilan affiche désormais le résumé financier juste après la période, puis regroupe les accès au détail dans un bloc plus lisible ;
-- le filtre par prestation est retiré du Bilan, tandis que les classements, les tris, les suppléments séparés et l’accès aux rendez-vous sources sont conservés.
+La V12.5 sécurise l’enregistrement des données sans modifier les fonctions métier validées de la V12.4.1.
 
-## Nouveautés introduites en version 12.4
+- les clientes, rendez-vous, événements, dépenses et réglages sont désormais enregistrés dans une base IndexedDB structurée ;
+- une modification est validée dans une transaction complète : en cas d’échec, la dernière version cohérente reste active ;
+- l’application contrôle le nombre d’éléments et l’empreinte de la base avant de l’utiliser ;
+- cinq copies automatiques tournantes sont conservées localement avant les dernières modifications ;
+- une base principale anormale est récupérée depuis la copie automatique la plus récente, puis depuis l’ancienne copie compatible si nécessaire ;
+- l’application attend la fin de la vérification des données avant d’afficher l’agenda ;
+- un écran de récupération permet de réessayer, de restaurer un fichier JSON ou de créer un diagnostic technique ;
+- le diagnostic ne contient ni noms, ni coordonnées, ni adresses, ni notes ;
+- si IndexedDB devient temporairement indisponible, le mode compatible reste utilisable et ses changements sont réintégrés au retour de la base sécurisée ;
+- l’ancien stockage V12.4.1 n’est pas supprimé pendant la migration.
 
-- en vue Mois, un appui sur une date ouvre une grande bulle avec le programme de la journée, les éléments de journée entière en premier et les rendez-vous horaires dans l’ordre ;
-- depuis cette bulle, il est possible d’ajouter directement un rendez-vous ou un événement personnel avec la date déjà remplie, puis de revenir au programme actualisé ;
-- le formulaire de rendez-vous affiche d’abord l’essentiel et range les notes, le paiement, la récurrence et l’historique dans **Plus d’options** ;
-- le Bilan propose trois questions rapides : ce qui est le plus réalisé, ce qui rapporte le plus et ce qui reste à encaisser ;
-- nouvelle navigation avec icônes cohérentes, messages intégrés à l’application et animations discrètes ;
-- choix d’un planning confortable ou compact dans les réglages ;
-- guide non bloquant lors de la première ouverture de cette version.
+La sauvegarde manuelle dans l’application Fichiers reste indispensable en cas de perte, réinitialisation ou remplacement de l’iPhone.
 
-## Nouveautés introduites en version 12.3
+## Fonctions métier conservées
 
-### Planning Jour et Semaine centré sur le travail
+- vues Jour et Semaine centrées sur les horaires de travail ;
+- agrandissement exceptionnel pour les rendez-vous actifs et événements personnels horaires hors horaires ;
+- événements d’une ou plusieurs journées entières affichés séparément sans étendre la frise de 00:00 à 24:00 ;
+- vue Mois avec bulle détaillant le programme du jour et ajout direct d’un rendez-vous ou d’un événement ;
+- bilans Jour, Semaine, Mois et Année ;
+- nombre de prestations rattaché à la date du rendez-vous et encaissement rattaché à la date réelle du paiement ;
+- classements distincts des prestations et des suppléments, avec nombre, montant et accès aux rendez-vous sources ;
+- suivi séparé des dépenses ;
+- recherche globale des rendez-vous ;
+- thème Clair par défaut ou Sombre choisi manuellement dans les réglages ;
+- densité de planning confortable ou compacte ;
+- sauvegarde JSON, vérification sans restauration et retour aux données précédentes après une restauration.
 
-- la frise commence et se termine automatiquement autour des horaires de travail configurés ;
-- un rendez-vous client actif ou un événement personnel horaire situé hors horaires agrandit exceptionnellement la frise ;
-- un événement personnel sur une journée entière ou plusieurs journées n’agrandit jamais la frise jusqu’à minuit ;
-- les rendez-vous annulés et les absences restent visibles sans imposer à eux seuls une plage horaire plus large.
+## Migration depuis une ancienne version
 
-### Bilans par prestation et supplément
+Au premier démarrage, la V12.5 suit cet ordre :
 
-- classement des prestations avec le nombre réalisé et le prix de base encaissé ;
-- classement distinct des suppléments avec le nombre d’utilisations et le montant encaissé ;
-- tri par nombre réalisé ou par montant encaissé ;
-- accès au détail des rendez-vous depuis chaque ligne ;
-- le nombre suit la date du rendez-vous, tandis que l’argent suit la date du paiement. Un rendez-vous de juin payé en juillet compte donc en juin, mais son encaissement apparaît en juillet.
+1. elle lit les données existantes sans les supprimer ;
+2. elle les adapte au schéma de données actuel ;
+3. elle les écrit dans la nouvelle base ;
+4. elle relit la base et vérifie son intégrité ;
+5. elle utilise la nouvelle base uniquement si tous les contrôles réussissent.
 
-### Recherche, sauvegardes et confort
-
-- recherche globale des rendez-vous par cliente, téléphone, prestation, note, date ou statut ;
-- vérification d’un fichier de sauvegarde sans restaurer ni modifier les données en cours ;
-- nouvelle icône de sauvegarde représentant un document enregistré dans Fichiers ;
-- index internes pour accélérer les recherches et les consultations répétées ;
-- améliorations d’accessibilité : libellés explicites, contraste renforcé et respect de la réduction des animations.
-
-## Fonctions introduites en version 12.2
-
-### Une prise de rendez-vous plus simple
-
-- après le choix de la prestation, la durée et le tarif sont regroupés dans un résumé compact ; le bouton **Ajuster** permet toujours une modification exceptionnelle ;
-- les coordonnées d’une cliente existante sont résumées sans encombrer le formulaire et restent modifiables ;
-- les formulaires longs sont découpés en sections, avec une barre d’action accessible et des boutons plus explicites ;
-- les zones tactiles, les contrastes et les états sélectionnés ont été harmonisés pour améliorer la lisibilité sur l’iPhone ;
-- les réglages sont regroupés en six rubriques : agenda, prestations, suppléments, clientes, données et à propos.
-
-### Repères clientes avec les emojis de l’iPhone
-
-- chaque repère possède un nom et un emoji saisi directement avec le clavier de l’iPhone ;
-- le repère reste visible dans la fiche cliente, la sélection d’une cliente et le planning ;
-- les anciens symboles sont conservés lors de la migration et peuvent ensuite être remplacés par un emoji ;
-- les couleurs de prestations restent indépendantes des repères clientes.
-
-### Événements personnels
-
-L’ancienne fonction **Bloquer un créneau** devient **Événement personnel** : rendez-vous médical, déplacement, congés, information familiale ou toute autre occupation non professionnelle.
-
-- événement sur une journée entière ou sur plusieurs journées entières ;
-- événement avec une date et une heure de début et de fin, y compris sur deux jours différents ;
-- choix **Bloquer les rendez-vous clients** activable ou désactivable pour chaque événement ;
-- les événements bloquants participent aux alertes de conflit, mais il reste possible d’enregistrer volontairement le rendez-vous ;
-- les événements informatifs restent visibles sans rendre le créneau indisponible ;
-- plusieurs événements personnels peuvent se chevaucher ;
-- les événements sur plusieurs jours sont présentés comme des bandeaux continus dans la vue Mois ;
-- une adresse facultative peut être utilisée pour ouvrir l’itinéraire ;
-- les anciens créneaux bloqués sont automatiquement convertis en événements personnels bloquants.
-
-Les événements personnels n’entrent jamais dans les revenus, paiements, heures de prestation ou statistiques clientes.
-
-### Suivi informatif des dépenses
-
-Le bouton central **+** permet maintenant d’ajouter une dépense liée à l’activité :
-
-- catégorie personnalisable ;
-- contenu ou articles facultatifs ;
-- fournisseur facultatif ;
-- date et montant ;
-- modification ou suppression ultérieure depuis le bilan.
-
-La rubrique **Dépenses** du bilan propose des vues Jour, Semaine, Mois et Année, une liste chronologique, les totaux, le nombre d’achats, la moyenne et une répartition par catégorie. Les dépenses sont volontairement séparées des revenus : elles sont affichées à titre informatif et ne sont jamais déduites du chiffre d’affaires.
-
-## Fonctions conservées et améliorées
-
-- vues Jour, Semaine et Mois, avec jours fériés et week-ends identifiables ;
-- heures proposées par pas de 5 minutes, tout en préservant les anciennes heures ;
-- avertissements de conflit détaillés et possibilité d’enregistrer malgré le conflit ;
-- suppléments multiples, prix proposés par défaut et montants modifiables par rendez-vous ;
-- ajustement du prix et des suppléments depuis la fin de journée ;
-- paiement laissé **À vérifier** à la création puis validé depuis la fin de journée ;
-- bilans par Jour, Semaine, Mois et Année et exports CSV séparés ;
-- historique des rendez-vous, filtres clientes, annulations tardives et suggestion de vigilance ;
-- confirmation avant de quitter une saisie modifiée, brouillons locaux et protection contre les doubles appuis ;
-- sauvegardes JSON, aperçu avant restauration et copie locale de sécurité avant une migration ou une restauration ;
-- fonctionnement hors ligne, sans publicité, analyseur externe ni assistant IA.
-
-## Compatibilité et migration
-
-La version 12.4.1 conserve le schéma de données sécurisé de la version 12.2 et adapte automatiquement les données des versions plus anciennes :
-
-- rendez-vous, clientes, paiements, prestations, suppléments, repères et réglages sont conservés ;
-- les anciens créneaux bloqués deviennent des événements personnels avec le blocage des rendez-vous activé ;
-- les anciens repères conservent leur symbole jusqu’à leur prochaine modification ;
-- les nouvelles catégories de dépenses sont ajoutées sans modifier les revenus existants ;
-- une copie locale de sécurité est créée avant l’adaptation des données.
-
-Une migration ne remplace pas une sauvegarde personnelle. Avant la mise à jour, utilise toujours **Réglages → Données et sauvegardes → Sauvegarder dans Fichiers**.
-
-## Installer ou mettre à jour avec GitHub Pages
-
-Lis le fichier `GUIDE-MISE-A-JOUR.md` fourni avec cette version. Après l’envoi des fichiers sur GitHub, attends une à deux minutes puis ouvre :
-
-`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.4.1`
-
-Accepte ensuite la mise à jour proposée par l’application. Dans **Réglages → À propos**, vérifie que `Mon agenda · version 12.4.1 bêta` est affiché.
+En cas d’échec, la copie d’origine reste disponible et l’application utilise le mode compatible ou affiche l’écran de récupération. Ne désinstalle pas l’application et n’efface pas les données Safari pour résoudre un problème de migration.
 
 ## Données et confidentialité
 
-- Les clientes, rendez-vous, paiements, événements personnels, dépenses et réglages restent sur l’iPhone.
-- GitHub Pages héberge seulement les fichiers de l’application et ne reçoit pas la base de données.
-- Ne dépose jamais un fichier de sauvegarde JSON dans le dépôt GitHub : il contient tes données professionnelles.
-- Les sauvegardes et exports peuvent être envoyés vers la feuille de partage iOS ; la destination reste choisie par l’utilisatrice dans l’application Fichiers.
-- Waze nécessite une connexion et reçoit l’adresse uniquement lorsque le bouton d’itinéraire est utilisé.
+- GitHub Pages héberge uniquement les fichiers de l’application, jamais la base locale.
+- Les copies automatiques restent sur l’iPhone ; elles ne remplacent pas un export dans Fichiers.
+- Une sauvegarde JSON contient les données professionnelles : ne la dépose jamais dans un dépôt GitHub public.
+- Waze reçoit une adresse uniquement quand le bouton d’itinéraire est utilisé.
+- Aucune synchronisation entre appareils n’est réalisée.
 
-## Limites importantes
+## Mise à jour
 
-- Les données ne sont pas synchronisées entre plusieurs appareils.
-- Désinstaller l’application, effacer les données Safari ou réinitialiser l’iPhone peut supprimer les données locales.
-- Ne supprime pas l’application et n’efface pas ses données pour forcer une mise à jour : utilise le bandeau de mise à jour et conserve une sauvegarde JSON récente.
-- iOS ne permet pas à une application web d’imposer ou de mémoriser silencieusement un dossier d’export.
+Lis `GUIDE-MISE-A-JOUR.md`, envoie tous les fichiers — notamment le nouveau fichier `storage.js` — puis ouvre :
 
-## Fichiers utiles
+`https://bd87b9495f-blip.github.io/mon-agenda/?v=12.5`
+
+Dans **Réglages → À propos**, la version affichée doit être `Mon agenda · version 12.5 bêta`.
+
+## Fichiers de l’application
 
 - `index.html` : interface ;
 - `style.css` : affichage mobile ;
-- `app.js` : données et fonctions métier ;
-- `sw.js` : fonctionnement hors connexion et mises à jour ;
-- `manifest.webmanifest` et les icônes PNG : installation sur l’iPhone.
+- `app.js` : fonctions métier ;
+- `storage.js` : stockage sécurisé, migration, contrôles et récupération ;
+- `sw.js` : fonctionnement hors connexion et mise à jour ;
+- `manifest.webmanifest` et icônes : installation sur l’iPhone.

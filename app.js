@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.4.1 bêta';
+  const APP_VERSION = '12.5 bêta';
   const CURRENT_DATA_VERSION = 14;
   const BACKUP_FORMAT_VERSION = 3;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
@@ -580,14 +580,17 @@
   }
 
   let startupLoadWarning = '';
-  function loadState() {
+  const legacyLoadInfo = { evidence: false, usable: false, source: 'none' };
+  function loadLegacyState() {
     let rawCurrent = null;
     try { rawCurrent = localStorage.getItem(STATE_KEY); } catch {}
     if (rawCurrent !== null) {
+      legacyLoadInfo.evidence = true;
       try {
         const current = JSON.parse(rawCurrent);
         if (!hasStoredState(current)) throw new Error('INVALID_CURRENT_STATE');
         if (Number(current?.version) !== CURRENT_DATA_VERSION) preserveBeforeMigration(current, current?.version);
+        legacyLoadInfo.usable = true; legacyLoadInfo.source = 'v14';
         return migrateState(current, {}, { strict: true });
       } catch {
         try { localStorage.setItem(CORRUPT_STATE_KEY, rawCurrent); } catch {}
@@ -601,11 +604,13 @@
       let raw = null;
       try { raw = localStorage.getItem(key); } catch {}
       if (raw === null) continue;
+      legacyLoadInfo.evidence = true;
       try {
         const state = JSON.parse(raw);
         if (!hasStoredState(state)) throw new Error('INVALID_LEGACY_STATE');
         const migrated = migrateState(state, {}, { strict: true });
         preserveBeforeMigration(state, version);
+        legacyLoadInfo.usable = true; legacyLoadInfo.source = `v${version}`;
         return migrated;
       } catch {
         try { localStorage.setItem(`nail-planner-unreadable-state-v${version}`, raw); } catch {}
@@ -613,15 +618,21 @@
       }
     }
     const legacyAppointments = safeJson(LEGACY_APPOINTMENTS_KEY, []), legacyProfiles = safeJson(LEGACY_PROFILES_KEY, {});
-    if (legacyAppointments.length || Object.keys(legacyProfiles).length) preserveBeforeMigration({ appointments: legacyAppointments, clientProfiles: legacyProfiles }, 1);
+    if (legacyAppointments.length || Object.keys(legacyProfiles).length) {
+      legacyLoadInfo.evidence = true; legacyLoadInfo.usable = true; legacyLoadInfo.source = 'v1';
+      preserveBeforeMigration({ appointments: legacyAppointments, clientProfiles: legacyProfiles }, 1);
+    } else if (!legacyLoadInfo.evidence) {
+      legacyLoadInfo.usable = true; legacyLoadInfo.source = 'new';
+    }
     return migrateState({ appointments: legacyAppointments }, legacyProfiles);
   }
 
   let dataIndexes = null;
   function invalidateDataIndexes() { dataIndexes = null; }
 
+  const legacyBootState = loadLegacyState();
   const app = {
-    state: loadState(),
+    state: legacyBootState,
     ui: {
       screen: 'agenda', mode: 'day', selectedDate: startOfDay(new Date()), weekStart: mondayOf(new Date()),
       monthDate: localDate(new Date().getFullYear(), new Date().getMonth(), 1), monthDayKey: '', monthReturnKey: '',
@@ -634,7 +645,8 @@
       updateRegistration: null, reloadingForUpdate: false, settingsPage: 'home', settingsDirty: false,
       editingSupplementTypeId: null, editingBadgeId: null, editingExpenseId: null, pendingLateBadgeClientId: null, pendingBlockConflict: null,
       appointmentDraftBaseline: '', clientDraftBaseline: '', blockDraftBaseline: '', expenseDraftBaseline: '',
-      formBaselines: {}, pendingUnsavedClose: null, reviewFinancialDraft: null, appointmentSearchTimer: null, appAlertQueue: []
+      formBaselines: {}, pendingUnsavedClose: null, reviewFinancialDraft: null, appointmentSearchTimer: null, appAlertQueue: [],
+      storageMode: 'starting', storageReady: false, storageWarning: '', storageStartupError: null
     }
   };
   const cloneState = state => JSON.parse(JSON.stringify(state));
@@ -688,16 +700,49 @@
     const target = $('#featureCoach'); if (target) target.hidden = true;
   }
 
-  const saveState = (state = app.state, silent = false) => {
-    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
-    catch {
-      if (!silent) showAppAlert('Impossible d’enregistrer sur cet appareil. Tes changements n’ont pas été appliqués. Libère un peu d’espace, puis réessaie.');
-      return false;
-    }
-    invalidateDataIndexes(); hideUndo(); return true;
+  let lastCommittedState = cloneState(app.state), storageSaveCount = 0;
+  let storageAdapter = {
+    mode: 'legacy-bootstrap',
+    async save(state) {
+      try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
+      catch (cause) { const error = new Error('LEGACY_SAVE_FAILED'); error.code = 'LEGACY_SAVE_FAILED'; error.cause = cause; throw error; }
+      return { ok: true, mode: 'legacy-bootstrap', mirrorOk: true };
+    },
+    async verify() { return { ok: true, mode: 'legacy-bootstrap', counts: backupCounts(app.state), snapshots: 0 }; },
+    async snapshotList() { return []; },
+    async restoreSnapshot() { const error = new Error('SNAPSHOT_NOT_FOUND'); error.code = 'SNAPSHOT_NOT_FOUND'; throw error; },
+    async diagnosticsReport() { return { app: 'mon-agenda-prothesiste-diagnostic', exportedAt: new Date().toISOString(), appVersion: APP_VERSION, dataVersion: CURRENT_DATA_VERSION, storage: { mode: 'legacy-bootstrap' }, verification: await this.verify(), snapshots: [], logs: [] }; },
+    async recordError() {}
   };
-  saveState();
-  if (startupLoadWarning) setTimeout(() => showAppAlert(startupLoadWarning), 0);
+
+  function storageFailureMessage(error) {
+    const code = error?.code || error?.name || error?.message;
+    if (code === 'CONCURRENT_CHANGE') return 'Une autre fenêtre de Mon agenda a modifié les données. Cette action n’a pas été enregistrée. Ferme l’autre fenêtre, puis relance l’application.';
+    if (code === 'QuotaExceededError' || code === 'LEGACY_SAVE_FAILED') return 'L’enregistrement a été refusé faute d’espace disponible. La dernière version valide est conservée. Crée une sauvegarde dans Fichiers, puis libère de l’espace.';
+    if (code === 'INVALID_STATE') return 'L’enregistrement a été annulé car les nouvelles données sont incomplètes. La dernière version valide est conservée.';
+    return 'L’enregistrement n’a pas abouti. La dernière version valide est conservée. Tu peux vérifier le stockage dans Réglages → Données et sauvegardes.';
+  }
+
+  async function saveState(state = app.state, silent = false, options = {}) {
+    const candidate = cloneState(state), isCurrentState = state === app.state; storageSaveCount += 1;
+    if (document.body?.dataset) document.body.dataset.storageSaving = 'true';
+    try {
+      const result = await storageAdapter.save(candidate, { reason: options.reason || 'application-change', snapshot: options.snapshot !== false, force: options.force === true });
+      lastCommittedState = cloneState(candidate);
+      invalidateDataIndexes(); hideUndo();
+      app.ui.storageMode = result.mode || storageAdapter.mode || app.ui.storageMode;
+      return true;
+    } catch (error) {
+      if (isCurrentState) { app.state = cloneState(lastCommittedState); invalidateDataIndexes(); }
+      app.ui.storageWarning = storageFailureMessage(error);
+      await storageAdapter.recordError?.(error, options.reason || 'save', candidate).catch?.(() => {});
+      if (!silent) showAppAlert(app.ui.storageWarning, 'À vérifier');
+      return false;
+    } finally {
+      storageSaveCount = Math.max(0, storageSaveCount - 1);
+      if (!storageSaveCount && document.body?.dataset) delete document.body.dataset.storageSaving;
+    }
+  }
 
   function hideUndo() {
     if (app.ui.undoTimer) clearTimeout(app.ui.undoTimer);
@@ -722,10 +767,10 @@
     app.ui.undoTimer = setTimeout(hideUndo, 9000);
   }
 
-  function undoLastAction() {
+  async function undoLastAction() {
     if (!app.ui.undo?.state) return;
     const state = cloneState(app.ui.undo.state);
-    if (!saveState(state)) return;
+    if (!(await saveState(state, false, { reason: 'undo-last-action' }))) return;
     app.state = state; hideUndo(); render();
   }
 
@@ -965,11 +1010,11 @@
     if (!$('#unsavedChangesDialog').open) $('#unsavedChangesDialog').showModal();
   }
 
-  function saveSettingsBeforeClose() {
-    const buttonByPage = { agenda: '#saveWorkingHours', clients: '#saveClientSettings', data: '#saveReminderSettings' };
-    const button = $(buttonByPage[app.ui.settingsPage]);
-    if (!button) return false;
-    button.click();
+  async function saveSettingsBeforeClose() {
+    const saveByPage = { agenda: saveWorkingHours, clients: saveClientSettings, data: saveReminderSettings };
+    const save = saveByPage[app.ui.settingsPage];
+    if (!save) return false;
+    await save();
     return !app.ui.settingsDirty;
   }
 
@@ -987,7 +1032,7 @@
     if (!$('#unsavedChangesDialog').open) $('#unsavedChangesDialog').showModal();
   }
 
- function resolveUnsavedClose(action) {
+ async function resolveUnsavedClose(action) {
     const pending = app.ui.pendingUnsavedClose, prompt = $('#unsavedChangesDialog');
     if (prompt.open) prompt.close();
     if (!pending) return;
@@ -999,13 +1044,12 @@
      closeDialogNow(dialogId, true); return;
    }
     if (dialogId === 'settingsDialog') {
-      if (!saveSettingsBeforeClose()) return;
+      if (!(await saveSettingsBeforeClose())) return;
       if (settingsTarget) showSettingsPage(settingsTarget, true); else closeDialogNow(dialogId);
      return;
-   }
+    }
     if (expenseCategoryTarget) {
-      const form = $('#expenseCategoryForm'); form?.requestSubmit();
-      if (!formHasChanges('expenseCategoriesDialog')) editExpenseCategory(expenseCategoryTarget);
+      if (await saveExpenseCategory()) editExpenseCategory(expenseCategoryTarget);
       return;
     }
    const form = $(`#${dialogId}`)?.querySelector('form');
@@ -2358,16 +2402,16 @@
     $('#duplicateClientDialog').showModal();
   }
 
-  function commitDraftWithWarnings(draft) {
+  async function commitDraftWithWarnings(draft) {
     const warnings = scheduleWarnings(draft);
     if (warnings.length && !window.confirm(`${warnings.join('\n')}\n\nEnregistrer quand même ?`)) { setAppointmentSaving(false); return false; }
     return commitDraft(draft);
   }
 
-  function continueDraftSubmission(draft) {
+  async function continueDraftSubmission(draft) {
     const conflicts = findConflicts(draft);
     if (conflicts.length) { openConflictDialog(draft, conflicts); return; }
-    commitDraftWithWarnings(draft);
+    return commitDraftWithWarnings(draft);
   }
 
   function ensureClient(draft, existingAppointment = null) {
@@ -2397,7 +2441,7 @@
     app.state.appointments.push(repeated); return `Le prochain RDV a été créé le ${format(date, { day: 'numeric', month: 'long' })} avec le statut Confirmé.`;
   }
 
-  function commitDraft(draft) {
+  async function commitDraft(draft) {
     const previousState = cloneState(app.state);
     const existing = app.state.appointments.find(item => item.id === draft.id), previousClient = existing ? previousState.clients.find(item => item.id === existing.clientId) : null, client = ensureClient(draft, existing);
     const createdAt = existing?.createdAt || new Date().toISOString();
@@ -2421,7 +2465,7 @@
     const index = app.state.appointments.findIndex(item => item.id === appointment.id); if (index === -1) app.state.appointments.push(appointment); else app.state.appointments[index] = appointment;
     const recurrenceMessage = createRecurringAppointment(appointment, draft.repeatWeeks, draft.repeatDate, draft.repeatTime);
     app.ui.selectedDate = parseDate(appointment.date) || app.ui.selectedDate; app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.monthDate = localDate(app.ui.selectedDate.getFullYear(), app.ui.selectedDate.getMonth(), 1);
-    if (!saveState()) { app.state = previousState; setAppointmentSaving(false); return false; }
+    if (!(await saveState(app.state, false, { reason: existing ? 'appointment-update' : 'appointment-create' }))) { app.state = previousState; setAppointmentSaving(false); return false; }
     clearAppointmentDraft(); $('#appointmentDialog').close(); render();
     const moved = existing && (existing.date !== appointment.date || existing.time !== appointment.time), cancelled = existing && existing.status !== appointment.status && ['cancelled', 'no_show'].includes(appointment.status);
     offerUndo(previousState, cancelled ? 'Rendez-vous annulé' : moved ? 'Rendez-vous déplacé' : existing ? 'Rendez-vous modifié' : 'Rendez-vous créé');
@@ -2443,13 +2487,13 @@
     $('#lateBadgeDialog').showModal();
   }
 
-  function settleLateBadgePrompt(action) {
+  async function settleLateBadgePrompt(action) {
     const client = clientById(app.ui.pendingLateBadgeClientId); if (!client) { $('#lateBadgeDialog').close(); return; }
     const previousState = cloneState(app.state), count = lateCancellationCount(client.id);
     if (action === 'apply') client.badgeId = $('#lateBadgeChoice').value;
     if (action === 'disable') client.lateBadgePromptDisabled = true;
     client.lateBadgePromptLastCount = count; client.updatedAt = new Date().toISOString();
-    if (!saveState()) { app.state = previousState; return; }
+    if (!(await saveState(app.state, false, { reason: 'client-badge-update' }))) { app.state = previousState; return; }
     app.ui.pendingLateBadgeClientId = null; $('#lateBadgeDialog').close(); render();
   }
 
@@ -2539,18 +2583,18 @@
     $('#blockConflictDialog').showModal();
   }
 
-  function commitBlock(block) {
+  async function commitBlock(block) {
    const previousState = cloneState(app.state), index = app.state.blocks.findIndex(item => item.id === block.id);
     const now = new Date().toISOString(), existing = index >= 0 ? app.state.blocks[index] : null;
     const clean = normaliseBlock({ ...block, createdAt: existing?.createdAt || now, updatedAt: now }); if (!clean) { setBlockSaving(false); return false; }
     if (index === -1) app.state.blocks.push(clean); else app.state.blocks[index] = clean;
-    if (!saveState()) { app.state = previousState; setBlockSaving(false); return false; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'event-create' : 'event-update' }))) { app.state = previousState; setBlockSaving(false); return false; }
     app.ui.selectedDate = parseDate(clean.startDate) || app.ui.selectedDate; app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.monthDate = localDate(app.ui.selectedDate.getFullYear(), app.ui.selectedDate.getMonth(), 1);
     clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, index === -1 ? 'Événement personnel ajouté' : 'Événement personnel modifié');
     return true;
   }
 
-  function saveBlock() {
+  async function saveBlock() {
     if (app.ui.blockSaving) return;
     setBlockSaving(true);
     const block = blockDraft(), validation = $('#blockValidation');
@@ -2562,7 +2606,7 @@
     if (error) { validation.hidden = false; validation.textContent = error; setBlockSaving(false); return; }
     const existing = app.state.blocks.find(item => item.id === block.id), overlaps = needsBlockConflictCheck(block, existing) ? activeAppointmentsOverlappingBlock(block) : [];
     if (overlaps.length) { openBlockConflictDialog(block, overlaps); return; }
-    commitBlock(block);
+    return commitBlock(block);
   }
 
   function populateExpenseCategorySelect(selectedId = '') {
@@ -2592,7 +2636,7 @@
     app.ui.expenseDraftBaseline = expenseDraftSignature(expenseDraftValues()); $('#expenseDialog').showModal(); captureFormBaseline('expenseDialog');
   }
 
-  function saveExpense() {
+  async function saveExpense() {
     if (app.ui.expenseSaving || !$('#expenseForm').reportValidity()) return false;
     setExpenseSaving(true);
     const values = expenseDraftValues(), validation = $('#expenseValidation'), rawAmount = Number(String(values.amount).replace(',', '.'));
@@ -2606,15 +2650,15 @@
     if (!record) { validation.textContent = 'Cette dépense ne peut pas être enregistrée. Vérifie les informations.'; validation.hidden = false; setExpenseSaving(false); return false; }
     const previousState = cloneState(app.state), index = app.state.expenses.findIndex(expense => expense.id === record.id);
     if (index === -1) app.state.expenses.push(record); else app.state.expenses[index] = record;
-    if (!saveState()) { app.state = previousState; setExpenseSaving(false); return false; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'expense-create' : 'expense-update' }))) { app.state = previousState; setExpenseSaving(false); return false; }
     app.ui.editingExpenseId = null; clearFormDraft('expense'); $('#expenseDialog').close(); render(); offerUndo(previousState, index === -1 ? 'Dépense enregistrée' : 'Dépense modifiée');
     return true;
   }
 
-  function deleteExpense(id = app.ui.editingExpenseId || $('#expenseId')?.value) {
+  async function deleteExpense(id = app.ui.editingExpenseId || $('#expenseId')?.value) {
     const expense = app.state.expenses.find(item => item.id === id); if (!expense || !window.confirm('Supprimer cette dépense ?')) return false;
     const previousState = cloneState(app.state); app.state.expenses = app.state.expenses.filter(item => item.id !== expense.id);
-    if (!saveState()) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: 'expense-delete' }))) { app.state = previousState; return false; }
     app.ui.editingExpenseId = null; clearFormDraft('expense'); if ($('#expenseDialog').open) $('#expenseDialog').close(); render(); offerUndo(previousState, 'Dépense supprimée');
     return true;
   }
@@ -2640,7 +2684,7 @@
     $('#expenseCategoryId').value = category.id; $('#expenseCategoryName').value = category.name; $('#deleteExpenseCategory').hidden = false; $('#expenseCategorySubmit').textContent = category.active ? 'Enregistrer le nom' : 'Réactiver et enregistrer'; captureFormBaseline('expenseCategoriesDialog');
   }
 
- function saveExpenseCategory() {
+ async function saveExpenseCategory() {
    if (!$('#expenseCategoryForm').reportValidity()) return false;
    const id = $('#expenseCategoryId').value || uuid(), name = boundedText($('#expenseCategoryName').value, 100);
     if (!name) { showAppAlert('Donne un nom à cette catégorie.'); $('#expenseCategoryName').focus(); return false; }
@@ -2653,12 +2697,12 @@
       app.state.settings.expenseCategories[index] = record;
       app.state.expenses.forEach(expense => { if (expense.categoryId === id) expense.categoryLabel = name; });
     }
-    if (!saveState()) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'expense-category-create' : 'expense-category-update' }))) { app.state = previousState; return false; }
     clearFormDraft('expenseCategory'); populateExpenseCategorySelect($('#expenseCategory').value || id); renderExpenseCategoryList(); resetExpenseCategoryForm(); showSuccess(index === -1 ? 'Catégorie ajoutée' : 'Catégorie mise à jour');
     return true;
   }
 
- function deleteExpenseCategory() {
+ async function deleteExpenseCategory() {
    const id = $('#expenseCategoryId').value, category = expenseCategoryById(id); if (!category) return false;
     const selectedExpenseCategoryId = $('#expenseCategory').value;
     const used = app.state.expenses.some(expense => expense.categoryId === id), activeCount = app.state.settings.expenseCategories.filter(item => item.active).length;
@@ -2667,7 +2711,7 @@
     if (!window.confirm(wording)) return false;
     const previousState = cloneState(app.state);
     if (used) category.active = false; else app.state.settings.expenseCategories = app.state.settings.expenseCategories.filter(item => item.id !== id);
-    if (!saveState()) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: used ? 'expense-category-hide' : 'expense-category-delete' }))) { app.state = previousState; return false; }
     clearFormDraft('expenseCategory'); populateExpenseCategorySelect(selectedExpenseCategoryId); renderExpenseCategoryList(); resetExpenseCategoryForm(); showSuccess(used ? 'Catégorie masquée' : 'Catégorie supprimée');
     return true;
   }
@@ -2741,7 +2785,7 @@
     $('#reviewFinancialDialog').showModal(); captureFormBaseline('reviewFinancialDialog');
   }
 
-  function saveReviewFinancials(appointmentId, suppliedPrice, suppliedSupplements) {
+  async function saveReviewFinancials(appointmentId, suppliedPrice, suppliedSupplements) {
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return false;
     const usingForm = suppliedPrice === undefined && suppliedSupplements === undefined;
     if (usingForm && !$('#reviewFinancialForm').reportValidity()) return false;
@@ -2757,7 +2801,7 @@
     const beforeTotal = appointmentTotal(appointment), previousState = cloneState(app.state);
     appointment.price = price; appointment.supplements = supplements; appointment.updatedAt = new Date().toISOString();
     appendAppointmentHistory(appointment, 'financial', 'Tarif ajusté en fin de journée', `${money(beforeTotal) || '0 €'} → ${money(appointmentTotal(appointment)) || '0 €'}`);
-    if (!saveState()) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: 'appointment-financial-update' }))) { app.state = previousState; return false; }
     offerUndo(previousState, 'Tarif du rendez-vous ajusté');
     app.ui.reviewFinancialDraft = null; render();
     if ($('#dayReviewDialog')?.open) renderDayReview();
@@ -2779,23 +2823,23 @@
     }).join('') : '<section class="empty-message"><h2>Aucun rendez-vous</h2><p>Il n’y a rien à vérifier pour cette journée.</p></section>';
   }
 
-  function markAppointmentPaid(appointmentId, paymentDate) {
+  async function markAppointmentPaid(appointmentId, paymentDate) {
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
     if (appointment.paymentStatus === 'paid' && appointment.paymentDate === paymentDate && !appointment.paymentReminderDate) return;
     const previousState = cloneState(app.state); appointment.paymentStatus = 'paid'; appointment.paymentDate = paymentDate; appointment.paymentReminderDate = ''; appointment.updatedAt = new Date().toISOString(); appendAppointmentHistory(appointment, 'payment', 'Paiement marqué comme payé', `Date ${paymentDate}`);
-    if (!saveState()) { app.state = previousState; return; }
+    if (!(await saveState(app.state, false, { reason: 'payment-paid' }))) { app.state = previousState; return; }
     offerUndo(previousState, 'Paiement marqué comme payé');
     app.ui.reviewPendingId = null; render();
     if ($('#dayReviewDialog').open) renderDayReview();
     if ($('#todoDialog').open) openTodo('payments');
   }
 
-  function savePaymentReminder(appointmentId, reminderDate) {
+  async function savePaymentReminder(appointmentId, reminderDate) {
     if (!validDate(reminderDate)) { showAppAlert('Choisis une date de relance valide.'); return; }
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
     if (appointment.paymentStatus === 'pending' && appointment.paymentReminderDate === reminderDate && !appointment.paymentDate) return;
     const previousState = cloneState(app.state); appointment.paymentStatus = 'pending'; appointment.paymentDate = ''; appointment.paymentMethod = ''; appointment.paymentReminderDate = reminderDate; appointment.updatedAt = new Date().toISOString(); appendAppointmentHistory(appointment, 'payment', 'Paiement à relancer', `Relance ${reminderDate}`);
-    if (!saveState()) { app.state = previousState; return; }
+    if (!(await saveState(app.state, false, { reason: 'payment-reminder' }))) { app.state = previousState; return; }
     offerUndo(previousState, 'Relance de paiement enregistrée');
     app.ui.reviewPendingId = null; render(); renderDayReview();
   }
@@ -2908,7 +2952,7 @@
     app.ui.settingsDirty = true;
   }
 
-  function saveWorkingHours() {
+  async function saveWorkingHours() {
     const hours = {};
     for (let day = 0; day < 7; day += 1) {
       const enabled = $(`#workEnabled-${day}`).checked, start = $(`#workStart-${day}`).value, end = $(`#workEnd-${day}`).value, breakStart = $(`#workBreakStart-${day}`).value, breakEnd = $(`#workBreakEnd-${day}`).value;
@@ -2920,7 +2964,7 @@
     app.state.settings.workingHours = hours;
     app.state.settings.displayDensity = $('#displayDensity').value === 'compact' ? 'compact' : 'comfortable';
     app.state.settings.colorTheme = $('#colorTheme').value === 'dark' ? 'dark' : 'light';
-    if (!saveState()) { app.state.settings.workingHours = previousHours; app.state.settings.displayDensity = previousDensity; app.state.settings.colorTheme = previousTheme; return; }
+    if (!(await saveState(app.state, false, { reason: 'agenda-settings' }))) { app.state.settings.workingHours = previousHours; app.state.settings.displayDensity = previousDensity; app.state.settings.colorTheme = previousTheme; return; }
     app.ui.settingsDirty = false; render(); renderWorkingHoursEditor(); renderSettingsHome(); showAppAlert('Apparence et horaires enregistrés.');
   }
 
@@ -2928,7 +2972,7 @@
     app.ui.serviceSaving = false; $('#serviceForm button[type="submit"]').disabled = false; $('#serviceForm').reset(); $('#serviceId').value = service?.id || ''; $('#serviceDialogTitle').textContent = service ? 'Modifier la prestation' : 'Nouvelle prestation'; $('#serviceName').value = service?.name || ''; setDurationValue(service?.duration || 60, 'serviceDuration'); $('#servicePrice').value = service?.price ?? ''; $('#serviceColor').value = service?.color || 'rose'; $('#serviceActive').checked = service?.active !== false; $('#serviceDialog').showModal(); captureFormBaseline('serviceDialog');
   }
 
-  function saveService() {
+  async function saveService() {
     if (app.ui.serviceSaving || !$('#serviceForm').reportValidity()) return;
     app.ui.serviceSaving = true;
     const id = $('#serviceId').value || uuid(), name = $('#serviceName').value.trim();
@@ -2939,7 +2983,7 @@
     if (index === -1 && app.state.settings.services.length >= LIMITS.settingsItems) { app.ui.serviceSaving = false; showAppAlert('Le nombre maximal de prestations est atteint.'); return; }
     const previousState = cloneState(app.state), record = { id, name, duration: Number($('#serviceDuration').value), price: $('#servicePrice').value.trim(), color: $('#serviceColor').value, active: $('#serviceActive').checked };
     if (index === -1) app.state.settings.services.push(record); else app.state.settings.services[index] = record;
-    if (!saveState()) { app.state = previousState; app.ui.serviceSaving = false; return; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'service-create' : 'service-update' }))) { app.state = previousState; app.ui.serviceSaving = false; return; }
     app.ui.serviceSaving = false; $('#serviceDialog').close(); renderSettingsServiceList(); renderSettingsHome();
   }
 
@@ -2947,7 +2991,7 @@
     app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; $('#supplementTypeForm').reset(); $('#supplementTypeId').value = type?.id || ''; $('#supplementTypeTitle').textContent = type ? 'Modifier la nature' : 'Nouvelle nature'; $('#supplementTypeName').value = type?.name || ''; $('#supplementTypePrice').value = type?.price ?? ''; $('#supplementTypeActive').checked = type?.active !== false; $('#supplementTypeDialog').showModal(); captureFormBaseline('supplementTypeDialog');
   }
 
-  function saveSupplementType() {
+  async function saveSupplementType() {
     if (app.ui.supplementSaving || !$('#supplementTypeForm').reportValidity()) return;
     app.ui.supplementSaving = true; $('#supplementTypeForm button[type="submit"]').disabled = true;
     const id = $('#supplementTypeId').value || uuid(), name = $('#supplementTypeName').value.trim();
@@ -2956,7 +3000,7 @@
     if (index === -1 && app.state.settings.supplementTypes.length >= LIMITS.settingsItems) { app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; showAppAlert('Le nombre maximal de suppléments est atteint.'); return; }
     const previousState = cloneState(app.state), record = { id, name, price: rawPrice === '' ? '' : String(numericAmount(rawPrice)), active: $('#supplementTypeActive').checked };
     if (index === -1) app.state.settings.supplementTypes.push(record); else app.state.settings.supplementTypes[index] = record;
-    if (!saveState()) { app.state = previousState; app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; return; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'supplement-type-create' : 'supplement-type-update' }))) { app.state = previousState; app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; return; }
     $('#supplementTypeDialog').close(); renderSettingsSupplementList(); renderSettingsHome();
   }
 
@@ -2969,7 +3013,7 @@
     $('#badgePreviewName').textContent = $('#badgeName').value.trim() || 'Nouveau repère';
   }
 
- function saveBadge() {
+ async function saveBadge() {
    if (app.ui.badgeSaving || !$('#badgeForm').reportValidity()) return;
     app.ui.badgeSaving = true; $('#badgeSubmitButton').disabled = true;
    const id = $('#badgeId').value || uuid(), name = $('#badgeName').value.trim();
@@ -2980,40 +3024,137 @@
     if (index === -1 && app.state.settings.clientBadges.length >= LIMITS.settingsItems) { app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; showAppAlert('Le nombre maximal de repères est atteint.'); return; }
     const previousState = cloneState(app.state), record = { id, name, emoji, symbol: emoji };
    if (index === -1) app.state.settings.clientBadges.push(record); else app.state.settings.clientBadges[index] = record;
-    if (!saveState()) { app.state = previousState; app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; return; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'badge-create' : 'badge-update' }))) { app.state = previousState; app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; return; }
     $('#badgeDialog').close(); renderSettingsBadgeList(); renderSettingsHome(); render(); showSuccess(index === -1 ? 'Repère ajouté' : 'Repère mis à jour');
  }
 
-  function deleteBadge() {
+  async function deleteBadge() {
     const id = $('#badgeId').value, badge = badgeById(id); if (!badge) return;
     const assigned = app.state.clients.filter(client => client.badgeId === id).length;
     if (!window.confirm(`Supprimer « ${badge.name} » ?${assigned ? ` Il sera retiré de ${assigned} cliente${assigned > 1 ? 's' : ''}.` : ''}`)) return;
     const previousState = cloneState(app.state); app.state.settings.clientBadges = app.state.settings.clientBadges.filter(item => item.id !== id); app.state.clients.forEach(client => { if (client.badgeId === id) client.badgeId = ''; });
-    if (!saveState()) { app.state = previousState; return; }
+    if (!(await saveState(app.state, false, { reason: 'badge-delete' }))) { app.state = previousState; return; }
     $('#badgeDialog').close(); renderSettingsBadgeList(); renderSettingsHome(); render();
   }
 
-  function saveClientSettings() {
+  async function saveClientSettings() {
     const threshold = Number($('#lateCancellationThreshold').value);
     if (!Number.isInteger(threshold) || threshold < 1 || threshold > 20) { showAppAlert('Choisis un seuil entre 1 et 20.'); return; }
     const previous = cloneState(app.state); app.state.settings.lateCancellationThreshold = threshold; app.state.settings.lateCancellationPromptEnabled = $('#lateCancellationPromptEnabled').checked;
-    if (!saveState()) { app.state = previous; return; }
+    if (!(await saveState(app.state, false, { reason: 'client-settings' }))) { app.state = previous; return; }
     app.ui.settingsDirty = false; renderSettingsHome(); showAppAlert('Réglages clientes enregistrés.');
   }
 
-  function saveReminderSettings() {
+  async function saveReminderSettings() {
     const days = Number($('#backupReminderDays').value), previous = app.state.settings.backupReminderDays; app.state.settings.backupReminderDays = days;
-    if (!saveState()) { app.state.settings.backupReminderDays = previous; return; }
+    if (!(await saveState(app.state, false, { reason: 'backup-reminder-settings' }))) { app.state.settings.backupReminderDays = previous; return; }
     app.ui.settingsDirty = false; renderSettingsHome(); renderHeader(); showAppAlert('Rappel enregistré.');
   }
 
   async function updateStorageStatus() {
-    const target = $('#storageStatus'); if (!target) return;
+    const target = $('#storageStatus'), secure = $('#secureStorageStatus'), snapshotTarget = $('#automaticSnapshotStatus'); if (!target) return;
     try {
       const persisted = await navigator.storage?.persisted?.(), estimate = await navigator.storage?.estimate?.();
       const used = estimate?.usage ? `${(estimate.usage / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo utilisés` : 'espace utilisé non disponible';
       target.textContent = `${persisted ? 'Stockage persistant accordé' : 'Stockage local standard'} · ${used}`;
+      const verification = await storageAdapter.verify();
+      const mode = verification.mode === 'indexeddb' ? 'Base sécurisée active' : 'Stockage de compatibilité actif';
+      const appointments = Number(verification.counts?.appointments || 0), clients = Number(verification.counts?.clients || 0);
+      if (secure) secure.innerHTML = `<strong>${mode}</strong><span>${appointments} rendez-vous · ${clients} clientes · contrôle réussi</span>`;
+      const snapshots = await storageAdapter.snapshotList();
+      if (snapshotTarget) snapshotTarget.textContent = snapshots.length ? `${snapshots.length} copie${snapshots.length > 1 ? 's' : ''} automatique${snapshots.length > 1 ? 's' : ''} · dernière le ${format(new Date(snapshots[0].createdAt), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'La première copie automatique sera créée avant la prochaine modification.';
+      const restore = $('#restoreAutomaticSnapshot'); if (restore) restore.hidden = !snapshots.length;
     } catch { target.textContent = 'État du stockage non disponible sur ce navigateur.'; }
+  }
+
+  async function verifySecureStorage() {
+    const button = $('#verifySecureStorage'); if (button) button.disabled = true;
+    try {
+      const result = await storageAdapter.verify();
+      await updateStorageStatus();
+      showAppAlert(`La base est valide : ${result.counts.appointments} rendez-vous et ${result.counts.clients} clientes vérifiés.`, 'C’est enregistré');
+    } catch (error) {
+      await storageAdapter.recordError?.(error, 'manual-verification', app.state);
+      showAppAlert('La vérification a détecté une anomalie. Tes données n’ont pas été modifiées. Crée une sauvegarde dans Fichiers puis exporte le diagnostic.', 'À vérifier');
+    } finally { if (button) button.disabled = false; }
+  }
+
+  async function restoreAutomaticSnapshot() {
+    const snapshots = await storageAdapter.snapshotList().catch(() => []), latest = snapshots[0];
+    if (!latest) { showAppAlert('Aucune copie automatique n’est encore disponible.'); return; }
+    const label = format(new Date(latest.createdAt), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    if (!window.confirm(`Remplacer les données actuelles par la copie automatique du ${label} ? Une copie des données actuelles sera créée avant le retour.`)) return;
+    try {
+      const restored = await storageAdapter.restoreSnapshot(latest.id);
+      app.state = migrateState(restored, {}, { strict: true }); lastCommittedState = cloneState(app.state); clearAllFormDrafts();
+      $('#settingsDialog').close(); render(); showAppAlert(`La copie automatique du ${label} a été restaurée.`);
+    } catch (error) {
+      await storageAdapter.recordError?.(error, 'snapshot-restore', app.state);
+      showAppAlert('Cette copie automatique n’a pas pu être restaurée. Les données actuelles sont conservées.', 'À vérifier');
+    }
+  }
+
+  async function exportStorageDiagnostic() {
+    try {
+      let estimate = {};
+      try { estimate = await navigator.storage?.estimate?.() || {}; } catch {}
+      const report = await storageAdapter.diagnosticsReport(estimate);
+      if (app.ui.storageStartupError) report.startupError = { code: app.ui.storageStartupError.code || app.ui.storageStartupError.name || 'STARTUP_ERROR', stage: app.ui.storageStartupError.stage || 'startup' };
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const delivered = await shareOrDownload(blob, `diagnostic-mon-agenda-${todayKey()}.json`, 'Diagnostic Mon agenda');
+      if (delivered) showSuccess('Diagnostic créé');
+    } catch { showAppAlert('Le diagnostic n’a pas pu être créé sur cet appareil.', 'À vérifier'); }
+  }
+
+  function finishStorageLoading() {
+    app.ui.storageReady = true;
+    if (document.body?.dataset) delete document.body.dataset.storageLoading;
+    const loading = $('#storageLoading'); if (loading) loading.hidden = true;
+  }
+
+  function showStorageRecovery(error) {
+    app.ui.storageStartupError = error; app.ui.storageMode = 'recovery'; app.ui.storageReady = false;
+    if (document.body?.dataset) document.body.dataset.storageRecovery = 'true';
+    const details = $('#storageRecoveryDetails');
+    if (details) details.textContent = 'Aucune base exploitable n’a été remplacée. Réessaie ou restaure une sauvegarde créée dans Fichiers.';
+    const dialog = $('#storageRecoveryDialog'); if (dialog?.showModal && !dialog.open) dialog.showModal();
+  }
+
+  async function importRecoveryData(file) {
+    const input = $('#recoveryImportData'); if (!file) return;
+    try {
+      const { data, state: migrated } = await readValidatedBackupFile(file);
+      if (!window.confirm(backupPreview(data, migrated))) return;
+      if (!(await saveState(migrated, false, { reason: 'recovery-import', force: true }))) return;
+      app.state = migrated; lastCommittedState = cloneState(migrated);
+      showAppAlert('La sauvegarde est restaurée. L’application va maintenant redémarrer.');
+      setTimeout(() => globalThis.location?.reload?.(), 500);
+    } catch { showAppAlert('Cette sauvegarde ne peut pas être utilisée pour la récupération.', 'À vérifier'); }
+    finally { if (input) input.value = ''; }
+  }
+
+  async function initialiseSecureStorage() {
+    try {
+      if (!globalThis.AgendaStorage?.initialise) throw Object.assign(new Error('STORAGE_MODULE_MISSING'), { code: 'STORAGE_MODULE_MISSING', stage: 'startup' });
+      const result = await globalThis.AgendaStorage.initialise({
+        indexedDB: globalThis.indexedDB,
+        localStorage,
+        legacyKey: STATE_KEY,
+        legacyState: legacyBootState,
+        legacyFallbackAllowed: legacyLoadInfo.usable,
+        validateState: state => migrateState(state, {}, { strict: true }),
+        appVersion: APP_VERSION,
+        dataVersion: CURRENT_DATA_VERSION
+      });
+      storageAdapter = result.storage; app.state = migrateState(result.state, {}, { strict: true }); lastCommittedState = cloneState(app.state);
+      app.ui.storageMode = result.mode; app.ui.storageWarning = result.warning || ''; app.ui.storageStartupError = result.startupError || null;
+      finishStorageLoading(); render();
+      if (result.warning) setTimeout(() => showAppAlert(result.warning, 'À vérifier'), 0);
+      else if (startupLoadWarning && (result.migrated || result.mode !== 'indexeddb')) setTimeout(() => showAppAlert(startupLoadWarning, 'À vérifier'), 0);
+      return true;
+    } catch (error) {
+      finishStorageLoading(); showStorageRecovery(error); return false;
+    }
   }
 
   function backupCounts(state) {
@@ -3109,7 +3250,7 @@
     const delivered = await shareOrDownload(blob, `sauvegarde-agenda-${stamp}.json`, 'Sauvegarde Mon agenda');
     if (!delivered) return false;
     app.state.settings.lastBackupAt = content.exportedAt;
-    if (!saveState()) { app.state.settings.lastBackupAt = previousDate; return false; }
+    if (!(await saveState(app.state, false, { reason: 'manual-backup-created', snapshot: false }))) { app.state.settings.lastBackupAt = previousDate; return false; }
     renderHeader(); renderSettingsHome(); renderBackupStatus(); showSuccess('Sauvegarde créée'); return true;
   }
 
@@ -3119,9 +3260,17 @@
       const { data, state: migrated } = await readValidatedBackupFile(file);
       if (!window.confirm(backupPreview(data, migrated))) return;
       const safety = makeBackupPayload(app.state, 'before-restore');
+      let compatibilitySafetyStored = true;
       try { localStorage.setItem(RESTORE_SAFETY_KEY, JSON.stringify(safety)); }
-      catch { showAppAlert('La restauration a été annulée : impossible de créer la copie de secours sur cet appareil.'); return; }
-      if (!saveState(migrated)) { try { localStorage.removeItem(RESTORE_SAFETY_KEY); } catch {} return; }
+      catch (error) {
+        compatibilitySafetyStored = false;
+        await storageAdapter.recordError?.(error, 'restore-compatibility-copy', app.state);
+      }
+      if (!compatibilitySafetyStored && storageAdapter.mode !== 'indexeddb') {
+        showAppAlert('La restauration a été annulée : la copie de sécurité n’a pas pu être créée dans le mode de compatibilité.', 'À vérifier');
+        return;
+      }
+      if (!(await saveState(migrated, false, { reason: 'backup-restore' }))) { try { localStorage.removeItem(RESTORE_SAFETY_KEY); } catch {} return; }
       app.state = migrated; clearAllFormDrafts(); $('#settingsDialog').close(); render(); showAppAlert('Sauvegarde restaurée et adaptée à la version actuelle. Toutes les données compatibles ont été conservées.');
     } catch (error) {
       if (error?.message === 'FUTURE_BACKUP') showAppAlert('Cette sauvegarde vient d’une version plus récente. Mets d’abord l’application à jour : tes données actuelles n’ont pas été modifiées.');
@@ -3132,24 +3281,24 @@
     } finally { input.value = ''; }
   }
 
-  function undoLastRestore() {
+  async function undoLastRestore() {
     const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V13_RESTORE_SAFETY_KEY, null) || safeJson(V12_RESTORE_SAFETY_KEY, null) || safeJson(V11_RESTORE_SAFETY_KEY, null) || safeJson(V10_RESTORE_SAFETY_KEY, null) || safeJson(V9_RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
     if (!backup || !window.confirm('Revenir aux données présentes juste avant la dernière restauration ?')) return;
     try {
       if (!recognisedBackup(backup) || (backup.app && backup.app !== BACKUP_APP_ID) || backupVersion(backup) > CURRENT_DATA_VERSION) throw new Error('INVALID_SAFETY_COPY');
       const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, { strict: true });
-      if (!saveState(restored)) return;
+      if (!(await saveState(restored, false, { reason: 'undo-backup-restore' }))) return;
       app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V13_RESTORE_SAFETY_KEY); localStorage.removeItem(V12_RESTORE_SAFETY_KEY); localStorage.removeItem(V11_RESTORE_SAFETY_KEY); localStorage.removeItem(V10_RESTORE_SAFETY_KEY); localStorage.removeItem(V9_RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); showAppAlert('Les données d’avant la restauration ont été récupérées.');
     } catch { showAppAlert('La copie de secours locale n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); }
   }
 
-  function undoLastMigration() {
+  async function undoLastMigration() {
     const backup = safeJson(MIGRATION_SAFETY_KEY, null);
     if (!backup || !window.confirm('Récupérer la copie créée juste avant la mise à jour ? Les ajouts effectués depuis seront remplacés.')) return;
     try {
       if (!recognisedBackup(backup) || (backup.app && backup.app !== BACKUP_APP_ID) || backupVersion(backup) > CURRENT_DATA_VERSION) throw new Error('INVALID_MIGRATION_COPY');
       const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, { strict: true });
-      if (!saveState(restored)) return;
+      if (!(await saveState(restored, false, { reason: 'undo-migration' }))) return;
       app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(MIGRATION_SAFETY_KEY); } catch {}
       $('#settingsDialog').close(); render(); showAppAlert('Les données présentes avant la mise à jour ont été récupérées et adaptées à cette version.');
     } catch { showAppAlert('La copie d’avant mise à jour n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); }
@@ -3182,7 +3331,7 @@
       if (!app.ui.reloadingForUpdate) return;
       app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
     });
-    navigator.serviceWorker.register('./sw.js?v=12.4.1', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register('./sw.js?v=12.5', { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
       registration.addEventListener?.('updatefound', () => {
         const worker = registration.installing; if (!worker) return;
@@ -3200,7 +3349,7 @@
     renderAgenda();
   }
 
-  document.addEventListener('click', event => {
+  document.addEventListener('click', async event => {
     const target = event.target.closest('button'); if (!target) return;
     if (target.dataset.close) { requestDialogClose(target.dataset.close); return; }
     if (target.dataset.mode) { setMode(target.dataset.mode); return; }
@@ -3248,7 +3397,7 @@
     if (target.id === 'deleteAppointment') {
       if (app.ui.editingAppointmentId && window.confirm('Supprimer ce rendez-vous ?')) {
         const previousState = cloneState(app.state); app.state.appointments = app.state.appointments.filter(appointment => appointment.id !== app.ui.editingAppointmentId);
-        if (!saveState()) app.state = previousState; else { clearAppointmentDraft(); $('#appointmentDialog').close(); render(); offerUndo(previousState, 'Rendez-vous supprimé'); }
+        if (!(await saveState(app.state, false, { reason: 'appointment-delete' }))) app.state = previousState; else { clearAppointmentDraft(); $('#appointmentDialog').close(); render(); offerUndo(previousState, 'Rendez-vous supprimé'); }
       }
       return;
     }
@@ -3256,7 +3405,7 @@
       const id = $('#blockId').value;
       if (id && window.confirm('Supprimer cet événement personnel ?')) {
         const previousState = cloneState(app.state); app.state.blocks = app.state.blocks.filter(block => block.id !== id);
-        if (!saveState()) app.state = previousState; else { clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, 'Événement personnel supprimé'); }
+        if (!(await saveState(app.state, false, { reason: 'event-delete' }))) app.state = previousState; else { clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, 'Événement personnel supprimé'); }
       }
       return;
     }
@@ -3275,6 +3424,10 @@
       else setAppointmentSaving(false); return;
     }
     if (target.id === 'exportData' || target.id === 'backupButton' || target.id === 'backupNotice') { exportData(); return; }
+    if (target.id === 'verifySecureStorage') { await verifySecureStorage(); return; }
+    if (target.id === 'restoreAutomaticSnapshot') { await restoreAutomaticSnapshot(); return; }
+    if (target.id === 'exportStorageDiagnostic' || target.id === 'exportRecoveryDiagnostic') { await exportStorageDiagnostic(); return; }
+    if (target.id === 'retryStorageStartup') { globalThis.location?.reload?.(); return; }
     if (target.id === 'undoRestore') { undoLastRestore(); return; }
     if (target.id === 'undoMigration') { undoLastMigration(); return; }
     if (target.id === 'undoLastAction') { undoLastAction(); return; }
@@ -3301,9 +3454,9 @@
     if (target.id === 'applyLateBadge') { settleLateBadgePrompt('apply'); return; }
     if (target.id === 'dismissLateBadge') { settleLateBadgePrompt('dismiss'); return; }
     if (target.id === 'disableLateBadge') { settleLateBadgePrompt('disable'); return; }
-    if (target.id === 'unsavedSave') { resolveUnsavedClose('save'); return; }
-    if (target.id === 'unsavedDiscard') { resolveUnsavedClose('discard'); return; }
-    if (target.id === 'unsavedContinue') { resolveUnsavedClose('continue'); return; }
+    if (target.id === 'unsavedSave') { await resolveUnsavedClose('save'); return; }
+    if (target.id === 'unsavedDiscard') { await resolveUnsavedClose('discard'); return; }
+    if (target.id === 'unsavedContinue') { await resolveUnsavedClose('continue'); return; }
     if (target.dataset.settingsPage) { showSettingsPage(target.dataset.settingsPage); return; }
     if (target.dataset.removeSupplement) { renderSupplementRows(supplementsFromForm(true).filter(item => item.id !== target.dataset.removeSupplement)); return; }
     if (target.dataset.removeReviewSupplement) { renderReviewSupplementRows(reviewSupplementsFromForm(true).filter(item => item.id !== target.dataset.removeReviewSupplement)); return; }
@@ -3353,12 +3506,12 @@
   $('#blockForm').addEventListener('submit', event => { event.preventDefault(); saveBlock(); });
   $('#expenseForm').addEventListener('submit', event => { event.preventDefault(); saveExpense(); });
   $('#expenseCategoryForm').addEventListener('submit', event => { event.preventDefault(); saveExpenseCategory(); });
-  $('#clientForm').addEventListener('submit', event => {
+  $('#clientForm').addEventListener('submit', async event => {
    event.preventDefault(); if (app.ui.clientSaving || !$('#clientForm').reportValidity()) return; app.ui.clientSaving = true;
     $('#clientSubmitButton').disabled = true;
     const client = clientById($('#profileKey').value); if (!client) { app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
     const previousState = cloneState(app.state); client.name = $('#profileName').value.trim(); client.phone = $('#profilePhone').value.trim(); client.contactVia = $('#profileContactVia').value; client.badgeId = $('#profileBadge').value; client.address = $('#profileAddress').value.trim(); client.notes = $('#profileNotes').value.trim(); client.updatedAt = new Date().toISOString();
-    if (!saveState()) { app.state = previousState; app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
+    if (!(await saveState(app.state, false, { reason: 'client-update' }))) { app.state = previousState; app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
     app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; clearFormDraft('client'); $('#clientDialog').close(); render(); showSuccess('Fiche cliente enregistrée');
   });
   $('#serviceForm').addEventListener('submit', event => { event.preventDefault(); saveService(); });
@@ -3417,6 +3570,7 @@
   $('#backupReminderDays').addEventListener('change', () => { app.ui.settingsDirty = true; });
   $('#verifyData').addEventListener('change', event => verifyBackupFile(event.target.files[0]));
   $('#importData').addEventListener('change', event => importData(event.target.files[0]));
+  $('#recoveryImportData').addEventListener('change', event => importRecoveryData(event.target.files[0]));
  $('#conflictDialog').addEventListener('cancel', () => { app.ui.pendingDraft = null; setAppointmentSaving(false); });
   $('#blockConflictDialog').addEventListener('cancel', () => { app.ui.pendingBlockConflict = null; setBlockSaving(false); });
   $('#duplicateClientDialog').addEventListener('cancel', () => { app.ui.pendingDuplicate = null; setAppointmentSaving(false); });
@@ -3443,6 +3597,7 @@
     $(`#${dialogId}`).addEventListener('cancel', event => { event.preventDefault(); requestDialogClose(dialogId); });
   });
   $('#unsavedChangesDialog').addEventListener('cancel', event => { event.preventDefault(); resolveUnsavedClose('continue'); });
+  $('#storageRecoveryDialog').addEventListener('cancel', event => event.preventDefault());
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveOpenFormDrafts(); });
   globalThis.addEventListener?.('pagehide', saveOpenFormDrafts);
   globalThis.addEventListener?.('beforeunload', event => {
@@ -3459,5 +3614,7 @@
   }, 60 * 1000);
   registerServiceWorker();
   navigator.storage?.persist?.().catch?.(() => {});
-  render();
+  globalThis.addEventListener?.('error', event => storageAdapter.recordError?.(event.error || new Error('APPLICATION_ERROR'), 'window-error', app.state).catch?.(() => {}));
+  globalThis.addEventListener?.('unhandledrejection', event => storageAdapter.recordError?.(event.reason || new Error('UNHANDLED_REJECTION'), 'unhandled-rejection', app.state).catch?.(() => {}));
+  app.ready = initialiseSecureStorage();
 })();

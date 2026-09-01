@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" data-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,13 +8,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-    <link rel="manifest" href="manifest.webmanifest?v=12.4.1">
+    <link rel="manifest" href="manifest.webmanifest?v=12.5">
     <link rel="apple-touch-icon" href="icon-180.png">
-    <script>try{const state=JSON.parse(localStorage.getItem('nail-planner-state-v14')||'{}');document.documentElement.dataset.theme=state?.settings?.colorTheme==='dark'?'dark':'light'}catch{document.documentElement.dataset.theme='light'}</script>
-    <link rel="stylesheet" href="style.css?v=12.4.1">
+    <link rel="stylesheet" href="style.css?v=12.5">
     <title>Mon agenda</title>
   </head>
-  <body>
+  <body data-storage-loading="true">
+    <section id="storageLoading" class="storage-loading" role="status" aria-live="polite" aria-label="Ouverture de Mon agenda">
+      <div class="storage-loading-card">
+        <span class="storage-loading-mark" aria-hidden="true">M</span>
+        <span class="storage-loading-spinner" aria-hidden="true"></span>
+        <strong>Ouverture de Mon agenda</strong>
+        <small>Vérification de tes données…</small>
+      </div>
+    </section>
     <main class="app-shell" id="agendaScreen">
       <header class="app-header">
         <p class="eyebrow" id="todayLabel"></p>
@@ -270,8 +277,22 @@
       <section class="settings-page" data-settings-content="services" hidden><div class="settings-heading"><div><h3>Prestations</h3><p>Les anciens rendez-vous conservent leur tarif.</p></div><button class="small-action" id="addService" type="button">+ Ajouter</button></div><div id="settingsServiceList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="supplements" hidden><div class="settings-heading"><div><h3>Natures de supplément</h3><p>Définis un prix proposé automatiquement. Il restera modifiable dans chaque rendez-vous.</p></div><button class="small-action" id="addSupplementType" type="button">+ Ajouter</button></div><div id="settingsSupplementList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="clients" hidden><div class="settings-heading"><div><h3>Repères clientes</h3><p>Un nom et un emoji choisi depuis le clavier de l’iPhone.</p></div><button class="small-action" id="addBadge" type="button">+ Ajouter</button></div><div id="settingsBadgeList" class="settings-service-list"></div><div class="settings-card"><h3>Annulations tardives</h3><label class="field">Proposer un repère après<input id="lateCancellationThreshold" type="number" min="1" max="20" inputmode="numeric"></label><label class="check-field"><input id="lateCancellationPromptEnabled" type="checkbox"><span><strong>Afficher la proposition</strong><small>Le repère ne sera jamais appliqué automatiquement.</small></span></label><button id="saveClientSettings" class="primary-button full-width" type="button">Enregistrer les réglages clientes</button></div></section>
-      <section class="settings-page backup-section" data-settings-content="data" hidden><div class="settings-card"><h3>Rappel de sauvegarde</h3><label class="field">Me le rappeler après<select id="backupReminderDays"><option value="3">3 jours</option><option value="7">7 jours</option><option value="14">14 jours</option><option value="30">30 jours</option></select></label><button id="saveReminderSettings" class="primary-button full-width" type="button">Enregistrer le rappel</button></div><div class="settings-card"><h3>Sauvegarde locale</h3><p class="backup-status" id="backupStatus"></p><p class="small-copy">Tout est inclus : clientes, rendez-vous, paiements, suppléments, repères, événements personnels, dépenses et réglages. Sur iPhone, choisis ensuite « Enregistrer dans Fichiers » et le dossier souhaité. Ne place jamais ce fichier dans ton dépôt GitHub public.</p><button type="button" class="primary-button full-width save-action-button" id="exportData"><svg class="interface-icon file-save-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg> Sauvegarder dans Fichiers</button><label class="file-button verify-file-button"><span>✓ Vérifier une sauvegarde</span><input id="verifyData" type="file" accept="application/json,.json"></label><div id="backupVerificationResult" class="backup-verification-result" role="status" aria-live="polite" hidden></div><label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json,.json"></label><button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button><button type="button" class="secondary-button full-width" id="undoMigration" hidden>Récupérer les données d’avant la mise à jour</button><div class="storage-status" id="storageStatus"></div></div></section>
-      <section class="settings-page" data-settings-content="about" hidden><div class="settings-card"><h3>Mon agenda</h3><p id="aboutVersion"></p><p>Application personnelle hors ligne. Les données métier restent dans le navigateur de cet appareil et ne sont pas envoyées à GitHub.</p><p class="small-copy">Le verrouillage de l’iPhone protège l’accès. Aucun mot de passe supplémentaire n’est ajouté dans l’application.</p></div></section>
+      <section class="settings-page backup-section" data-settings-content="data" hidden>
+        <div class="settings-card secure-storage-card">
+          <div class="secure-storage-heading"><span aria-hidden="true">✓</span><div><h3>Sécurité des données</h3><p>Contrôle d’intégrité et copies automatiques locales.</p></div></div>
+          <div id="secureStorageStatus" class="secure-storage-status" role="status" aria-live="polite"><strong>Vérification en cours…</strong></div>
+          <p id="automaticSnapshotStatus" class="automatic-snapshot-status"></p>
+          <div class="storage-action-grid">
+            <button id="verifySecureStorage" class="secondary-button" type="button">Vérifier maintenant</button>
+            <button id="restoreAutomaticSnapshot" class="secondary-button" type="button" hidden>Revenir à la dernière copie</button>
+          </div>
+          <button id="exportStorageDiagnostic" class="text-button full-width diagnostic-button" type="button">Créer un diagnostic technique</button>
+          <div class="storage-status" id="storageStatus"></div>
+        </div>
+        <div class="settings-card"><h3>Rappel de sauvegarde</h3><label class="field">Me le rappeler après<select id="backupReminderDays"><option value="3">3 jours</option><option value="7">7 jours</option><option value="14">14 jours</option><option value="30">30 jours</option></select></label><button id="saveReminderSettings" class="primary-button full-width" type="button">Enregistrer le rappel</button></div>
+        <div class="settings-card"><h3>Sauvegarde dans Fichiers</h3><p class="backup-status" id="backupStatus"></p><p class="small-copy">Tout est inclus : clientes, rendez-vous, paiements, suppléments, repères, événements personnels, dépenses et réglages. Sur iPhone, choisis ensuite « Enregistrer dans Fichiers » et le dossier souhaité. Ne place jamais ce fichier dans ton dépôt GitHub public.</p><button type="button" class="primary-button full-width save-action-button" id="exportData"><svg class="interface-icon file-save-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg> Sauvegarder dans Fichiers</button><label class="file-button verify-file-button"><span>✓ Vérifier une sauvegarde</span><input id="verifyData" type="file" accept="application/json,.json"></label><div id="backupVerificationResult" class="backup-verification-result" role="status" aria-live="polite" hidden></div><label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json,.json"></label><button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button><button type="button" class="secondary-button full-width" id="undoMigration" hidden>Récupérer les données d’avant la mise à jour</button></div>
+      </section>
+      <section class="settings-page" data-settings-content="about" hidden><div class="settings-card"><h3>Mon agenda</h3><p id="aboutVersion"></p><p>Application personnelle hors ligne. Les données sont enregistrées dans une base locale contrôlée avant chaque ouverture et ne sont pas envoyées à GitHub.</p><p class="small-copy">Le verrouillage de l’iPhone protège l’accès. Aucun mot de passe supplémentaire n’est ajouté dans l’application.</p></div></section>
     </div></dialog>
 
     <dialog id="serviceDialog" class="modal"><form id="serviceForm"><div class="modal-heading"><h2 id="serviceDialogTitle">Nouvelle prestation</h2><button type="button" class="close-button" data-close="serviceDialog" aria-label="Fermer">×</button></div><input id="serviceId" type="hidden"><label class="field">Nom<input id="serviceName" maxlength="200" required placeholder="Ex. Pose complète"></label><div class="two-columns"><label class="field">Durée<select id="serviceDuration"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="75">1 h 15</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="150">2 h 30</option><option value="180">3 h</option></select></label><label class="field">Prix (€)<input id="servicePrice" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" placeholder="Optionnel"></label></div><label class="field">Couleur<select id="serviceColor"><option value="rose">Rose</option><option value="purple">Violet</option><option value="orange">Orange</option><option value="teal">Vert d’eau</option><option value="blue">Bleu</option><option value="green">Vert</option><option value="amber">Jaune</option><option value="coral">Corail</option></select></label><label class="check-field"><input id="serviceActive" type="checkbox" checked><span><strong>Disponible à la création</strong><small>Décoche pour masquer sans perdre l’historique.</small></span></label><div class="form-actions"><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
@@ -279,10 +300,25 @@
     <dialog id="badgeDialog" class="modal"><form id="badgeForm"><div class="modal-heading"><div><p class="eyebrow">Repère cliente</p><h2 id="badgeDialogTitle">Nouveau repère</h2></div><button type="button" class="close-button" data-close="badgeDialog" aria-label="Fermer">×</button></div><input id="badgeId" type="hidden"><section class="form-section"><div class="form-section-heading simple"><div><h3>Nom et emoji</h3><p>L’emoji sera visible discrètement près du nom de la cliente.</p></div></div><label class="field">Nom<input id="badgeName" maxlength="60" required placeholder="Ex. Cliente appréciée"></label><label class="field emoji-field">Emoji<input id="badgeSymbol" maxlength="16" required autocomplete="off" placeholder="Touchez pour choisir un emoji" aria-describedby="badgeEmojiHelp"><small id="badgeEmojiHelp" class="field-help">Ouvre le clavier emoji de l’iPhone et choisis-en un seul.</small></label><div class="emoji-preview"><span id="badgeEmojiPreview" aria-hidden="true">🙂</span><div><strong>Aperçu</strong><small id="badgePreviewName">Nouveau repère</small></div></div></section><div class="form-actions sticky-form-actions"><button id="deleteBadge" class="danger-button" type="button" hidden>Supprimer</button><button id="badgeSubmitButton" class="primary-button" type="submit">Ajouter le repère</button></div></form></dialog>
     <dialog id="lateBadgeDialog" class="modal conflict-modal"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2>Annulations tardives</h2><p id="lateBadgeText"></p><label class="field">Repère proposé<select id="lateBadgeChoice"></select></label><div class="stacked-actions"><button id="applyLateBadge" class="primary-button" type="button">Appliquer ce repère</button><button id="dismissLateBadge" class="secondary-button" type="button">Pas maintenant</button><button id="disableLateBadge" class="text-button" type="button">Ne plus proposer pour cette cliente</button></div></div></dialog>
     <dialog id="unsavedChangesDialog" class="modal conflict-modal"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2>Modifications non enregistrées</h2><p id="unsavedChangesText">Veux-tu enregistrer avant de fermer ?</p><div class="stacked-actions"><button id="unsavedSave" class="primary-button" type="button">Enregistrer et fermer</button><button id="unsavedDiscard" class="secondary-button" type="button">Quitter sans enregistrer</button><button id="unsavedContinue" class="text-button" type="button">Continuer la modification</button></div></div></dialog>
+    <dialog id="storageRecoveryDialog" class="storage-recovery-dialog" aria-labelledby="storageRecoveryTitle" aria-describedby="storageRecoveryDetails">
+      <div>
+        <span class="storage-recovery-icon" aria-hidden="true">!</span>
+        <p class="eyebrow">Protection des données</p>
+        <h2 id="storageRecoveryTitle">Mon agenda a besoin d’une vérification</h2>
+        <p id="storageRecoveryDetails">Aucune donnée exploitable n’a été remplacée.</p>
+        <div class="stacked-actions">
+          <button id="retryStorageStartup" class="primary-button" type="button">Réessayer l’ouverture</button>
+          <label class="file-button recovery-file-button">Restaurer depuis Fichiers<input id="recoveryImportData" type="file" accept="application/json,.json"></label>
+          <button id="exportRecoveryDiagnostic" class="text-button" type="button">Créer un diagnostic technique</button>
+        </div>
+        <small>Si tu n’as pas de sauvegarde, ne supprime pas les données de Safari. Le diagnostic ne contient ni noms, ni coordonnées, ni notes.</small>
+      </div>
+    </dialog>
     <dialog id="appAlertDialog" class="app-alert-dialog" aria-labelledby="appAlertTitle" aria-describedby="appAlertMessage"><div><span id="appAlertIcon" class="app-alert-icon" aria-hidden="true">i</span><h2 id="appAlertTitle">Information</h2><p id="appAlertMessage"></p><button id="appAlertClose" class="primary-button" type="button">Fermer</button></div></dialog>
 
     <section id="successToast" class="success-toast" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span><strong id="successMessage">Enregistré</strong></section>
     <section id="undoToast" class="undo-toast" role="status" aria-live="polite" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
-    <script src="app.js?v=12.4.1"></script>
+    <script src="storage.js?v=12.5"></script>
+    <script src="app.js?v=12.5"></script>
   </body>
 </html>
