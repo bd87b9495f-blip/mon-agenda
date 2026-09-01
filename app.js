@@ -1,11 +1,14 @@
 (() => {
   'use strict';
 
-  const APP_VERSION = '12.5 bêta';
-  const CURRENT_DATA_VERSION = 14;
-  const BACKUP_FORMAT_VERSION = 3;
+  const APP_VERSION = '2026.15';
+  const BUILD_ID = '2026.15.0';
+  const CURRENT_DATA_VERSION = 15;
+  const BACKUP_FORMAT_VERSION = 4;
+  const INTEGRITY_BACKUP_FORMAT_VERSION = 4;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
-  const STATE_KEY = 'nail-planner-state-v14';
+  const STATE_KEY = 'nail-planner-state-v15';
+  const V14_KEY = 'nail-planner-state-v14';
   const V13_KEY = 'nail-planner-state-v13';
   const V12_KEY = 'nail-planner-state-v12';
   const V11_KEY = 'nail-planner-state-v11';
@@ -17,27 +20,35 @@
   const V5_KEY = 'nail-planner-state-v5';
   const LEGACY_APPOINTMENTS_KEY = 'nail-planner-v1';
   const LEGACY_PROFILES_KEY = 'nail-client-profiles-v1';
-  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v14';
+  const RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v15';
+  const PENDING_RESTORE_SAFETY_KEY = 'nail-planner-pending-restore-v15';
+  const V14_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v14';
   const V13_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v13';
   const V12_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v12';
   const V11_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v11';
   const V10_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v10';
   const V9_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v9';
   const V8_RESTORE_SAFETY_KEY = 'nail-planner-before-restore-v8';
-  const MIGRATION_SAFETY_KEY = 'nail-planner-before-migration-v14';
-  const APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v14';
+  const HISTORICAL_RESTORE_SAFETY_KEYS = [V14_RESTORE_SAFETY_KEY, V13_RESTORE_SAFETY_KEY, V12_RESTORE_SAFETY_KEY, V11_RESTORE_SAFETY_KEY, V10_RESTORE_SAFETY_KEY, V9_RESTORE_SAFETY_KEY, V8_RESTORE_SAFETY_KEY];
+  const MIGRATION_SAFETY_KEY = 'nail-planner-before-migration-v15';
+  const APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v15';
+  const V14_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v14';
   const V13_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v13';
   const V12_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v12';
   const V11_APPOINTMENT_DRAFT_KEY = 'nail-planner-appointment-draft-v11';
-  const CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v14';
+  const CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v15';
+  const V14_CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v14';
   const V13_CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v13';
   const V12_CLIENT_DRAFT_KEY = 'nail-planner-client-draft-v12';
-  const BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v14';
+  const BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v15';
+  const V14_BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v14';
   const V13_BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v13';
   const V12_BLOCK_DRAFT_KEY = 'nail-planner-block-draft-v12';
- const EXPENSE_DRAFT_KEY = 'nail-planner-expense-draft-v14';
-  const EXPENSE_CATEGORY_DRAFT_KEY = 'nail-planner-expense-category-draft-v14';
-  const CORRUPT_STATE_KEY = 'nail-planner-unreadable-state-v14';
+ const EXPENSE_DRAFT_KEY = 'nail-planner-expense-draft-v15';
+  const V14_EXPENSE_DRAFT_KEY = 'nail-planner-expense-draft-v14';
+  const EXPENSE_CATEGORY_DRAFT_KEY = 'nail-planner-expense-category-draft-v15';
+  const V14_EXPENSE_CATEGORY_DRAFT_KEY = 'nail-planner-expense-category-draft-v14';
+  const CORRUPT_STATE_KEY = 'nail-planner-unreadable-state-v15';
   const FEATURE_COACH_KEY = 'mon-agenda-feature-coach-v12-4';
   const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
   const SEARCH_RESULT_LIMIT = 100;
@@ -45,13 +56,15 @@
   const LIMITS = { clients: 20000, appointments: 100000, blocks: 20000, expenses: 50000, settingsItems: 500, text: 5000, shortText: 200, duration: 24 * 60, amount: 1000000 };
   const COMFORTABLE_HOUR_HEIGHT = 68;
   const COMPACT_HOUR_HEIGHT = 54;
-  const COMFORTABLE_WEEK_HOUR_HEIGHT = 44;
-  const COMPACT_WEEK_HOUR_HEIGHT = 36;
+  // Une demi-heure reste une vraie cible tactile de 24 px, sans que deux
+  // créneaux transparents se chevauchent dans la vue semaine.
+  const COMFORTABLE_WEEK_HOUR_HEIGHT = 48;
+  const COMPACT_WEEK_HOUR_HEIGHT = 48;
   const STATUS = {
     to_confirm: 'À confirmer', confirmed: 'Confirmé', completed: 'Terminé',
     cancelled: 'Annulé', no_show: 'Absente'
   };
-  const PAYMENT = { unreviewed: 'À vérifier', pending: 'À régler', paid: 'Payé' };
+  const PAYMENT = { unreviewed: 'À vérifier', pending: 'À régler', paid: 'Payé', refunded: 'Remboursé' };
   const METHOD = { cash: 'Espèces', card: 'Carte', transfer: 'Virement', other: 'Autre' };
   const CONTACT = { instagram: 'Instagram', messenger: 'Facebook / Messenger', phone: 'Téléphone / SMS', whatsapp: 'WhatsApp', other: 'Autre' };
   const COLORS = ['rose', 'purple', 'orange', 'teal', 'blue', 'green', 'amber', 'coral'];
@@ -92,6 +105,7 @@
   const isWeekend = date => date.getDay() === 0 || date.getDay() === 6;
   const money = value => value === '' || value === null || value === undefined || Number.isNaN(Number(value)) ? '' : `${Number(value).toLocaleString('fr-FR')} €`;
   const numericAmount = value => Math.round(Math.max(0, Number(String(value ?? '').replace(',', '.')) || 0) * 100) / 100;
+  const roundedAmount = value => Math.round((Number(value) || 0) * 100) / 100;
   const boundedText = (value, maximum = LIMITS.text) => String(value || '').trim().slice(0, maximum);
 
   function toMinutes(time) {
@@ -297,6 +311,12 @@
     return numericAmount(appointment?.price) + normaliseSupplements(appointment?.supplements).reduce((sum, item) => sum + numericAmount(item.amount), 0);
   }
 
+  function appointmentFinancialSignature(appointment) {
+    const serviceKey = String(appointment?.serviceId || '').trim() || `name:${normaliseName(appointment?.service)}`;
+    const supplements = normaliseSupplements(appointment?.supplements).map(item => ({ key: String(item.typeId || '').trim() || `name:${normaliseName(item.label)}`, amount: numericAmount(item.amount) })).sort((one, two) => one.key.localeCompare(two.key) || one.amount - two.amount);
+    return JSON.stringify({ serviceKey, price: numericAmount(appointment?.price), supplements });
+  }
+
   function normaliseHours(raw) {
     const defaults = defaultWorkingHours(), result = {};
     for (let day = 0; day < 7; day += 1) {
@@ -362,7 +382,7 @@
     return { id: String(raw.id || uuid()), allDay: false, startDate, startTime, endDate, endTime, reason: boundedText(raw.reason || raw.title || raw.label || 'Événement personnel', LIMITS.shortText) || 'Événement personnel', ...details };
   }
 
-  function validateImportedState(data) {
+  function validateImportedState(data, options = {}) {
     const state = data?.state || data || {};
     const currentSchema = Number(data?.dataVersion ?? state?.version ?? data?.version ?? 0) >= CURRENT_DATA_VERSION;
     const appointments = Array.isArray(state) ? state : (Array.isArray(state.appointments) ? state.appointments : []);
@@ -382,6 +402,17 @@
       || (Object.prototype.hasOwnProperty.call(raw || {}, 'history') && !Array.isArray(raw.history))
       || (raw?.status !== undefined && !Object.prototype.hasOwnProperty.call(STATUS, raw.status))
       || (raw?.paymentStatus !== undefined && !Object.prototype.hasOwnProperty.call(PAYMENT, raw.paymentStatus))
+      || !Object.prototype.hasOwnProperty.call(raw || {}, 'refundDate')
+      || (raw?.refundDate !== '' && !validDate(pickDate(raw?.refundDate)))
+      || (raw?.paymentStatus === 'paid' && !validDate(pickDate(raw?.paymentDate)))
+      || (raw?.paymentStatus === 'refunded' && (!validDate(pickDate(raw?.paymentDate)) || !validDate(pickDate(raw?.refundDate))))
+      || (!options.allowFutureFinancialDates && ['paid', 'refunded'].includes(raw?.paymentStatus) && pickDate(raw?.paymentDate) > todayKey())
+      || (!options.allowFutureFinancialDates && raw?.paymentStatus === 'refunded' && pickDate(raw?.refundDate) > todayKey())
+      || (raw?.paymentStatus !== 'refunded' && Boolean(raw?.refundDate))
+      || (raw?.paymentStatus === 'refunded' && pickDate(raw?.refundDate) < pickDate(raw?.paymentDate))
+      || (!['paid', 'refunded'].includes(raw?.paymentStatus) && Boolean(raw?.paymentDate || raw?.paymentMethod))
+      || (raw?.paymentStatus === 'pending' && !validDate(pickDate(raw?.paymentReminderDate)))
+      || (raw?.paymentStatus !== 'pending' && Boolean(raw?.paymentReminderDate))
       || (raw?.paymentMethod !== undefined && raw.paymentMethod !== '' && !Object.prototype.hasOwnProperty.call(METHOD, raw.paymentMethod))
       || (raw?.contactVia !== undefined && raw.contactVia !== '' && !Object.prototype.hasOwnProperty.call(CONTACT, raw.contactVia))
       || (raw?.lateCancellation !== undefined && typeof raw.lateCancellation !== 'boolean')
@@ -405,8 +436,11 @@
   }
 
   function migrateState(source, legacyProfiles = {}, options = {}) {
-    const data = source?.state || source || {}, strict = Boolean(options.strict), clients = [], clientsById = new Map(), firstClientByName = new Map();
-    if (strict) validateImportedState(source);
+    const data = source?.state || source || {}, sourceVersion = Number(source?.dataVersion ?? data?.version ?? source?.version ?? 0), strict = Boolean(options.strict), clients = [], clientsById = new Map(), firstClientByName = new Map();
+    const suppliedMigrationDate = pickDate(options.migrationDate), migrationDate = validDate(suppliedMigrationDate) ? suppliedMigrationDate : todayKey();
+    const migrationTimestamp = `${migrationDate}T12:00:00.000Z`;
+    if (strict && options.migrationDate && !validDate(suppliedMigrationDate)) throw new Error('INVALID_MIGRATION_DATE');
+    if (strict) validateImportedState(source, { allowFutureFinancialDates: options.allowFutureFinancialDates === true });
     if (strict && !Array.isArray(data)) {
       for (const key of ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'expenses', 'spendings']) {
         if (Object.prototype.hasOwnProperty.call(data, key) && !Array.isArray(data[key])) throw new Error('INVALID_STRUCTURE');
@@ -434,7 +468,7 @@
         id: suppliedId || uuid(), name, phone: boundedText(raw?.phone, 80), address: boundedText(raw?.address, LIMITS.shortText), notes: boundedText(raw?.notes),
         contactVia: CONTACT[raw?.contactVia] ? raw.contactVia : '', badgeId: String(raw?.badgeId || '').trim(),
         lateBadgePromptDisabled: raw?.lateBadgePromptDisabled === true, lateBadgePromptLastCount: Math.max(0, Number(raw?.lateBadgePromptLastCount) || 0),
-        createdAt: raw?.createdAt || new Date().toISOString(), updatedAt: raw?.updatedAt || new Date().toISOString()
+        createdAt: raw?.createdAt || migrationTimestamp, updatedAt: raw?.updatedAt || migrationTimestamp
       };
       clients.push(client); clientsById.set(client.id, client); if (!firstClientByName.has(nameKey)) firstClientByName.set(nameKey, client); return client;
     };
@@ -489,23 +523,44 @@
       client ||= firstClientByName.get(normaliseName(legacyName)) || addClient(appointmentClient, { dedupeByName: true }) || addClient({ name: 'Cliente sans nom' }, { dedupeByName: true });
       let service = raw.serviceId ? services.find(item => item.id === raw.serviceId) : null;
       service ||= serviceByName(raw.service || 'Prestation') || ensureService(raw.service || 'Prestation', raw.duration, raw.price, raw.serviceColor);
-      const paymentStatus = Object.prototype.hasOwnProperty.call(PAYMENT, raw.paymentStatus) ? raw.paymentStatus : 'unreviewed';
+      const paymentStatus = Object.prototype.hasOwnProperty.call(PAYMENT, raw.paymentStatus) && (raw.paymentStatus !== 'refunded' || sourceVersion >= 15) ? raw.paymentStatus : 'unreviewed';
       const suppliedPaymentDate = pickDate(raw.paymentDate) || pickDate(raw.paidAt);
+      const suppliedRefundDate = pickDate(raw.refundDate) || pickDate(raw.refundedAt);
       const suppliedReminderDate = pickDate(raw.paymentReminderDate) || pickDate(raw.paymentDueDate) || pickDate(raw.reminderDate);
       if (strict && raw.paymentDate && !validDate(pickDate(raw.paymentDate))) throw new Error('INVALID_PAYMENT_DATE');
+      if (strict && (raw.refundDate || raw.refundedAt) && !validDate(suppliedRefundDate)) throw new Error('INVALID_REFUND_DATE');
       if (strict && (raw.paymentReminderDate || raw.paymentDueDate || raw.reminderDate) && !validDate(suppliedReminderDate)) throw new Error('INVALID_PAYMENT_REMINDER');
-      const paymentDate = paymentStatus === 'paid' ? (validDate(suppliedPaymentDate) ? suppliedPaymentDate : raw.date) : '';
-      const paymentReminderDate = paymentStatus === 'pending' && validDate(suppliedReminderDate) ? suppliedReminderDate : '';
+      const hasCollectedPayment = paymentStatus === 'paid' || paymentStatus === 'refunded';
+      const inferredPaymentDate = hasCollectedPayment ? (validDate(suppliedPaymentDate) ? suppliedPaymentDate : raw.date) : '';
+      // Les anciennes versions pouvaient préremplir par erreur la date du RDV,
+      // même lorsqu'elle était future. La migration ramène ce cas à la date de
+      // migration et en conserve une trace dans l'historique.
+      const correctedLegacyFuturePayment = sourceVersion < CURRENT_DATA_VERSION && inferredPaymentDate > migrationDate;
+      const paymentDate = correctedLegacyFuturePayment ? migrationDate : inferredPaymentDate;
+      const refundDate = paymentStatus === 'refunded' && validDate(suppliedRefundDate) ? suppliedRefundDate : '';
+      const correctedLegacyMissingReminder = sourceVersion < CURRENT_DATA_VERSION && paymentStatus === 'pending' && !validDate(suppliedReminderDate);
+      const paymentReminderDate = paymentStatus === 'pending' ? (validDate(suppliedReminderDate) ? suppliedReminderDate : migrationDate) : '';
+      const history = normaliseHistory(raw.history, raw.createdAt);
+      if (correctedLegacyFuturePayment) history.push({
+        id: `migration-payment-date-${String(raw.id || 'legacy')}-${migrationDate}`, type: 'migration', at: migrationTimestamp,
+        label: 'Date de paiement future corrigée',
+        details: `${inferredPaymentDate} → ${paymentDate}`
+      });
+      if (correctedLegacyMissingReminder) history.push({
+        id: `migration-payment-reminder-${String(raw.id || 'legacy')}-${migrationDate}`, type: 'migration', at: migrationTimestamp,
+        label: 'Date de relance ajoutée',
+        details: `Dette héritée à relancer à partir du ${migrationDate}`
+      });
       return {
         id: String(raw.id || uuid()), clientId: client.id, date: raw.date, time: raw.time, duration: Math.min(LIMITS.duration, Math.max(15, Number(raw.duration) || 60)),
         price: raw.price === '' || raw.price === null || raw.price === undefined ? '' : String(Math.min(LIMITS.amount, numericAmount(raw.price))), service: boundedText(raw.service || service.name || 'Prestation', LIMITS.shortText),
         serviceId: service.id, serviceColor: COLORS.includes(raw.serviceColor) ? raw.serviceColor : service.color,
         notes: boundedText(raw.notes), address: boundedText(raw.address || client.address, LIMITS.shortText), contactVia: CONTACT[raw.contactVia] ? raw.contactVia : (client.contactVia || ''), supplements: normaliseSupplements(raw.supplements),
         status: STATUS[raw.status] ? raw.status : 'confirmed', paymentStatus,
-        paymentDate, paymentReminderDate, paymentMethod: METHOD[raw.paymentMethod] ? raw.paymentMethod : '', cancellationReason: String(raw.cancellationReason || raw.statusReason || raw.reason || '').trim(),
+        paymentDate, refundDate, paymentReminderDate, paymentMethod: hasCollectedPayment && METHOD[raw.paymentMethod] ? raw.paymentMethod : '', cancellationReason: String(raw.cancellationReason || raw.statusReason || raw.reason || '').trim(),
         lateCancellation: raw.lateCancellation === true,
         recurrenceId: String(raw.recurrenceId || '').trim(), parentAppointmentId: String(raw.parentAppointmentId || raw.sourceAppointmentId || '').trim(),
-        history: normaliseHistory(raw.history, raw.createdAt), createdAt: raw.createdAt || new Date().toISOString(), updatedAt: raw.updatedAt || new Date().toISOString()
+        history: history.slice(-100), createdAt: raw.createdAt || migrationTimestamp, updatedAt: raw.updatedAt || migrationTimestamp
       };
     });
    const blockSources = [data.blocks, data.blockedSlots, data.unavailableDays].filter(Array.isArray).flat();
@@ -534,6 +589,21 @@
     const blocks = rawBlocks.map(normaliseBlock).filter(Boolean);
    const expenseCategories = normaliseExpenseCategories(rawSettings.expenseCategories);
    const rawExpenses = Array.isArray(data.expenses) ? data.expenses : (Array.isArray(data.spendings) ? data.spendings : []);
+   // Les anciennes versions pouvaient enregistrer uniquement le libellé de la
+   // nature. On recrée une catégorie masquée plutôt que de fusionner ces
+   // dépenses dans « Autre » et de perdre leur sens dans le bilan.
+   const expenseCategoryIds = new Set(expenseCategories.map(category => category.id));
+   const expenseCategoryNames = new Set(expenseCategories.map(category => normaliseName(category.name)));
+   rawExpenses.forEach(expense => {
+     if (expenseCategories.length >= LIMITS.settingsItems) return;
+     const suppliedId = String(expense?.categoryId || '').trim();
+     const suppliedLabel = boundedText(expense?.categoryLabel || expense?.categoryName || expense?.category || expense?.nature, 100);
+     const nameKey = normaliseName(suppliedLabel);
+     if (!suppliedLabel || expenseCategoryIds.has(suppliedId) || expenseCategoryNames.has(nameKey)) return;
+     const id = suppliedId && !expenseCategoryIds.has(suppliedId) ? suppliedId : uuid();
+     expenseCategories.push({ id, name: suppliedLabel, active: false });
+     expenseCategoryIds.add(id); expenseCategoryNames.add(nameKey);
+   });
    if (strict) {
      const expenseIds = rawExpenses.map(expense => String(expense?.id || '').trim()).filter(Boolean);
      if (rawExpenses.some(expense => !String(expense?.id || '').trim()) || new Set(expenseIds).size !== expenseIds.length) throw new Error('INVALID_EXPENSE');
@@ -556,81 +626,148 @@
       displayDensity: rawSettings.displayDensity === 'compact' ? 'compact' : 'comfortable',
       colorTheme: rawSettings.colorTheme === 'dark' ? 'dark' : 'light'
     };
+    const restoreSafetyId = boundedText(rawSettings.restoreSafetyId, 100);
+    if (restoreSafetyId) settings.restoreSafetyId = restoreSafetyId;
     const validBadgeIds = new Set(settings.clientBadges.map(badge => badge.id));
     clients.forEach(client => { if (!validBadgeIds.has(client.badgeId)) client.badgeId = ''; });
     return { version: CURRENT_DATA_VERSION, clients, appointments, blocks, expenses, settings };
+  }
+
+  function migrateStoredState(state, context = {}) {
+    const contextualDate = pickDate(context.migrationDate);
+    return migrateState(state, {}, {
+      strict: true,
+      allowFutureFinancialDates: true,
+      migrationDate: validDate(contextualDate) ? contextualDate : todayKey()
+    });
   }
 
   function hasStoredState(state) {
     return Boolean(state && (Array.isArray(state) || state.clients || state.appointments || state.blocks || state.expenses || state.settings));
   }
 
-  function preserveBeforeMigration(state, sourceVersion) {
+  function preserveBeforeMigration(state, sourceVersion, migratedState, migrationDate = todayKey()) {
     if (!hasStoredState(state)) return;
     try {
-      localStorage.setItem(MIGRATION_SAFETY_KEY, JSON.stringify({
+      const safetyState = migrateStoredState(migratedState || state, { migrationDate });
+      const safety = applyBackupIntegrity({
         app: BACKUP_APP_ID,
         backupFormatVersion: BACKUP_FORMAT_VERSION,
-        dataVersion: Number(sourceVersion) || Number(state?.version) || 1,
+        dataVersion: CURRENT_DATA_VERSION,
         exportedAt: new Date().toISOString(),
         reason: 'before-migration',
-        state
-      }));
+        sourceDataVersion: Number(sourceVersion || state?.version || 1),
+        state: safetyState
+      });
+      localStorage.setItem(MIGRATION_SAFETY_KEY, JSON.stringify(safety));
     } catch {}
   }
 
   let startupLoadWarning = '';
-  const legacyLoadInfo = { evidence: false, usable: false, source: 'none' };
+  const legacyLoadInfo = { evidence: false, usable: false, readUncertain: false, source: 'none', key: STATE_KEY, rawKey: '', rawState: null };
   function loadLegacyState() {
     let rawCurrent = null;
-    try { rawCurrent = localStorage.getItem(STATE_KEY); } catch {}
+    try { rawCurrent = localStorage.getItem(STATE_KEY); }
+    catch {
+      legacyLoadInfo.readUncertain = true;
+      startupLoadWarning = 'La lecture d’une copie locale a échoué. Aucune donnée incertaine ne sera remplacée automatiquement.';
+    }
     if (rawCurrent !== null) {
       legacyLoadInfo.evidence = true;
       try {
         const current = JSON.parse(rawCurrent);
         if (!hasStoredState(current)) throw new Error('INVALID_CURRENT_STATE');
-        if (Number(current?.version) !== CURRENT_DATA_VERSION) preserveBeforeMigration(current, current?.version);
-        legacyLoadInfo.usable = true; legacyLoadInfo.source = 'v14';
-        return migrateState(current, {}, { strict: true });
+        const migrationDate = todayKey();
+        const migrated = migrateStoredState(current, { migrationDate });
+        if (Number(current?.version) !== CURRENT_DATA_VERSION) preserveBeforeMigration(current, current?.version, migrated, migrationDate);
+        legacyLoadInfo.usable = true; legacyLoadInfo.source = 'v15'; legacyLoadInfo.key = STATE_KEY; legacyLoadInfo.rawKey = STATE_KEY; legacyLoadInfo.rawState = current;
+        return migrated;
       } catch {
-        try { localStorage.setItem(CORRUPT_STATE_KEY, rawCurrent); } catch {}
-        startupLoadWarning = 'Les données de la version actuelle étaient illisibles. Une ancienne copie exploitable a été chargée sans supprimer la copie abîmée. Vérifie tes rendez-vous puis fais une sauvegarde.';
+        try { localStorage.setItem(CORRUPT_STATE_KEY, rawCurrent); }
+        catch { legacyLoadInfo.readUncertain = true; }
+        startupLoadWarning = 'Une copie locale de la version actuelle était illisible. Elle a été conservée lorsque l’espace disponible le permet. Vérifie tes rendez-vous puis fais une sauvegarde.';
       }
     }
     const candidates = [
-      [13, V13_KEY], [12, V12_KEY], [11, V11_KEY], [10, V10_KEY], [9, V9_KEY], [8, V8_KEY], [7, V7_KEY], [6, V6_KEY], [5, V5_KEY]
+      [14, V14_KEY], [13, V13_KEY], [12, V12_KEY], [11, V11_KEY], [10, V10_KEY], [9, V9_KEY], [8, V8_KEY], [7, V7_KEY], [6, V6_KEY], [5, V5_KEY]
     ];
     for (const [version, key] of candidates) {
       let raw = null;
-      try { raw = localStorage.getItem(key); } catch {}
+      try { raw = localStorage.getItem(key); }
+      catch {
+        legacyLoadInfo.readUncertain = true;
+        startupLoadWarning ||= 'La lecture d’une ancienne copie locale a échoué. Aucune donnée incertaine ne sera remplacée automatiquement.';
+      }
       if (raw === null) continue;
       legacyLoadInfo.evidence = true;
       try {
         const state = JSON.parse(raw);
         if (!hasStoredState(state)) throw new Error('INVALID_LEGACY_STATE');
-        const migrated = migrateState(state, {}, { strict: true });
-        preserveBeforeMigration(state, version);
-        legacyLoadInfo.usable = true; legacyLoadInfo.source = `v${version}`;
+        const migrationDate = todayKey();
+        const migrated = migrateStoredState(state, { migrationDate });
+        preserveBeforeMigration(state, version, migrated, migrationDate);
+        legacyLoadInfo.usable = true; legacyLoadInfo.source = `v${version}`; legacyLoadInfo.key = key; legacyLoadInfo.rawKey = key; legacyLoadInfo.rawState = state;
         return migrated;
       } catch {
-        try { localStorage.setItem(`nail-planner-unreadable-state-v${version}`, raw); } catch {}
+        try { localStorage.setItem(`nail-planner-unreadable-state-v${version}`, raw); }
+        catch { legacyLoadInfo.readUncertain = true; }
         startupLoadWarning ||= `Les données de la version ${version} étaient illisibles. Une copie plus ancienne a été recherchée sans supprimer la copie abîmée.`;
       }
     }
-    const legacyAppointments = safeJson(LEGACY_APPOINTMENTS_KEY, []), legacyProfiles = safeJson(LEGACY_PROFILES_KEY, {});
+    const readV1 = (key, fallback, valid, quarantineKey) => {
+      let raw = null;
+      try { raw = localStorage.getItem(key); }
+      catch {
+        legacyLoadInfo.readUncertain = true;
+        startupLoadWarning ||= 'La lecture d’une très ancienne copie locale a échoué. Aucune donnée incertaine ne sera remplacée automatiquement.';
+        return fallback;
+      }
+      if (raw === null) return fallback;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!valid(parsed)) throw new Error('INVALID_LEGACY_V1');
+        return parsed;
+      } catch {
+        legacyLoadInfo.evidence = true;
+        try { localStorage.setItem(quarantineKey, raw); }
+        catch { legacyLoadInfo.readUncertain = true; }
+        startupLoadWarning ||= 'Une très ancienne copie locale était illisible. Elle n’a pas été remplacée.';
+        return fallback;
+      }
+    };
+    const legacyAppointments = readV1(LEGACY_APPOINTMENTS_KEY, [], Array.isArray, 'nail-planner-unreadable-v1-appointments');
+    const legacyProfiles = readV1(LEGACY_PROFILES_KEY, {}, value => value && typeof value === 'object' && !Array.isArray(value), 'nail-planner-unreadable-v1-profiles');
     if (legacyAppointments.length || Object.keys(legacyProfiles).length) {
-      legacyLoadInfo.evidence = true; legacyLoadInfo.usable = true; legacyLoadInfo.source = 'v1';
-      preserveBeforeMigration({ appointments: legacyAppointments, clientProfiles: legacyProfiles }, 1);
+      legacyLoadInfo.evidence = true;
+      const composite = { version: 1, appointments: legacyAppointments, clientProfiles: legacyProfiles };
+      try {
+        if (legacyLoadInfo.readUncertain) throw new Error('UNCERTAIN_LEGACY_V1');
+        const migrationDate = todayKey();
+        const migrated = migrateStoredState(composite, { migrationDate });
+        preserveBeforeMigration(composite, 1, migrated, migrationDate);
+        legacyLoadInfo.usable = true; legacyLoadInfo.source = 'v1'; legacyLoadInfo.rawKey = 'legacy-v1-composite'; legacyLoadInfo.rawState = composite;
+        return migrated;
+      } catch {
+        legacyLoadInfo.readUncertain = true;
+        startupLoadWarning ||= 'Une très ancienne copie locale contient des données incomplètes. Elle a été conservée et aucune migration partielle ne sera effectuée.';
+        try {
+          const rawAppointments = localStorage.getItem(LEGACY_APPOINTMENTS_KEY);
+          const rawProfiles = localStorage.getItem(LEGACY_PROFILES_KEY);
+          if (rawAppointments !== null) localStorage.setItem('nail-planner-unreadable-v1-appointments', rawAppointments);
+          if (rawProfiles !== null) localStorage.setItem('nail-planner-unreadable-v1-profiles', rawProfiles);
+        } catch {}
+      }
     } else if (!legacyLoadInfo.evidence) {
       legacyLoadInfo.usable = true; legacyLoadInfo.source = 'new';
     }
-    return migrateState({ appointments: legacyAppointments }, legacyProfiles);
+    return migrateState({ version: CURRENT_DATA_VERSION, clients: [], appointments: [], blocks: [], expenses: [], settings: {} });
   }
 
   let dataIndexes = null;
   function invalidateDataIndexes() { dataIndexes = null; }
 
-  const legacyBootState = loadLegacyState();
+  let legacyBootState = migrateState({ version: CURRENT_DATA_VERSION, clients: [], appointments: [], blocks: [], expenses: [], settings: {} });
+  let legacyBootLoaded = false;
   const app = {
     state: legacyBootState,
     ui: {
@@ -639,10 +776,10 @@
       editingAppointmentId: null, editingBlockId: null, pendingDraft: null, formClientId: null, formServiceColor: 'rose', repeatDateEdited: false, repeatTimeEdited: false,
       reportMode: 'week', expenseReportMode: 'week', expenseReportView: 'global', reportTab: 'activity', reportDate: startOfDay(new Date()), reportSort: 'count',
       reviewDate: startOfDay(new Date()), reviewPendingId: null,
-     quickAddDate: todayKey(), quickAddTime: '10:00', pendingDuplicate: null,
+     pendingDuplicate: null,
      appointmentSaving: false, blockSaving: false, expenseSaving: false, clientSaving: false, serviceSaving: false, supplementSaving: false, badgeSaving: false, undo: null, undoTimer: null, successTimer: null,
       appointmentContactExpanded: true, appointmentAdjustmentsExpanded: false,
-      updateRegistration: null, reloadingForUpdate: false, settingsPage: 'home', settingsDirty: false,
+      updateRegistration: null, updateActivated: false, reloadingForUpdate: false, settingsPage: 'home', settingsDirty: false,
       editingSupplementTypeId: null, editingBadgeId: null, editingExpenseId: null, pendingLateBadgeClientId: null, pendingBlockConflict: null,
       appointmentDraftBaseline: '', clientDraftBaseline: '', blockDraftBaseline: '', expenseDraftBaseline: '',
       formBaselines: {}, pendingUnsavedClose: null, reviewFinancialDraft: null, appointmentSearchTimer: null, appAlertQueue: [],
@@ -701,17 +838,15 @@
   }
 
   let lastCommittedState = cloneState(app.state), storageSaveCount = 0;
+  let applicationSaveQueue = Promise.resolve(), nextSaveRequestId = 0, latestCurrentSaveRequestId = 0, mirrorWarningShown = false, snapshotWarningShown = false;
+  let exclusiveReplacementToken = null;
   let storageAdapter = {
-    mode: 'legacy-bootstrap',
-    async save(state) {
-      try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
-      catch (cause) { const error = new Error('LEGACY_SAVE_FAILED'); error.code = 'LEGACY_SAVE_FAILED'; error.cause = cause; throw error; }
-      return { ok: true, mode: 'legacy-bootstrap', mirrorOk: true };
-    },
-    async verify() { return { ok: true, mode: 'legacy-bootstrap', counts: backupCounts(app.state), snapshots: 0 }; },
+    mode: 'bootstrap',
+    async save() { const error = new Error('STORAGE_NOT_READY'); error.code = 'STORAGE_NOT_READY'; throw error; },
+    async verify() { const error = new Error('STORAGE_NOT_READY'); error.code = 'STORAGE_NOT_READY'; throw error; },
     async snapshotList() { return []; },
     async restoreSnapshot() { const error = new Error('SNAPSHOT_NOT_FOUND'); error.code = 'SNAPSHOT_NOT_FOUND'; throw error; },
-    async diagnosticsReport() { return { app: 'mon-agenda-prothesiste-diagnostic', exportedAt: new Date().toISOString(), appVersion: APP_VERSION, dataVersion: CURRENT_DATA_VERSION, storage: { mode: 'legacy-bootstrap' }, verification: await this.verify(), snapshots: [], logs: [] }; },
+    async diagnosticsReport() { return { app: 'mon-agenda-prothesiste-diagnostic', exportedAt: new Date().toISOString(), appVersion: APP_VERSION, dataVersion: CURRENT_DATA_VERSION, storage: { mode: 'bootstrap' }, verification: { ok: false, code: 'STORAGE_NOT_READY' }, snapshots: [], logs: [] }; },
     async recordError() {}
   };
 
@@ -723,25 +858,80 @@
     return 'L’enregistrement n’a pas abouti. La dernière version valide est conservée. Tu peux vérifier le stockage dans Réglages → Données et sauvegardes.';
   }
 
-  async function saveState(state = app.state, silent = false, options = {}) {
-    const candidate = cloneState(state), isCurrentState = state === app.state; storageSaveCount += 1;
-    if (document.body?.dataset) document.body.dataset.storageSaving = 'true';
-    try {
-      const result = await storageAdapter.save(candidate, { reason: options.reason || 'application-change', snapshot: options.snapshot !== false, force: options.force === true });
-      lastCommittedState = cloneState(candidate);
-      invalidateDataIndexes(); hideUndo();
-      app.ui.storageMode = result.mode || storageAdapter.mode || app.ui.storageMode;
-      return true;
-    } catch (error) {
-      if (isCurrentState) { app.state = cloneState(lastCommittedState); invalidateDataIndexes(); }
-      app.ui.storageWarning = storageFailureMessage(error);
-      await storageAdapter.recordError?.(error, options.reason || 'save', candidate).catch?.(() => {});
-      if (!silent) showAppAlert(app.ui.storageWarning, 'À vérifier');
+  async function runExclusiveReplacement(task) {
+    if (exclusiveReplacementToken) {
+      showAppAlert('Un remplacement de données est déjà en cours. Attends sa fin avant de recommencer.', 'Opération en cours');
       return false;
-    } finally {
-      storageSaveCount = Math.max(0, storageSaveCount - 1);
-      if (!storageSaveCount && document.body?.dataset) delete document.body.dataset.storageSaving;
     }
+    const token = uuid();
+    exclusiveReplacementToken = token;
+    if (document.body?.dataset) document.body.dataset.replacingData = 'true';
+    document.body?.setAttribute?.('aria-busy', 'true');
+    try {
+      // Les mutations acceptées avant la prise du verrou sont publiées (ou
+      // annulées) avant de capturer l’état à protéger.
+      await applicationSaveQueue;
+      return await task(token);
+    } finally {
+      if (exclusiveReplacementToken === token) exclusiveReplacementToken = null;
+      if (document.body?.dataset) delete document.body.dataset.replacingData;
+      document.body?.removeAttribute?.('aria-busy');
+    }
+  }
+
+  async function saveState(state = app.state, silent = false, options = {}) {
+    if (exclusiveReplacementToken && options.operationToken !== exclusiveReplacementToken) {
+      if (state === app.state) {
+        app.state = cloneState(lastCommittedState); invalidateDataIndexes(); render();
+        if ($('#dayReviewDialog')?.open) renderDayReview();
+        if ($('#todoDialog')?.open) openTodo('payments');
+      }
+      return false;
+    }
+    const candidate = cloneState(state), isCurrentState = state === app.state, requestId = ++nextSaveRequestId;
+    if (isCurrentState) latestCurrentSaveRequestId = requestId;
+    storageSaveCount += 1;
+    if (document.body?.dataset) document.body.dataset.storageSaving = 'true';
+    const previousQueue = applicationSaveQueue;
+    const operation = (async () => {
+      try {
+        await previousQueue;
+        const result = await storageAdapter.save(candidate, { reason: options.reason || 'application-change', snapshot: options.snapshot !== false, force: options.force === true, requireSnapshot: options.requireSnapshot === true });
+        lastCommittedState = cloneState(candidate);
+        // Une sauvegarde plus ancienne ne doit jamais réécrire en mémoire
+        // les changements déjà capturés par une sauvegarde suivante.
+        if (isCurrentState && requestId === latestCurrentSaveRequestId) app.state = cloneState(candidate);
+        invalidateDataIndexes(); hideUndo();
+        app.ui.storageMode = result.mode || storageAdapter.mode || app.ui.storageMode;
+        if (result.mirrorOk === false || result.snapshotOk === false) {
+          const warnings = [];
+          if (result.mirrorOk === false) warnings.push('La base sécurisée est enregistrée, mais sa copie locale liée n’a pas pu être mise à jour.');
+          if (result.snapshotOk === false) warnings.push('Les données sont enregistrées, mais la copie automatique de l’état précédent n’a pas pu être conservée faute d’espace.');
+          warnings.push('Crée une sauvegarde dans Fichiers, puis libère de l’espace.');
+          app.ui.storageWarning = warnings.join(' ');
+          const newWarning = result.mirrorOk === false && !mirrorWarningShown || result.snapshotOk === false && !snapshotWarningShown;
+          if (result.mirrorOk === false) mirrorWarningShown = true;
+          if (result.snapshotOk === false) snapshotWarningShown = true;
+          if (!silent && newWarning) showAppAlert(app.ui.storageWarning, 'À vérifier');
+        }
+        return true;
+      } catch (error) {
+        if (isCurrentState && requestId === latestCurrentSaveRequestId) {
+          app.state = cloneState(lastCommittedState); invalidateDataIndexes(); render();
+          if ($('#dayReviewDialog')?.open) renderDayReview();
+          if ($('#todoDialog')?.open) openTodo('payments');
+        }
+        app.ui.storageWarning = storageFailureMessage(error);
+        await storageAdapter.recordError?.(error, options.reason || 'save', candidate).catch?.(() => {});
+        if (!silent) showAppAlert(app.ui.storageWarning, 'À vérifier');
+        return false;
+      } finally {
+        storageSaveCount = Math.max(0, storageSaveCount - 1);
+        if (!storageSaveCount && document.body?.dataset) delete document.body.dataset.storageSaving;
+      }
+    })();
+    applicationSaveQueue = operation.then(() => undefined, () => undefined);
+    return operation;
   }
 
   function hideUndo() {
@@ -774,7 +964,7 @@
     app.state = state; hideUndo(); render();
   }
 
-  const DRAFT_FIELDS = ['clientName', 'phone', 'contactVia', 'serviceSelect', 'service', 'price', 'date', 'time', 'duration', 'status', 'address', 'notes', 'paymentStatus', 'paymentDate', 'paymentMethod', 'paymentReminderDate', 'repeatWeeks', 'repeatDate', 'repeatTime', 'cancellationReason'];
+  const DRAFT_FIELDS = ['clientName', 'phone', 'contactVia', 'serviceSelect', 'service', 'price', 'date', 'time', 'duration', 'status', 'address', 'notes', 'paymentStatus', 'paymentDate', 'refundDate', 'paymentMethod', 'paymentReminderDate', 'repeatWeeks', 'repeatDate', 'repeatTime', 'cancellationReason'];
 
   function appointmentDraftPayload() {
     const values = Object.fromEntries(DRAFT_FIELDS.map(id => [id, $(`#${id}`).value]));
@@ -784,22 +974,22 @@
   const draftSignature = draft => JSON.stringify({ ...draft, savedAt: undefined });
 
   function appointmentDraft() {
-    const draft = safeJson(APPOINTMENT_DRAFT_KEY, null) || safeJson(V13_APPOINTMENT_DRAFT_KEY, null) || safeJson(V12_APPOINTMENT_DRAFT_KEY, null) || safeJson(V11_APPOINTMENT_DRAFT_KEY, null);
+    const draft = safeJson(APPOINTMENT_DRAFT_KEY, null) || safeJson(V14_APPOINTMENT_DRAFT_KEY, null) || safeJson(V13_APPOINTMENT_DRAFT_KEY, null) || safeJson(V12_APPOINTMENT_DRAFT_KEY, null) || safeJson(V11_APPOINTMENT_DRAFT_KEY, null);
     if (!draft || draft.version !== 1 || !draft.values || typeof draft.values !== 'object') return null;
     return draft;
   }
 
   function clearAppointmentDraft() {
-    try { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); } catch {}
+    try { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V14_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); } catch {}
     renderDraftNotice();
   }
 
   function clearAllFormDrafts() {
     try {
-      localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY);
-      localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V13_CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY);
-     localStorage.removeItem(EXPENSE_DRAFT_KEY);
-      localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY);
+      localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V14_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY);
+      localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V14_CLIENT_DRAFT_KEY); localStorage.removeItem(V13_CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V14_BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY);
+     localStorage.removeItem(EXPENSE_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_DRAFT_KEY);
+      localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_CATEGORY_DRAFT_KEY);
     } catch {}
     renderDraftNotice();
   }
@@ -850,10 +1040,10 @@
     return { id: $('#profileKey').value, name: $('#profileName').value, phone: $('#profilePhone').value, contactVia: $('#profileContactVia').value, badgeId: $('#profileBadge').value, address: $('#profileAddress').value, notes: $('#profileNotes').value };
   }
 
- const clientFormDraft = () => safeJson(CLIENT_DRAFT_KEY, null) || safeJson(V13_CLIENT_DRAFT_KEY, null) || safeJson(V12_CLIENT_DRAFT_KEY, null);
-  const blockFormDraft = () => safeJson(BLOCK_DRAFT_KEY, null) || safeJson(V13_BLOCK_DRAFT_KEY, null) || safeJson(V12_BLOCK_DRAFT_KEY, null);
-  const expenseFormDraft = () => safeJson(EXPENSE_DRAFT_KEY, null);
- const expenseCategoryFormDraft = () => safeJson(EXPENSE_CATEGORY_DRAFT_KEY, null);
+ const clientFormDraft = () => safeJson(CLIENT_DRAFT_KEY, null) || safeJson(V14_CLIENT_DRAFT_KEY, null) || safeJson(V13_CLIENT_DRAFT_KEY, null) || safeJson(V12_CLIENT_DRAFT_KEY, null);
+  const blockFormDraft = () => safeJson(BLOCK_DRAFT_KEY, null) || safeJson(V14_BLOCK_DRAFT_KEY, null) || safeJson(V13_BLOCK_DRAFT_KEY, null) || safeJson(V12_BLOCK_DRAFT_KEY, null);
+  const expenseFormDraft = () => safeJson(EXPENSE_DRAFT_KEY, null) || safeJson(V14_EXPENSE_DRAFT_KEY, null);
+ const expenseCategoryFormDraft = () => safeJson(EXPENSE_CATEGORY_DRAFT_KEY, null) || safeJson(V14_EXPENSE_CATEGORY_DRAFT_KEY, null);
 
   function expenseDraftValues() {
     const category = app.state.settings.expenseCategories.find(item => item.id === $('#expenseCategory')?.value);
@@ -906,11 +1096,11 @@
 
   function clearFormDraft(kind = app.ui.draftNoticeKind) {
     try {
-      if (kind === 'client') { localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V13_CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); }
-      else if (kind === 'block') { localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY); }
-     else if (kind === 'expense') localStorage.removeItem(EXPENSE_DRAFT_KEY);
-      else if (kind === 'expenseCategory') localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY);
-      else { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); }
+      if (kind === 'client') { localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V14_CLIENT_DRAFT_KEY); localStorage.removeItem(V13_CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); }
+      else if (kind === 'block') { localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V14_BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY); }
+     else if (kind === 'expense') { localStorage.removeItem(EXPENSE_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_DRAFT_KEY); }
+      else if (kind === 'expenseCategory') { localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_CATEGORY_DRAFT_KEY); }
+      else { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V14_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); }
     } catch {}
     renderDraftNotice();
   }
@@ -1052,6 +1242,10 @@
       if (await saveExpenseCategory()) editExpenseCategory(expenseCategoryTarget);
       return;
     }
+    if (dialogId === 'expenseCategoriesDialog') {
+      if (await saveExpenseCategory()) closeDialogNow(dialogId);
+      return;
+    }
    const form = $(`#${dialogId}`)?.querySelector('form');
     form?.requestSubmit();
     if ($(`#${dialogId}`)?.open && !formHasChanges(dialogId)) closeDialogNow(dialogId);
@@ -1118,7 +1312,15 @@
   }
 
   function expenseCategoryLabel(expense) {
-    return expenseCategoryById(expense?.categoryId)?.name || boundedText(expense?.categoryLabel, 100) || 'Autre';
+    const configured = expenseCategoryById(expense?.categoryId), historical = boundedText(expense?.categoryLabel, 100);
+    if (configured?.id === 'expense-other' && historical && normaliseName(historical) !== normaliseName(configured.name)) return historical;
+    return configured?.name || historical || 'Autre';
+  }
+
+  function expenseReportCategoryKey(expense) {
+    const configured = expenseCategoryById(expense?.categoryId), historical = boundedText(expense?.categoryLabel, 100);
+    if (configured?.id === 'expense-other' && historical && normaliseName(historical) !== normaliseName(configured.name)) return `legacy:${normaliseName(historical)}`;
+    return configured?.id || expense?.categoryId || `legacy:${normaliseName(historical || 'Autre')}`;
   }
 
   function eventBlocksAppointments(block) { return block?.blocksAppointments !== false; }
@@ -1307,7 +1509,7 @@
  }
 
   function unreviewedForDate(key) {
-    return activeAppointmentsForDate(key).filter(appointment => appointment.paymentStatus === 'unreviewed');
+    return activeAppointmentsForDate(key).filter(appointment => paymentNeedsReview(appointment));
   }
 
   function dayCanBeClosed(date) {
@@ -1320,7 +1522,7 @@
   function unclosedDays() {
     const today = todayKey(), keys = new Set();
     app.state.appointments.forEach(appointment => {
-      if (activeAppointment(appointment) && appointment.paymentStatus === 'unreviewed' && appointment.date < today) keys.add(appointment.date);
+      if (appointment.date < today && paymentNeedsReview(appointment)) keys.add(appointment.date);
     });
     return [...keys].sort().map(parseDate).filter(Boolean);
   }
@@ -1368,7 +1570,7 @@
   function pendingPayments() {
     const today = todayKey();
     return sortedAppointments()
-      .filter(appointment => activeAppointment(appointment) && appointment.paymentStatus === 'pending' && validDate(appointment.paymentReminderDate) && appointment.paymentReminderDate <= today)
+      .filter(appointment => appointment.paymentStatus === 'pending' && validDate(appointment.paymentReminderDate) && appointment.paymentReminderDate <= today)
       .sort((one, two) => one.paymentReminderDate.localeCompare(two.paymentReminderDate) || appointmentTimestamp(one) - appointmentTimestamp(two));
   }
 
@@ -1488,13 +1690,13 @@
       const blockHtml = timedEvents.map(({ block, segment }) => {
         const start = Math.max(firstHour * 60, segment.startMinutes), end = Math.min(lastHour * 60, segment.endMinutes);
         if (end <= start) return '';
-        const top = ((start - firstHour * 60) / 60) * hourHeight, blockHeight = Math.max(22, ((end - start) / 60) * hourHeight - 2), layout = layouts.get(`b:${block.id}`), status = blockStatusMeta(block);
+        const top = ((start - firstHour * 60) / 60) * hourHeight, blockHeight = Math.max(10, ((end - start) / 60) * hourHeight - 2), layout = layouts.get(`b:${block.id}`), status = blockStatusMeta(block);
         return `<button class="week-blocked-block personal-event ${status.className} ${layout?.columns > 1 ? 'overlapped' : ''}" data-edit-block="${escapeHtml(block.id)}" style="top:${top}px;height:${blockHeight}px;${weekHorizontalStyle(layout)}" title="${escapeHtml(blockTitle(block))}" aria-label="${status.label} : ${escapeHtml(blockTitle(block))}"><span>${status.icon}</span><small>${escapeHtml(blockTitle(block))}</small></button>`;
       }).join('');
       const appointmentHtml = dayAppointments.map(appointment => {
         const client = clientFor(appointment), firstName = client.name.trim().split(/\s+/)[0] || client.name;
         const top = ((toMinutes(appointment.time) - firstHour * 60) / 60) * hourHeight;
-        const appointmentHeight = Math.max(22, (Number(appointment.duration || 0) / 60) * hourHeight - 2), layout = layouts.get(`a:${appointment.id}`);
+        const appointmentHeight = Math.max(10, (Number(appointment.duration || 0) / 60) * hourHeight - 2), layout = layouts.get(`a:${appointment.id}`);
         const conflicted = hasAppointmentConflict(appointment), compactTime = appointment.time;
         return `<button class="week-appointment ${serviceTheme(appointment)} ${Number(appointment.duration || 0) <= 30 ? 'micro' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${!activeAppointment(appointment) ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" data-edit="${escapeHtml(appointment.id)}" style="top:${top}px;height:${appointmentHeight}px;${weekHorizontalStyle(layout)}" aria-label="${appointment.time}, ${escapeHtml(client.name)}, ${escapeHtml(appointment.service)}"><span class="week-appointment-time">${compactTime}</span><strong class="week-appointment-name">${escapeHtml(firstName)}</strong>${badgeHtml(client, 'week')}${conflicted ? '<span class="week-conflict-marker" aria-hidden="true">!</span>' : ''}</button>`;
       }).join('');
@@ -1547,10 +1749,12 @@
     const appointments = activeAppointmentsForDate(dateKey(app.ui.selectedDate)), blocks = blocksOnDate(app.ui.selectedDate), hours = workHoursFor(app.ui.selectedDate);
     const minutes = appointments.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     const planned = appointments.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
-    const paid = appointments.filter(appointment => appointment.paymentStatus === 'paid').reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+    const dayStart = startOfDay(app.ui.selectedDate), dayEnd = addDays(dayStart, 1);
+    const cash = financialSummary(dayStart, dayEnd);
     const first = appointments[0], last = [...appointments].sort((one, two) => appointmentEnd(two) - appointmentEnd(one))[0];
     const clientSpan = first && last ? `<span class="client-hours-summary"><strong>${first.time}</strong> début clientes</span><span class="client-hours-summary"><strong>${endTime(last)}</strong> fin clientes</span>` : '';
-    $('#daySummary').innerHTML = `${clientSpan}<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${paid ? `<span><strong>${money(paid)}</strong> encaissé</span>` : ''}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
+    const cashSummary = cash.gross || cash.refunded ? `${cash.refunded ? `<span><strong>${money(cash.gross)}</strong> brut</span><span><strong>${money(cash.refunded)}</strong> remboursé</span>` : ''}<span><strong>${money(cash.net)}</strong> encaissé net</span>` : '';
+    $('#daySummary').innerHTML = `${clientSpan}<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${cashSummary}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
   }
 
   function timelineLayouts(items) {
@@ -1618,7 +1822,7 @@
       const height = Math.max(30, (Number(appointment.duration || 0) / 60) * hourHeight - 4), compact = Number(appointment.duration || 0) <= 60;
       const inactive = !activeAppointment(appointment), conflicted = hasAppointmentConflict(appointment), layout = layouts.get(`a:${appointment.id}`);
       const reason = appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : '';
-      return `<article class="appointment-block ${serviceTheme(appointment)} status-${appointment.status} ${compact ? 'compact' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${inactive ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" style="top:${top}px;height:${height}px;${appointmentHorizontalStyle(layout)}"><button class="appointment-edit" data-edit="${escapeHtml(appointment.id)}"><span class="appointment-time">${appointment.time} – ${endTime(appointment)}</span><strong class="appointment-name">${badgeHtml(client, 'planning')}${escapeHtml(client.name)}</strong><span class="appointment-meta">${escapeHtml(appointment.service)} · ${Number(appointment.duration)} min${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${reason}</span></button><div class="appointment-footer"><span class="status-badge">${STATUS[appointment.status]}</span>${appointment.paymentStatus === 'paid' && activeAppointment(appointment) ? '<span class="paid-badge">Payé</span>' : ''}</div></article>`;
+      return `<article class="appointment-block ${serviceTheme(appointment)} status-${appointment.status} ${compact ? 'compact' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${inactive ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" style="top:${top}px;height:${height}px;${appointmentHorizontalStyle(layout)}"><button class="appointment-edit" data-edit="${escapeHtml(appointment.id)}"><span class="appointment-time">${appointment.time} – ${endTime(appointment)}</span><strong class="appointment-name">${badgeHtml(client, 'planning')}${escapeHtml(client.name)}</strong><span class="appointment-meta">${escapeHtml(appointment.service)} · ${Number(appointment.duration)} min${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${reason}</span></button><div class="appointment-footer"><span class="status-badge">${STATUS[appointment.status]}</span>${['paid', 'refunded'].includes(appointment.paymentStatus) ? `<span class="paid-badge ${appointment.paymentStatus === 'refunded' ? 'refunded' : ''}">${PAYMENT[appointment.paymentStatus]}</span>` : ''}</div></article>`;
     }).join('');
     const now = new Date().getHours() * 60 + new Date().getMinutes();
     const currentLine = sameDay(date, new Date()) && now >= firstHour * 60 && now <= lastHour * 60 ? `<span id="currentTimeLine" class="current-time-line" style="top:${((now - firstHour * 60) / 60) * hourHeight}px"><b>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</b></span>` : '';
@@ -1779,7 +1983,7 @@
       const history = historyFor(client.id), last = lastFor(client.id), lastTime = last ? appointmentStart(last) : 0;
       if (filterValue === 'badge') return Boolean(clientBadge(client));
       if (filterValue === 'late') return history.some(appointment => appointment.status === 'cancelled' && appointment.lateCancellation === true);
-      if (filterValue === 'pending') return history.some(appointment => activeAppointment(appointment) && appointment.paymentStatus === 'pending');
+      if (filterValue === 'pending') return history.some(appointment => appointment.paymentStatus === 'pending');
       if (filterValue === 'inactive90') return !last || now - lastTime >= 90 * 86400000;
       if (filterValue === 'inactive180') return !last || now - lastTime >= 180 * 86400000;
       return true;
@@ -1796,7 +2000,7 @@
     const dateVariants = [appointment.date, `${day}/${month}/${year}`, `${day}-${month}-${year}`].join(' ');
     return normaliseName([
       client.name, client.phone, appointment.service, appointment.notes, appointment.address,
-      appointment.cancellationReason, STATUS[appointment.status], PAYMENT[appointment.paymentStatus], dateVariants
+      appointment.cancellationReason, STATUS[appointment.status], PAYMENT[appointment.paymentStatus], METHOD[appointment.paymentMethod], appointment.paymentDate, appointment.refundDate, dateVariants
     ].filter(Boolean).join(' '));
   }
 
@@ -1825,7 +2029,7 @@
     counter.textContent = found.total ? `${found.total} rendez-vous trouvé${found.total > 1 ? 's' : ''}${found.truncated ? ` · ${found.results.length} affichés` : ''}` : 'Aucun rendez-vous trouvé';
     target.innerHTML = found.results.map(appointment => {
       const client = clientFor(appointment), parsed = parseDate(appointment.date), note = boundedText(appointment.notes, 80);
-      return `<button type="button" class="search-result-button" data-edit="${escapeHtml(appointment.id)}"><span class="search-result-date">${format(parsed, { day: 'numeric', month: 'short' })}<br>${appointment.time}</span><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}${note ? ` · ${escapeHtml(note)}` : ''}</small></span><b>${money(appointmentTotal(appointment)) || '—'} ›</b></button>`;
+      return `<button type="button" class="search-result-button" data-edit="${escapeHtml(appointment.id)}"><span class="search-result-date">${format(parsed, { day: 'numeric', month: 'short' })}<br>${appointment.time}</span><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)} · ${STATUS[appointment.status]} · ${PAYMENT[appointment.paymentStatus]}${note ? ` · ${escapeHtml(note)}` : ''}</small></span><b>${money(appointmentTotal(appointment)) || '—'} ›</b></button>`;
     }).join('') || '<p class="empty-report">Essaie un autre nom, une prestation ou une date.</p>';
   }
 
@@ -1868,7 +2072,7 @@
   function aggregateExpensesByCategory(expenses) {
     const groups = new Map();
     expenses.forEach(expense => {
-      const id = expense.categoryId || 'expense-other', row = groups.get(id) || { id, categoryId: id, label: expenseCategoryLabel(expense), total: 0, count: 0 };
+      const id = expenseReportCategoryKey(expense), row = groups.get(id) || { id, categoryId: expense.categoryId || '', label: expenseCategoryLabel(expense), total: 0, count: 0 };
       row.total = numericAmount(row.total + numericAmount(expense.amount)); row.count += 1; groups.set(id, row);
     });
     return [...groups.values()].sort((one, two) => two.total - one.total || one.label.localeCompare(two.label, 'fr'));
@@ -1889,16 +2093,47 @@
   }
 
   function appointmentPaymentDate(appointment) {
-    return parseDate(appointment?.paymentDate || appointment?.date);
+    return parseDate(appointment?.paymentDate);
+  }
+
+  function appointmentRefundDate(appointment) {
+    return parseDate(appointment?.refundDate);
   }
 
   function performedInRange(appointment, start, end) {
     return activeAppointment(appointment) && dateInRange(appointment.date, start, end) && appointmentEnd(appointment) <= Date.now();
   }
 
-  function paidInRange(appointment, start, end) {
+  function paymentNeedsReview(appointment, now = Date.now()) {
+    return activeAppointment(appointment) && appointment.paymentStatus === 'unreviewed' && appointmentEnd(appointment) <= now;
+  }
+
+  function hasCollectedPayment(appointment) {
+    return appointment?.paymentStatus === 'paid' || appointment?.paymentStatus === 'refunded';
+  }
+
+  function collectedInRange(appointment, start, end) {
     const paidDate = appointmentPaymentDate(appointment);
-    return activeAppointment(appointment) && appointment.paymentStatus === 'paid' && paidDate && paidDate >= start && paidDate < end;
+    // Le statut du rendez-vous et le flux financier sont indépendants : un
+    // paiement reste au brut après annulation/absence, jusqu'à un éventuel
+    // remboursement explicite enregistré à sa propre date.
+    return hasCollectedPayment(appointment) && paidDate && paidDate >= start && paidDate < end;
+  }
+
+  function refundedInRange(appointment, start, end) {
+    const refundDate = appointmentRefundDate(appointment);
+    return appointment?.paymentStatus === 'refunded' && refundDate && refundDate >= start && refundDate < end;
+  }
+
+  function financialSummary(start, end) {
+    let gross = 0, refunded = 0;
+    app.state.appointments.forEach(appointment => {
+      const amount = appointmentTotal(appointment);
+      if (collectedInRange(appointment, start, end)) gross += amount;
+      if (refundedInRange(appointment, start, end)) refunded += amount;
+    });
+    gross = numericAmount(gross); refunded = numericAmount(refunded);
+    return { gross, refunded, net: roundedAmount(gross - refunded) };
   }
 
   function aggregateReportCategories(start, end) {
@@ -1906,48 +2141,52 @@
     const ensureService = appointment => {
       const key = serviceReportKey(appointment), configured = serviceById(appointment.serviceId), existing = services.get(key);
       if (existing) return existing;
-      const row = { key, label: configured?.name || appointment.service || 'Prestation', color: configured?.color || appointment.serviceColor || 'rose', count: 0, paid: 0 };
+      const row = { key, label: configured?.name || appointment.service || 'Prestation', color: configured?.color || appointment.serviceColor || 'rose', count: 0, gross: 0, refunded: 0, net: 0, paid: 0 };
       services.set(key, row); return row;
     };
     const ensureSupplement = supplement => {
       const key = supplementReportKey(supplement), configured = supplementTypeById(supplement.typeId), existing = supplements.get(key);
       if (existing) return existing;
-      const row = { key, label: configured?.name || supplement.label || 'Supplément', count: 0, paid: 0 };
+      const row = { key, label: configured?.name || supplement.label || 'Supplément', count: 0, gross: 0, refunded: 0, net: 0, paid: 0 };
       supplements.set(key, row); return row;
     };
     app.state.appointments.forEach(appointment => {
-      if (!activeAppointment(appointment)) return;
-      const performed = performedInRange(appointment, start, end), paid = paidInRange(appointment, start, end);
-      if (!performed && !paid) return;
+      const performed = performedInRange(appointment, start, end), collected = collectedInRange(appointment, start, end), refunded = refundedInRange(appointment, start, end);
+      if (!performed && !collected && !refunded) return;
       const serviceRow = ensureService(appointment);
       if (performed) serviceRow.count += 1;
-      if (paid) serviceRow.paid = numericAmount(serviceRow.paid + numericAmount(appointment.price));
+      if (collected) serviceRow.gross = numericAmount(serviceRow.gross + numericAmount(appointment.price));
+      if (refunded) serviceRow.refunded = numericAmount(serviceRow.refunded + numericAmount(appointment.price));
+      serviceRow.net = roundedAmount(serviceRow.gross - serviceRow.refunded); serviceRow.paid = serviceRow.net;
       (appointment.supplements || []).forEach(supplement => {
         const row = ensureSupplement(supplement);
         if (performed) row.count += 1;
-        if (paid) row.paid = numericAmount(row.paid + numericAmount(supplement.amount));
+        if (collected) row.gross = numericAmount(row.gross + numericAmount(supplement.amount));
+        if (refunded) row.refunded = numericAmount(row.refunded + numericAmount(supplement.amount));
+        row.net = roundedAmount(row.gross - row.refunded); row.paid = row.net;
       });
     });
     const sorter = (one, two) => {
-      const primary = app.ui.reportSort === 'paid' ? two.paid - one.paid : two.count - one.count;
-      const secondary = app.ui.reportSort === 'paid' ? two.count - one.count : two.paid - one.paid;
+      const primary = app.ui.reportSort === 'paid' ? two.net - one.net : two.count - one.count;
+      const secondary = app.ui.reportSort === 'paid' ? two.gross - one.gross : two.net - one.net;
       return primary || secondary || one.label.localeCompare(two.label, 'fr', { sensitivity: 'base' });
     };
     return { services: [...services.values()].sort(sorter), supplements: [...supplements.values()].sort(sorter) };
   }
 
   function categoryReportTable(title, rows, kind) {
-    const description = kind === 'service' ? 'Nombre réalisé et prix de base encaissé, hors suppléments.' : 'Nombre d’utilisations et montant encaissé, séparés des prestations.';
+    const description = kind === 'service' ? 'Nombre réalisé et encaissement net du prix de base, hors suppléments.' : 'Nombre d’utilisations et encaissement net des suppléments, séparé des prestations.';
     const heading = `<div class="report-panel-heading"><p class="eyebrow">Classement</p><h2>${escapeHtml(title)}</h2><p>${description}</p></div>`;
     if (!rows.length) return `<section class="report-panel category-report-panel">${heading}<p class="empty-report">Aucune donnée sur cette période.</p></section>`;
-    const maximumCount = Math.max(...rows.map(row => row.count)), maximumPaid = Math.max(...rows.map(row => row.paid));
-    const maximum = app.ui.reportSort === 'paid' ? maximumPaid : maximumCount;
+    const maximumCount = Math.max(...rows.map(row => row.count)), maximumNet = Math.max(...rows.map(row => Math.abs(row.net)));
+    const maximum = app.ui.reportSort === 'paid' ? maximumNet : maximumCount;
     const body = rows.map((row, index) => {
-      const badges = rows.length > 1 ? [row.count > 0 && row.count === maximumCount ? (kind === 'service' ? 'Plus réalisée' : 'Plus utilisé') : '', row.paid > 0 && row.paid === maximumPaid ? 'Plus encaissé' : ''].filter(Boolean).join(' · ') : '';
-      const label = `${row.label}, ${row.count} réalisé${row.count > 1 ? 's' : ''}, ${money(row.paid) || '0 €'} encaissé`;
-      const value = app.ui.reportSort === 'paid' ? row.paid : row.count, width = maximum > 0 ? Math.max(value > 0 ? 4 : 0, value / maximum * 100) : 0;
+      const badges = rows.length > 1 ? [row.count > 0 && row.count === maximumCount ? (kind === 'service' ? 'Plus réalisée' : 'Plus utilisé') : '', row.net > 0 && row.net === Math.max(...rows.map(item => item.net)) ? 'Meilleur net encaissé' : ''].filter(Boolean).join(' · ') : '';
+      const cashDetail = row.refunded ? `${money(row.gross) || '0 €'} brut · ${money(row.refunded)} remboursé · ` : '';
+      const label = `${row.label}, ${row.count} réalisé${row.count > 1 ? 's' : ''}, ${cashDetail}${money(row.net) || '0 €'} net`;
+      const value = app.ui.reportSort === 'paid' ? Math.abs(row.net) : row.count, width = maximum > 0 ? Math.max(value > 0 ? 4 : 0, value / maximum * 100) : 0;
       const countLabel = kind === 'service' ? `prestation${row.count > 1 ? 's' : ''}` : `utilisation${row.count > 1 ? 's' : ''}`;
-      return `<button type="button" class="report-category-button" data-report-detail-kind="${kind}" data-report-detail-key="${escapeHtml(row.key)}" aria-label="Voir le détail : ${escapeHtml(label)}"><span class="report-category-rank" aria-hidden="true">${index + 1}</span><span class="report-category-main"><strong>${kind === 'service' ? `<span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}" aria-hidden="true"></span>` : ''}${escapeHtml(row.label)}</strong><span class="report-category-values"><span><b>${row.count}</b> ${countLabel}</span><span><b>${money(row.paid) || '0 €'}</b> encaissé</span></span>${badges ? `<small class="report-category-badges">${escapeHtml(badges)}</small>` : ''}<span class="report-category-bar" aria-hidden="true"><i style="--bar-width:${width.toFixed(1)}%"></i></span></span><span class="report-category-chevron" aria-hidden="true">›</span></button>`;
+      return `<button type="button" class="report-category-button ${row.net < 0 ? 'negative' : ''}" data-report-detail-kind="${kind}" data-report-detail-key="${escapeHtml(row.key)}" aria-label="Voir le détail : ${escapeHtml(label)}"><span class="report-category-rank" aria-hidden="true">${index + 1}</span><span class="report-category-main"><strong>${kind === 'service' ? `<span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}" aria-hidden="true"></span>` : ''}${escapeHtml(row.label)}</strong><span class="report-category-values"><span><b>${row.count}</b> ${countLabel}</span><span><b>${money(row.net) || '0 €'}</b> net${row.refunded ? ` · ${money(row.gross) || '0 €'} brut · ${money(row.refunded)} remboursé` : ''}</span></span>${badges ? `<small class="report-category-badges">${escapeHtml(badges)}</small>` : ''}<span class="report-category-bar" aria-hidden="true"><i style="--bar-width:${width.toFixed(1)}%"></i></span></span><span class="report-category-chevron" aria-hidden="true">›</span></button>`;
     }).join('');
     return `<section class="report-panel category-report-panel">${heading}<div class="category-report-list">${body}</div></section>`;
   }
@@ -2001,37 +2240,59 @@
       const inMonth = appointment => dateInRange(appointment.date, start, end);
       const appointments = app.state.appointments.filter(inMonth), active = appointments.filter(activeAppointment), performed = active.filter(item => appointmentEnd(item) <= Date.now()), clients = new Set(performed.map(item => item.clientId));
       const minutes = performed.reduce((sum, item) => sum + Number(item.duration || 0), 0);
-      const collected = app.state.appointments.filter(item => paidInRange(item, start, end)).reduce((sum, item) => sum + appointmentTotal(item), 0);
-      const pending = active.filter(item => item.paymentStatus === 'pending').reduce((sum, item) => sum + appointmentTotal(item), 0);
-      return `<article class="annual-row"><strong>${format(start, { month: 'long' })}</strong><span class="annual-row-values"><span><b>${performed.length}</b> réalisées</span><span><b>${clients.size}</b> clientes</span><span><b>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</b> effectuées</span><span><b>${money(collected) || '0 €'}</b> encaissé${pending ? ` · ${money(pending)} à régler` : ''}</span></span></article>`;
+      const cash = financialSummary(start, end);
+      const pending = appointments.filter(item => item.paymentStatus === 'pending').reduce((sum, item) => sum + appointmentTotal(item), 0);
+      return `<article class="annual-row"><strong>${format(start, { month: 'long' })}</strong><span class="annual-row-values"><span><b>${performed.length}</b> réalisées</span><span><b>${clients.size}</b> clientes</span><span><b>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</b> effectuées</span><span><b>${money(cash.net) || '0 €'}</b> net encaissé${cash.refunded ? ` · ${money(cash.gross) || '0 €'} brut · ${money(cash.refunded)} remboursé` : ''}${pending ? ` · ${money(pending)} à régler` : ''}</span></span></article>`;
     }).join('');
-    return `<section class="report-panel annual-panel"><div class="report-panel-heading"><p class="eyebrow">Année complète</p><h2>Détail mois par mois</h2><p>Prestations réalisées et paiements encaissés à leur date réelle.</p></div><div class="annual-list">${rows}</div></section>`;
+    return `<section class="report-panel annual-panel"><div class="report-panel-heading"><p class="eyebrow">Année complète</p><h2>Détail mois par mois</h2><p>Prestations à leur date de réalisation, paiements et remboursements à leurs dates réelles.</p></div><div class="annual-list">${rows}</div></section>`;
   }
 
   function csvCell(value) {
     let textValue = String(value ?? '').replace(/[\r\n]+/g, ' ');
-    if (/^[=+\-@\t]/.test(textValue)) textValue = `'${textValue}`;
+    if (/^\s*[=+\-@\t]/.test(textValue)) textValue = `'${textValue}`;
     return `"${textValue.replace(/"/g, '""')}"`;
+  }
+
+  // Ces valeurs sont calculées par l'application : elles peuvent donc rester
+  // numériques, y compris lorsqu'un remboursement produit un net négatif.
+  // Les textes saisis par l'utilisatrice continuent de passer par csvCell afin
+  // de neutraliser les formules lors de l'ouverture dans Excel ou Sheets.
+  function csvNumber(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toFixed(2) : '0.00';
   }
 
   async function exportReportCsv() {
     if (app.ui.reportTab === 'expenses') {
       const mode = app.ui.expenseReportMode, { start, end } = expenseReportRange(mode), expenses = expensesForRange(start, end);
       const header = ['Date', 'Catégorie', 'Description', 'Fournisseur', 'Montant'];
-      const rows = expenses.map(expense => [expense.date, expenseCategoryLabel(expense), expense.details, expense.supplier, numericAmount(expense.amount).toFixed(2)].map(csvCell).join(';'));
+      const rows = expenses.map(expense => [
+        csvCell(expense.date), csvCell(expenseCategoryLabel(expense)), csvCell(expense.details), csvCell(expense.supplier), csvNumber(numericAmount(expense.amount))
+      ].join(';'));
       const label = mode === 'year' ? String(start.getFullYear()) : mode === 'month' ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}` : dateKey(start);
       const blob = new Blob([`\ufeff${header.map(csvCell).join(';')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
       return shareOrDownload(blob, `depenses-${mode}-${label}.csv`, 'Dépenses Mon agenda');
     }
-    const { start, end } = reportRange(app.ui.reportMode), appointments = app.state.appointments.filter(item => dateInRange(item.date, start, end)).sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b));
-    const header = ['Date', 'Heure', 'Cliente', 'Téléphone', 'Contact via', 'Prestation', 'Durée (min)', 'Prix de base', 'Suppléments', 'Total', 'Statut', 'Paiement', 'Date paiement', 'Date relance'];
+    const { start, end } = reportRange(app.ui.reportMode), paymentsTab = app.ui.reportTab === 'payments';
+    const appointmentInRange = appointment => dateInRange(appointment.date, start, end);
+    const included = appointment => (paymentsTab
+      ? appointmentInRange(appointment) && (activeAppointment(appointment) || appointment.paymentStatus === 'pending')
+      : appointmentInRange(appointment)) || collectedInRange(appointment, start, end) || refundedInRange(appointment, start, end);
+    const exportTimestamp = appointment => appointmentInRange(appointment) ? appointmentTimestamp(appointment) : collectedInRange(appointment, start, end) ? dateTimeMs(appointment.paymentDate, '00:00') : dateTimeMs(appointment.refundDate, '00:00');
+    const appointments = app.state.appointments.filter(included).sort((one, two) => exportTimestamp(one) - exportTimestamp(two) || appointmentTimestamp(one) - appointmentTimestamp(two));
+    const header = ['Date RDV', 'Heure', 'Cliente', 'Téléphone', 'Contact via', 'Prestation', 'Durée (min)', 'Prix de base', 'Suppléments', 'Total RDV', 'Statut RDV', 'État paiement', 'Date paiement', 'Date remboursement', 'Moyen de paiement', 'Date relance', 'RDV dans la période', 'Réalisé dans la période', 'À venir dans la période', 'Montant prévu dans la période', 'Encaissé brut dans la période', 'Montant encaissé brut dans la période', 'Remboursé dans la période', 'Montant remboursé dans la période', 'Net financier dans la période', 'À régler dans la période', 'Montant à régler dans la période', 'À vérifier dans la période'];
     const rows = appointments.map(appointment => {
       const client = clientFor(appointment), supplementText = normaliseSupplements(appointment.supplements).map(item => `${item.label}: ${numericAmount(item.amount).toFixed(2)} €`).join(' | ');
-      return [appointment.date, appointment.time, client.name, client.phone, CONTACT[appointment.contactVia || client.contactVia] || '', appointment.service, appointment.duration, numericAmount(appointment.price).toFixed(2), supplementText, appointmentTotal(appointment).toFixed(2), STATUS[appointment.status], PAYMENT[appointment.paymentStatus], appointment.paymentDate, appointment.paymentReminderDate].map(csvCell).join(';');
+      const scheduled = activeAppointment(appointment) && appointmentInRange(appointment), performed = performedInRange(appointment, start, end), upcoming = scheduled && appointmentEnd(appointment) > Date.now();
+      const collected = collectedInRange(appointment, start, end), refunded = refundedInRange(appointment, start, end), pending = appointmentInRange(appointment) && appointment.paymentStatus === 'pending', unreviewed = scheduled && paymentNeedsReview(appointment), total = appointmentTotal(appointment);
+      const grossAmount = collected ? total : 0, refundAmount = refunded ? total : 0, netAmount = roundedAmount(grossAmount - refundAmount);
+      const values = [appointment.date, appointment.time, client.name, client.phone, CONTACT[appointment.contactVia || client.contactVia] || '', appointment.service, appointment.duration, numericAmount(appointment.price), supplementText, total, STATUS[appointment.status], PAYMENT[appointment.paymentStatus], appointment.paymentDate, appointment.refundDate, METHOD[appointment.paymentMethod] || '', appointment.paymentReminderDate, appointmentInRange(appointment) ? 'Oui' : 'Non', performed ? 'Oui' : 'Non', upcoming ? 'Oui' : 'Non', scheduled ? total : 0, collected ? 'Oui' : 'Non', grossAmount, refunded ? 'Oui' : 'Non', refundAmount, netAmount, pending ? 'Oui' : 'Non', pending ? total : 0, unreviewed ? 'Oui' : 'Non'];
+      const numericColumns = new Set([7, 9, 19, 21, 23, 24, 26]);
+      return values.map((value, index) => numericColumns.has(index) ? csvNumber(value) : csvCell(value)).join(';');
     });
     const label = app.ui.reportMode === 'year' ? String(start.getFullYear()) : app.ui.reportMode === 'month' ? `${start.getFullYear()}-${pad(start.getMonth() + 1)}` : dateKey(start);
     const blob = new Blob([`\ufeff${header.map(csvCell).join(';')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
-    await shareOrDownload(blob, `bilan-${app.ui.reportMode}-${label}.csv`, 'Bilan Mon agenda');
+    await shareOrDownload(blob, `bilan-${app.ui.reportTab}-${app.ui.reportMode}-${label}.csv`, 'Bilan Mon agenda');
   }
 
   function renderActivityReport(start, end) {
@@ -2041,23 +2302,27 @@
     const cancelled = appointments.filter(appointment => appointment.status === 'cancelled').length, noShows = appointments.filter(appointment => appointment.status === 'no_show').length;
     const workedMinutes = performed.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     const plannedMinutes = active.filter(appointment => appointmentEnd(appointment) > Date.now()).reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
-    const paid = app.state.appointments.filter(appointment => paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0), analysis = aggregateReportCategories(start, end);
+    const cash = financialSummary(start, end), analysis = aggregateReportCategories(start, end);
     const plannedCount = active.length - performed.length;
-    $('#reportSummary').innerHTML = `<section class="report-highlight"><span>Résumé de la période</span><div class="report-highlight-pair"><div><strong>${money(paid) || '0 €'}</strong><small>encaissé</small></div><div><strong>${performed.length}</strong><small>prestation${performed.length > 1 ? 's' : ''} réalisée${performed.length > 1 ? 's' : ''}</small></div></div></section><section class="metrics-grid"><article><span>Temps effectué</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article><span>Clientes reçues</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>À venir</span><strong>${plannedCount}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} planifiées` : 'rien de planifié'}</small></article></section>${cancelled || noShows ? `<p class="report-secondary-line"><span>${cancelled} annulée${cancelled > 1 ? 's' : ''}</span><span>${noShows} absence${noShows > 1 ? 's' : ''}</span></p>` : ''}<p class="report-definition">Le nombre suit la date du rendez-vous réalisé. L’encaissement suit la date du paiement.</p>`;
+    $('#reportSummary').innerHTML = `<section class="report-highlight"><span>Résumé de la période</span><div class="report-highlight-pair"><div><strong>${money(cash.net) || '0 €'}</strong><small>encaissé net</small></div><div><strong>${performed.length}</strong><small>prestation${performed.length > 1 ? 's' : ''} réalisée${performed.length > 1 ? 's' : ''}</small></div></div></section>${cash.refunded ? `<p class="report-secondary-line"><span>${money(cash.gross) || '0 €'} encaissé brut</span><span>${money(cash.refunded)} remboursé</span></p>` : ''}<section class="metrics-grid"><article><span>Temps effectué</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article><span>Clientes reçues</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>À venir</span><strong>${plannedCount}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} planifiées` : 'rien de planifié'}</small></article></section>${cancelled || noShows ? `<p class="report-secondary-line"><span>${cancelled} annulée${cancelled > 1 ? 's' : ''}</span><span>${noShows} absence${noShows > 1 ? 's' : ''}</span></p>` : ''}<p class="report-definition">Le nombre suit la date du rendez-vous réalisé. Le brut suit la date du paiement ; le remboursement intégral suit sa propre date.</p>`;
     $('#reportContent').innerHTML = `${categoryReportTable('Prestations', analysis.services, 'service')}${categoryReportTable('Suppléments', analysis.supplements, 'supplement')}`;
   }
 
   function renderPaymentsReport(start, end) {
     const appointments = app.state.appointments.filter(appointment => dateInRange(appointment.date, start, end)), active = appointments.filter(activeAppointment), planned = active.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
-    const paid = app.state.appointments.filter(appointment => paidInRange(appointment, start, end)).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
-    const pending = active.filter(appointment => appointment.paymentStatus === 'pending'), pendingTotal = pending.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
-    const unreviewed = active.filter(appointment => appointment.paymentStatus === 'unreviewed');
+    const cash = financialSummary(start, end);
+    const pending = appointments.filter(appointment => appointment.paymentStatus === 'pending'), pendingTotal = pending.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+    const unreviewed = active.filter(appointment => paymentNeedsReview(appointment));
     const rows = [...pending, ...unreviewed].sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b)).map(appointment => {
       const client = clientFor(appointment), label = appointment.paymentStatus === 'pending' ? 'À régler' : 'À vérifier';
       return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)} · ${label}</small></span><b>${money(appointmentTotal(appointment)) || 'À définir'} <i>›</i></b></button>`;
     }).join('') || '<p class="empty-report">Aucun paiement à suivre sur cette période.</p>';
-    $('#reportSummary').innerHTML = `<section class="report-highlight paid"><span>Encaissé sur la période</span><strong>${money(paid) || '0 €'}</strong><small>chaque paiement est compté à sa date d’encaissement</small></section><section class="metrics-grid payments"><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-alert"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><p class="report-definition">Exemple : un rendez-vous de juin payé en juillet apparaît dans l’encaissement de juillet.</p>`;
-    $('#reportContent').innerHTML = `<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">À traiter</p><h2>Paiements à suivre</h2></div>${rows}</section>`;
+    const refundRows = app.state.appointments.filter(appointment => refundedInRange(appointment, start, end)).sort((one, two) => appointmentRefundDate(two) - appointmentRefundDate(one)).map(appointment => {
+      const client = clientFor(appointment);
+      return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>Remboursé le ${format(appointmentRefundDate(appointment), { day: 'numeric', month: 'short' })} · RDV du ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })}</small></span><b>−${money(appointmentTotal(appointment)) || '0 €'} <i>›</i></b></button>`;
+    }).join('');
+    $('#reportSummary').innerHTML = `<section class="report-highlight paid"><span>Net encaissé sur la période</span><strong>${money(cash.net) || '0 €'}</strong><small>${money(cash.gross) || '0 €'} brut${cash.refunded ? ` · ${money(cash.refunded)} remboursé` : ''}</small></section><section class="metrics-grid payments"><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-alert"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><p class="report-definition">Un paiement reste au brut à sa date réelle. Un statut « Remboursé » enregistre un remboursement intégral à la date indiquée, même si le RDV est annulé ou noté absent.</p>`;
+    $('#reportContent').innerHTML = `<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">À traiter</p><h2>Paiements à suivre</h2></div>${rows}</section>${refundRows ? `<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Sorties</p><h2>Remboursements de la période</h2></div>${refundRows}</section>` : ''}`;
   }
 
   function supplementsMatchingKey(appointment, key) {
@@ -2067,13 +2332,16 @@
   function reportDetailRows(appointments, kind, key, mode) {
     const limited = appointments.slice(0, REPORT_DETAIL_LIMIT);
     const rows = limited.map(appointment => {
-      const client = clientFor(appointment), paidDate = appointmentPaymentDate(appointment), displayDate = mode === 'paid' ? paidDate : parseDate(appointment.date);
+      const client = clientFor(appointment), paidDate = appointmentPaymentDate(appointment), refundDate = appointmentRefundDate(appointment), displayDate = mode === 'paid' ? paidDate : mode === 'refunded' ? refundDate : parseDate(appointment.date);
       const matchedSupplements = kind === 'supplement' ? supplementsMatchingKey(appointment, key) : [];
       const amount = kind === 'service' ? numericAmount(appointment.price) : matchedSupplements.reduce((sum, item) => sum + numericAmount(item.amount), 0);
       const details = mode === 'paid'
         ? `RDV du ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}${kind === 'supplement' && matchedSupplements.length > 1 ? ` · ${matchedSupplements.length} lignes` : ''}`
+        : mode === 'refunded'
+          ? `Payé le ${format(paidDate, { day: 'numeric', month: 'short' })} · RDV du ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })}`
         : `${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}${kind === 'supplement' && matchedSupplements.length > 1 ? ` · ${matchedSupplements.length} lignes` : ''}`;
-      return `<button type="button" class="report-detail-row" data-edit="${escapeHtml(appointment.id)}"><span class="report-detail-date">${mode === 'paid' ? 'Payé<br>' : ''}${format(displayDate, { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>${money(amount) || '0 €'} ›</b></button>`;
+      const prefix = mode === 'paid' ? 'Payé<br>' : mode === 'refunded' ? 'Remboursé<br>' : '';
+      return `<button type="button" class="report-detail-row ${mode === 'refunded' ? 'negative' : ''}" data-edit="${escapeHtml(appointment.id)}"><span class="report-detail-date">${prefix}${format(displayDate, { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>${mode === 'refunded' ? '−' : ''}${money(amount) || '0 €'} ›</b></button>`;
     }).join('');
     const overflow = appointments.length > limited.length ? `<p class="report-detail-overflow">${appointments.length - limited.length} autre${appointments.length - limited.length > 1 ? 's' : ''} résultat${appointments.length - limited.length > 1 ? 's' : ''}. Affine la période pour tout afficher.</p>` : '';
     return (rows || '<p class="empty-report">Aucun rendez-vous correspondant.</p>') + overflow;
@@ -2083,22 +2351,28 @@
     if (!['service', 'supplement'].includes(kind) || !key) return;
     const { start, end } = reportRange(app.ui.reportMode);
     const kindMatches = appointment => kind === 'service' ? serviceReportKey(appointment) === key : supplementsMatchingKey(appointment, key).length > 0;
-    const baseMatches = appointment => activeAppointment(appointment) && kindMatches(appointment);
+    const baseMatches = appointment => kindMatches(appointment);
     const performed = app.state.appointments.filter(appointment => baseMatches(appointment) && performedInRange(appointment, start, end)).sort((one, two) => appointmentTimestamp(two) - appointmentTimestamp(one));
-    const paid = app.state.appointments.filter(appointment => baseMatches(appointment) && paidInRange(appointment, start, end)).sort((one, two) => appointmentPaymentDate(two) - appointmentPaymentDate(one) || appointmentTimestamp(two) - appointmentTimestamp(one));
+    const paid = app.state.appointments.filter(appointment => baseMatches(appointment) && collectedInRange(appointment, start, end)).sort((one, two) => appointmentPaymentDate(two) - appointmentPaymentDate(one) || appointmentTimestamp(two) - appointmentTimestamp(one));
+    const refunded = app.state.appointments.filter(appointment => baseMatches(appointment) && refundedInRange(appointment, start, end)).sort((one, two) => appointmentRefundDate(two) - appointmentRefundDate(one) || appointmentTimestamp(two) - appointmentTimestamp(one));
     const analysis = aggregateReportCategories(start, end), row = (kind === 'service' ? analysis.services : analysis.supplements).find(item => item.key === key);
     const label = row?.label || (kind === 'service' ? 'Prestation' : 'Supplément');
     const performedCount = kind === 'service' ? performed.length : performed.reduce((sum, appointment) => sum + supplementsMatchingKey(appointment, key).length, 0);
     const paidTotal = paid.reduce((sum, appointment) => sum + (kind === 'service' ? numericAmount(appointment.price) : supplementsMatchingKey(appointment, key).reduce((value, item) => value + numericAmount(item.amount), 0)), 0);
+    const refundedTotal = refunded.reduce((sum, appointment) => sum + (kind === 'service' ? numericAmount(appointment.price) : supplementsMatchingKey(appointment, key).reduce((value, item) => value + numericAmount(item.amount), 0)), 0);
     $('#reportDetailTitle').textContent = label;
-    $('#reportDetailSummary').textContent = `${performedCount} ${kind === 'service' ? 'prestation' : 'utilisation'}${performedCount > 1 ? 's' : ''} réalisée${performedCount > 1 ? 's' : ''} · ${money(numericAmount(paidTotal)) || '0 €'} encaissé`;
-    $('#reportDetailContent').innerHTML = `<section class="report-detail-section"><h3>Réalisé pendant la période</h3>${reportDetailRows(performed, kind, key, 'performed')}</section><section class="report-detail-section"><h3>Encaissé pendant la période</h3>${reportDetailRows(paid, kind, key, 'paid')}</section>`;
+    $('#reportDetailSummary').textContent = `${performedCount} ${kind === 'service' ? 'prestation' : 'utilisation'}${performedCount > 1 ? 's' : ''} réalisée${performedCount > 1 ? 's' : ''} · ${money(numericAmount(paidTotal)) || '0 €'} brut · ${money(numericAmount(refundedTotal)) || '0 €'} remboursé · ${money(roundedAmount(paidTotal - refundedTotal)) || '0 €'} net`;
+    $('#reportDetailContent').innerHTML = `<section class="report-detail-section"><h3>Réalisé pendant la période</h3>${reportDetailRows(performed, kind, key, 'performed')}</section><section class="report-detail-section"><h3>Encaissé brut pendant la période</h3>${reportDetailRows(paid, kind, key, 'paid')}</section><section class="report-detail-section"><h3>Remboursé pendant la période</h3>${reportDetailRows(refunded, kind, key, 'refunded')}</section>`;
     $('#reportDetailDialog').showModal();
   }
 
   function renderScreen() {
     $('#agendaScreen').hidden = app.ui.screen !== 'agenda'; $('#clientsScreen').hidden = app.ui.screen !== 'clients'; $('#reportScreen').hidden = app.ui.screen !== 'report';
-    $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.screen === app.ui.screen));
+    $$('.nav-item').forEach(button => {
+      const active = button.dataset.screen === app.ui.screen;
+      button.classList.toggle('active', active);
+      if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
+    });
   }
 
   function showScreen(screen) {
@@ -2140,11 +2414,21 @@
   }
 
   function syncPaymentFields() {
-    const editing = Boolean(app.ui.editingAppointmentId), status = $('#paymentStatus').value, paid = status === 'paid', pending = status === 'pending';
-    $('#paymentDateField').hidden = !paid; $('#paymentDate').disabled = !editing || !paid;
-    $('#paymentMethodField').hidden = !paid; $('#paymentMethod').disabled = !editing || !paid;
+    const editing = Boolean(app.ui.editingAppointmentId), status = $('#paymentStatus').value, collected = status === 'paid' || status === 'refunded', refunded = status === 'refunded', pending = status === 'pending';
+    $('#paymentDateField').hidden = !collected; $('#paymentDate').disabled = !editing || !collected; $('#paymentDate').required = editing && collected;
+    $('#paymentMethodField').hidden = !collected; $('#paymentMethod').disabled = !editing || !collected;
+    const refundField = $('#refundDateField'), refundDate = $('#refundDate');
+    if (refundField) refundField.hidden = !refunded;
+    if (refundDate) { refundDate.disabled = !editing || !refunded; refundDate.required = editing && refunded; }
     $('#paymentReminderField').hidden = !pending; $('#paymentReminderDate').disabled = !editing || !pending; $('#paymentReminderDate').required = editing && pending;
-    if (paid && !$('#paymentDate').value) $('#paymentDate').value = $('#date').value || todayKey();
+    const paymentDate = $('#paymentDate'), today = todayKey();
+    paymentDate.max = today;
+    if (collected && !paymentDate.value) paymentDate.value = today;
+    if (refundDate) {
+      refundDate.max = today;
+      refundDate.min = collected && validDate(paymentDate.value) ? paymentDate.value : '';
+      if (refunded && !refundDate.value) refundDate.value = today;
+    }
   }
 
   function populateStatusSelect(editing, selected = 'confirmed') {
@@ -2208,7 +2492,7 @@
   function syncAppointmentFormMode() {
     const editing = Boolean(app.ui.editingAppointmentId), linked = editing ? app.state.appointments.find(item => item.parentAppointmentId === app.ui.editingAppointmentId && activeAppointment(item)) : null;
     $('#appointmentEditFields').hidden = !editing; $('#recurrenceSection').hidden = !editing; $('#repeatWeeks').disabled = !editing || Boolean(linked); $('#repeatComposer').hidden = Boolean(linked);
-    $('#paymentStatus').disabled = !editing; $('#paymentDate').disabled = !editing; $('#paymentMethod').disabled = !editing; $('#paymentReminderDate').disabled = !editing;
+    $('#paymentStatus').disabled = !editing; $('#paymentDate').disabled = !editing; $('#paymentMethod').disabled = !editing; $('#paymentReminderDate').disabled = !editing; if ($('#refundDate')) $('#refundDate').disabled = !editing;
     $('#linkedNextAppointment').hidden = !linked;
     if (linked) {
       $('#repeatWeeks').value = '0';
@@ -2224,7 +2508,7 @@
     app.ui.appointmentContactExpanded = true; app.ui.appointmentAdjustmentsExpanded = false;
     $('#appointmentContactSummary').hidden = true; $('#appointmentContactFields').hidden = false; $('#appointmentServiceSummary').hidden = true; setAppointmentAdjustments(false);
     $('#date').value = dateKey(app.ui.selectedDate); setTimePicker('time', '10:00'); setTimePicker('repeatTime', '10:00'); setDurationValue(60); populateStatusSelect(false, 'confirmed');
-    $('#paymentStatus').value = 'unreviewed'; $('#paymentDate').value = ''; $('#paymentReminderDate').value = ''; $('#paymentMethod').value = ''; $('#repeatWeeks').value = '0'; $('#repeatDate').value = ''; $('#repeatTime').value = '';
+    $('#paymentStatus').value = 'unreviewed'; $('#paymentDate').value = ''; if ($('#refundDate')) $('#refundDate').value = ''; $('#paymentReminderDate').value = ''; $('#paymentMethod').value = ''; $('#repeatWeeks').value = '0'; $('#repeatDate').value = ''; $('#repeatTime').value = '';
     $('#contactVia').value = ''; $('#lateCancellation').checked = false; renderSupplementRows([]); renderAppointmentHistory(null);
     $('#clientSuggestions').hidden = true; $('#selectedClientInfo').hidden = true; $('#selectedClientInfo').innerHTML = ''; $('#conflictHint').hidden = true; app.ui.editingAppointmentId = null; app.ui.formClientId = null; app.ui.formServiceColor = 'rose'; app.ui.repeatDateEdited = false; app.ui.repeatTimeEdited = false;
     $('#appointmentWaze').hidden = true; $('#addressHint').hidden = true;
@@ -2249,7 +2533,7 @@
     $('#appointmentFormTitle').textContent = appointment ? 'Modifier le rendez-vous' : 'Nouveau rendez-vous'; $('#deleteAppointment').hidden = !appointment;
     if (appointment) {
       const client = clientFor(appointment); app.ui.editingAppointmentId = appointment.id; app.ui.formClientId = client.id; app.ui.formServiceColor = appointment.serviceColor || 'rose';
-      populateStatusSelect(true, appointment.status); $('#appointmentId').value = appointment.id; $('#clientName').value = client.name; $('#phone').value = client.phone; $('#contactVia').value = appointment.contactVia || client.contactVia || ''; $('#date').value = appointment.date; setTimePicker('time', appointment.time); setDurationValue(appointment.duration); $('#price').value = appointment.price; renderSupplementRows(appointment.supplements); populateServiceSelect(appointment.serviceId, appointment.service); $('#service').value = appointment.service; $('#address').value = appointmentAddress(appointment); $('#paymentStatus').value = appointment.paymentStatus; $('#paymentDate').value = appointment.paymentDate || ''; $('#paymentReminderDate').value = appointment.paymentReminderDate || ''; $('#paymentMethod').value = appointment.paymentMethod; $('#notes').value = appointment.notes; $('#cancellationReason').value = appointment.cancellationReason || ''; $('#lateCancellation').checked = appointment.lateCancellation === true; $('#appointmentWaze').hidden = !appointmentAddress(appointment); renderSelectedClientInfo(client); renderAppointmentHistory(appointment);
+      populateStatusSelect(true, appointment.status); $('#appointmentId').value = appointment.id; $('#clientName').value = client.name; $('#phone').value = client.phone; $('#contactVia').value = appointment.contactVia || client.contactVia || ''; $('#date').value = appointment.date; setTimePicker('time', appointment.time); setDurationValue(appointment.duration); $('#price').value = appointment.price; renderSupplementRows(appointment.supplements); populateServiceSelect(appointment.serviceId, appointment.service); $('#service').value = appointment.service; $('#address').value = appointmentAddress(appointment); $('#paymentStatus').value = appointment.paymentStatus; $('#paymentDate').value = appointment.paymentDate || ''; if ($('#refundDate')) $('#refundDate').value = appointment.refundDate || ''; $('#paymentReminderDate').value = appointment.paymentReminderDate || ''; $('#paymentMethod').value = appointment.paymentMethod; $('#notes').value = appointment.notes; $('#cancellationReason').value = appointment.cancellationReason || ''; $('#lateCancellation').checked = appointment.lateCancellation === true; $('#appointmentWaze').hidden = !appointmentAddress(appointment); renderSelectedClientInfo(client); renderAppointmentHistory(appointment);
     } else if (defaults.from) {
       const prior = defaults.from, client = clientFor(prior); app.ui.formClientId = client.id; app.ui.formServiceColor = prior.serviceColor || 'rose';
       $('#clientName').value = client.name; $('#phone').value = client.phone; $('#contactVia').value = prior.contactVia || client.contactVia || ''; $('#address').value = appointmentAddress(prior); setDurationValue(prior.duration); $('#price').value = prior.price; renderSupplementRows(prior.supplements); populateServiceSelect(prior.serviceId, prior.service); $('#service').value = prior.service; $('#date').value = defaults.date || dateKey(app.ui.selectedDate); setTimePicker('time', defaults.time || prior.time); $('#appointmentWaze').hidden = !appointmentAddress(prior); renderSelectedClientInfo(client);
@@ -2341,8 +2625,8 @@
   function getDraft() {
     const preset = serviceById($('#serviceSelect').value), service = preset?.name || $('#service').value.trim();
     const editing = Boolean(app.ui.editingAppointmentId), recurring = editing ? Number($('#repeatWeeks').value) : 0;
-    const paymentStatus = editing ? $('#paymentStatus').value : 'unreviewed';
-    return { id: app.ui.editingAppointmentId || $('#appointmentId').value || uuid(), clientId: app.ui.formClientId, clientName: $('#clientName').value.trim(), phone: $('#phone').value.trim(), contactVia: $('#contactVia').value, address: $('#address').value.trim(), date: $('#date').value, time: $('#time').value, duration: Number($('#duration').value), price: $('#price').value.trim(), supplements: supplementsFromForm(), service, serviceId: preset?.id || '', serviceColor: preset?.color || app.ui.formServiceColor || 'rose', status: $('#status').value, paymentStatus, paymentDate: paymentStatus === 'paid' ? (editing ? ($('#paymentDate').value || $('#date').value) : $('#date').value) : '', paymentReminderDate: paymentStatus === 'pending' ? $('#paymentReminderDate').value : '', paymentMethod: editing ? $('#paymentMethod').value : '', notes: $('#notes').value.trim(), cancellationReason: editing && ['cancelled', 'no_show'].includes($('#status').value) ? $('#cancellationReason').value.trim() : '', lateCancellation: editing && $('#status').value === 'cancelled' && $('#lateCancellation').checked, repeatWeeks: recurring, repeatDate: recurring ? $('#repeatDate').value : '', repeatTime: recurring ? $('#repeatTime').value : '' };
+    const paymentStatus = editing ? $('#paymentStatus').value : 'unreviewed', collected = paymentStatus === 'paid' || paymentStatus === 'refunded';
+    return { id: app.ui.editingAppointmentId || $('#appointmentId').value || uuid(), clientId: app.ui.formClientId, clientName: $('#clientName').value.trim(), phone: $('#phone').value.trim(), contactVia: $('#contactVia').value, address: $('#address').value.trim(), date: $('#date').value, time: $('#time').value, duration: Number($('#duration').value), price: $('#price').value.trim(), supplements: supplementsFromForm(), service, serviceId: preset?.id || '', serviceColor: preset?.color || app.ui.formServiceColor || 'rose', status: $('#status').value, paymentStatus, paymentDate: collected ? (editing ? ($('#paymentDate').value || todayKey()) : todayKey()) : '', refundDate: paymentStatus === 'refunded' ? ($('#refundDate')?.value || '') : '', paymentReminderDate: paymentStatus === 'pending' ? $('#paymentReminderDate').value : '', paymentMethod: collected && editing ? $('#paymentMethod').value : '', notes: $('#notes').value.trim(), cancellationReason: editing && ['cancelled', 'no_show'].includes($('#status').value) ? $('#cancellationReason').value.trim() : '', lateCancellation: editing && $('#status').value === 'cancelled' && $('#lateCancellation').checked, repeatWeeks: recurring, repeatDate: recurring ? $('#repeatDate').value : '', repeatTime: recurring ? $('#repeatTime').value : '' };
   }
 
   function updateConflictHint() {
@@ -2383,22 +2667,44 @@
     return row[right.length];
   }
 
-  function similarClient(draft) {
-    if (draft.clientId) return null;
+  function similarClients(draft) {
+    if (draft.clientId) return [];
     const phone = normalisePhone(draft.phone), name = normaliseName(draft.clientName);
-    const byPhone = phone.length >= 8 ? app.state.clients.find(client => normalisePhone(client.phone) === phone) : null;
-    if (byPhone) return byPhone;
-    return app.state.clients.find(client => {
+    if (phone.length >= 8) {
+      const phoneMatches = app.state.clients.filter(client => normalisePhone(client.phone) === phone);
+      if (phoneMatches.length) return phoneMatches.slice(0, 8);
+    }
+    const exactNames = app.state.clients.filter(client => name && normaliseName(client.name) === name);
+    if (exactNames.length) return exactNames.slice(0, 8);
+    if (name.length < 5) return [];
+    return app.state.clients.map(client => {
       const candidate = normaliseName(client.name), longest = Math.max(name.length, candidate.length);
-      if (!name || !candidate || longest < 5) return false;
-      return editDistance(name, candidate) <= (longest >= 9 ? 2 : 1);
-    }) || null;
+      return { client, distance: candidate && longest >= 5 ? editDistance(name, candidate) : Infinity, longest };
+    }).filter(item => item.distance <= (item.longest >= 9 ? 2 : 1))
+      .sort((one, two) => one.distance - two.distance || one.client.name.localeCompare(two.client.name, 'fr'))
+      .slice(0, 8).map(item => item.client);
   }
 
-  function openDuplicateClientDialog(draft, client) {
-    app.ui.pendingDuplicate = { draft, clientId: client.id };
-    $('#duplicateClientText').textContent = 'Le nom ou le numéro ressemble à une fiche déjà présente.';
-    $('#duplicateClientDetails').innerHTML = `<strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.phone || 'Sans téléphone')}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ''}`;
+  function updateDuplicateClientDetails() {
+    const pending = app.ui.pendingDuplicate;
+    const selectedId = $('#duplicateClientChoice')?.value || pending?.clientIds?.[0];
+    const client = selectedId ? clientById(selectedId) : null;
+    $('#duplicateClientDetails').innerHTML = client
+      ? `<strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.phone || 'Sans téléphone')}</span>${client.address ? `<small>${escapeHtml(client.address)}</small>` : ''}`
+      : '<span>Aucune fiche sélectionnée.</span>';
+  }
+
+  function openDuplicateClientDialog(draft, candidates) {
+    const clients = [...(candidates || [])].filter(client => client?.id);
+    if (!clients.length) return;
+    app.ui.pendingDuplicate = { draft, clientIds: clients.map(client => client.id) };
+    $('#duplicateClientText').textContent = clients.length > 1
+      ? 'Plusieurs fiches ressemblent à cette saisie. Choisis la bonne cliente ou crée une nouvelle fiche.'
+      : 'Le nom ou le numéro ressemble à une fiche déjà présente.';
+    const choice = $('#duplicateClientChoice'), choiceField = $('#duplicateClientChoiceField');
+    choice.innerHTML = clients.map(client => `<option value="${escapeHtml(client.id)}">${escapeHtml([client.name, client.phone || 'sans téléphone', client.address].filter(Boolean).join(' · '))}</option>`).join('');
+    choiceField.hidden = clients.length < 2;
+    updateDuplicateClientDetails();
     $('#duplicateClientDialog').showModal();
   }
 
@@ -2434,7 +2740,7 @@
     if (alreadyExists) return 'Ce prochain RDV existe déjà : aucun doublon n’a été créé.';
     const recurrenceId = appointment.recurrenceId || uuid();
     const createdAt = new Date().toISOString();
-    const repeated = { ...appointment, id: uuid(), date: requestedDate, time: requestedTime, supplements: normaliseSupplements(appointment.supplements), status: 'confirmed', paymentStatus: 'unreviewed', paymentDate: '', paymentReminderDate: '', paymentMethod: '', cancellationReason: '', lateCancellation: false, recurrenceId, parentAppointmentId: appointment.id, history: [appointmentHistoryEntry('created', 'Prochain rendez-vous créé', `Depuis le rendez-vous du ${appointment.date}`)], createdAt, updatedAt: createdAt };
+    const repeated = { ...appointment, id: uuid(), date: requestedDate, time: requestedTime, supplements: normaliseSupplements(appointment.supplements), status: 'confirmed', paymentStatus: 'unreviewed', paymentDate: '', refundDate: '', paymentReminderDate: '', paymentMethod: '', cancellationReason: '', lateCancellation: false, recurrenceId, parentAppointmentId: appointment.id, history: [appointmentHistoryEntry('created', 'Prochain rendez-vous créé', `Depuis le rendez-vous du ${appointment.date}`)], createdAt, updatedAt: createdAt };
     const conflicts = findConflicts(repeated), warnings = scheduleWarnings(repeated);
     if ((conflicts.length || warnings.length) && !window.confirm(`Le prochain RDV du ${format(date, { day: 'numeric', month: 'long' })} à ${repeated.time} demande ton attention.\n${conflicts.length ? 'Il chevauche un rendez-vous ou un événement personnel bloquant.\n' : ''}${warnings.join('\n')}\n\nLe créer quand même ?`)) return 'Le rendez-vous principal est enregistré. Le prochain RDV n’a pas été créé afin que tu puisses choisir un autre jour.';
     appointment.recurrenceId = recurrenceId;
@@ -2445,12 +2751,13 @@
     const previousState = cloneState(app.state);
     const existing = app.state.appointments.find(item => item.id === draft.id), previousClient = existing ? previousState.clients.find(item => item.id === existing.clientId) : null, client = ensureClient(draft, existing);
     const createdAt = existing?.createdAt || new Date().toISOString();
-    const appointment = { id: draft.id, clientId: client.id, date: draft.date, time: draft.time, duration: draft.duration, price: draft.price, supplements: normaliseSupplements(draft.supplements), service: draft.service, serviceId: draft.serviceId, serviceColor: draft.serviceColor, address: draft.address, contactVia: draft.contactVia, status: draft.status, paymentStatus: draft.paymentStatus, paymentDate: draft.paymentStatus === 'paid' ? draft.paymentDate : '', paymentReminderDate: draft.paymentStatus === 'pending' ? draft.paymentReminderDate : '', paymentMethod: draft.paymentStatus === 'paid' ? draft.paymentMethod : '', notes: draft.notes, cancellationReason: draft.cancellationReason, lateCancellation: draft.lateCancellation === true, recurrenceId: existing?.recurrenceId || '', parentAppointmentId: existing?.parentAppointmentId || '', history: normaliseHistory(existing?.history, createdAt), createdAt, updatedAt: new Date().toISOString() };
+    const collected = draft.paymentStatus === 'paid' || draft.paymentStatus === 'refunded';
+    const appointment = { id: draft.id, clientId: client.id, date: draft.date, time: draft.time, duration: draft.duration, price: draft.price, supplements: normaliseSupplements(draft.supplements), service: draft.service, serviceId: draft.serviceId, serviceColor: draft.serviceColor, address: draft.address, contactVia: draft.contactVia, status: draft.status, paymentStatus: draft.paymentStatus, paymentDate: collected ? draft.paymentDate : '', refundDate: draft.paymentStatus === 'refunded' ? draft.refundDate : '', paymentReminderDate: draft.paymentStatus === 'pending' ? draft.paymentReminderDate : '', paymentMethod: collected ? draft.paymentMethod : '', notes: draft.notes, cancellationReason: draft.cancellationReason, lateCancellation: draft.lateCancellation === true, recurrenceId: existing?.recurrenceId || '', parentAppointmentId: existing?.parentAppointmentId || '', history: normaliseHistory(existing?.history, createdAt), createdAt, updatedAt: new Date().toISOString() };
     if (!existing) appendAppointmentHistory(appointment, 'created', 'Rendez-vous créé', `${appointment.date} à ${appointment.time}`);
     else {
       if (existing.date !== appointment.date || existing.time !== appointment.time) appendAppointmentHistory(appointment, 'moved', 'Rendez-vous déplacé', `${existing.date} ${existing.time} → ${appointment.date} ${appointment.time}`);
       if (existing.status !== appointment.status) appendAppointmentHistory(appointment, 'status', `Statut : ${STATUS[appointment.status]}`, `Ancien statut : ${STATUS[existing.status]}`);
-      if (existing.paymentStatus !== appointment.paymentStatus || existing.paymentDate !== appointment.paymentDate || existing.paymentMethod !== appointment.paymentMethod || existing.paymentReminderDate !== appointment.paymentReminderDate) appendAppointmentHistory(appointment, 'payment', `Paiement : ${PAYMENT[appointment.paymentStatus]}`, appointment.paymentDate ? `Date ${appointment.paymentDate}` : appointment.paymentReminderDate ? `Relance ${appointment.paymentReminderDate}` : '');
+      if (existing.paymentStatus !== appointment.paymentStatus || existing.paymentDate !== appointment.paymentDate || existing.refundDate !== appointment.refundDate || existing.paymentMethod !== appointment.paymentMethod || existing.paymentReminderDate !== appointment.paymentReminderDate) appendAppointmentHistory(appointment, 'payment', `Paiement : ${PAYMENT[appointment.paymentStatus]}`, appointment.refundDate ? `Payé le ${appointment.paymentDate} · remboursé le ${appointment.refundDate}` : appointment.paymentDate ? `Date ${appointment.paymentDate}` : appointment.paymentReminderDate ? `Relance ${appointment.paymentReminderDate}` : '');
       if (existing.service !== appointment.service || existing.duration !== appointment.duration || numericAmount(existing.price) !== numericAmount(appointment.price) || JSON.stringify(normaliseSupplements(existing.supplements)) !== JSON.stringify(normaliseSupplements(appointment.supplements))) appendAppointmentHistory(appointment, 'details', 'Prestation ou tarif modifié');
       const otherChanges = [];
       if (existing.clientId !== appointment.clientId) otherChanges.push('cliente');
@@ -2465,7 +2772,7 @@
     const index = app.state.appointments.findIndex(item => item.id === appointment.id); if (index === -1) app.state.appointments.push(appointment); else app.state.appointments[index] = appointment;
     const recurrenceMessage = createRecurringAppointment(appointment, draft.repeatWeeks, draft.repeatDate, draft.repeatTime);
     app.ui.selectedDate = parseDate(appointment.date) || app.ui.selectedDate; app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.monthDate = localDate(app.ui.selectedDate.getFullYear(), app.ui.selectedDate.getMonth(), 1);
-    if (!(await saveState(app.state, false, { reason: existing ? 'appointment-update' : 'appointment-create' }))) { app.state = previousState; setAppointmentSaving(false); return false; }
+    if (!(await saveState(app.state, false, { reason: existing ? 'appointment-update' : 'appointment-create' }))) { setAppointmentSaving(false); return false; }
     clearAppointmentDraft(); $('#appointmentDialog').close(); render();
     const moved = existing && (existing.date !== appointment.date || existing.time !== appointment.time), cancelled = existing && existing.status !== appointment.status && ['cancelled', 'no_show'].includes(appointment.status);
     offerUndo(previousState, cancelled ? 'Rendez-vous annulé' : moved ? 'Rendez-vous déplacé' : existing ? 'Rendez-vous modifié' : 'Rendez-vous créé');
@@ -2489,11 +2796,11 @@
 
   async function settleLateBadgePrompt(action) {
     const client = clientById(app.ui.pendingLateBadgeClientId); if (!client) { $('#lateBadgeDialog').close(); return; }
-    const previousState = cloneState(app.state), count = lateCancellationCount(client.id);
+    const count = lateCancellationCount(client.id);
     if (action === 'apply') client.badgeId = $('#lateBadgeChoice').value;
     if (action === 'disable') client.lateBadgePromptDisabled = true;
     client.lateBadgePromptLastCount = count; client.updatedAt = new Date().toISOString();
-    if (!(await saveState(app.state, false, { reason: 'client-badge-update' }))) { app.state = previousState; return; }
+    if (!(await saveState(app.state, false, { reason: 'client-badge-update' }))) return;
     app.ui.pendingLateBadgeClientId = null; $('#lateBadgeDialog').close(); render();
   }
 
@@ -2550,14 +2857,6 @@
     $('#blockDialog').showModal(); captureFormBaseline('blockDialog');
   }
 
-  function openQuickAdd(date = dateKey(app.ui.selectedDate), time = '10:00') {
-    app.ui.quickAddDate = validDate(date) ? date : dateKey(app.ui.selectedDate);
-    app.ui.quickAddTime = validTime(time) ? time : '10:00';
-    const parsed = parseDate(app.ui.quickAddDate);
-    $('#quickAddWhen').textContent = `${format(parsed, { weekday: 'long', day: 'numeric', month: 'long' })} à ${app.ui.quickAddTime}`;
-    $('#quickAddDialog').showModal();
-  }
-
   function blockDraft() {
     const allDay = $('#blockAllDay').checked, startDate = allDay ? $('#blockAllDayDate').value : $('#blockStartDate').value;
     const endDate = allDay ? ($('#blockAllDayEndDate').value || startDate) : $('#blockEndDate').value;
@@ -2588,7 +2887,7 @@
     const now = new Date().toISOString(), existing = index >= 0 ? app.state.blocks[index] : null;
     const clean = normaliseBlock({ ...block, createdAt: existing?.createdAt || now, updatedAt: now }); if (!clean) { setBlockSaving(false); return false; }
     if (index === -1) app.state.blocks.push(clean); else app.state.blocks[index] = clean;
-    if (!(await saveState(app.state, false, { reason: index === -1 ? 'event-create' : 'event-update' }))) { app.state = previousState; setBlockSaving(false); return false; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'event-create' : 'event-update' }))) { setBlockSaving(false); return false; }
     app.ui.selectedDate = parseDate(clean.startDate) || app.ui.selectedDate; app.ui.weekStart = mondayOf(app.ui.selectedDate); app.ui.monthDate = localDate(app.ui.selectedDate.getFullYear(), app.ui.selectedDate.getMonth(), 1);
     clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, index === -1 ? 'Événement personnel ajouté' : 'Événement personnel modifié');
     return true;
@@ -2650,7 +2949,7 @@
     if (!record) { validation.textContent = 'Cette dépense ne peut pas être enregistrée. Vérifie les informations.'; validation.hidden = false; setExpenseSaving(false); return false; }
     const previousState = cloneState(app.state), index = app.state.expenses.findIndex(expense => expense.id === record.id);
     if (index === -1) app.state.expenses.push(record); else app.state.expenses[index] = record;
-    if (!(await saveState(app.state, false, { reason: index === -1 ? 'expense-create' : 'expense-update' }))) { app.state = previousState; setExpenseSaving(false); return false; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'expense-create' : 'expense-update' }))) { setExpenseSaving(false); return false; }
     app.ui.editingExpenseId = null; clearFormDraft('expense'); $('#expenseDialog').close(); render(); offerUndo(previousState, index === -1 ? 'Dépense enregistrée' : 'Dépense modifiée');
     return true;
   }
@@ -2658,7 +2957,7 @@
   async function deleteExpense(id = app.ui.editingExpenseId || $('#expenseId')?.value) {
     const expense = app.state.expenses.find(item => item.id === id); if (!expense || !window.confirm('Supprimer cette dépense ?')) return false;
     const previousState = cloneState(app.state); app.state.expenses = app.state.expenses.filter(item => item.id !== expense.id);
-    if (!(await saveState(app.state, false, { reason: 'expense-delete' }))) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: 'expense-delete' }))) return false;
     app.ui.editingExpenseId = null; clearFormDraft('expense'); if ($('#expenseDialog').open) $('#expenseDialog').close(); render(); offerUndo(previousState, 'Dépense supprimée');
     return true;
   }
@@ -2691,13 +2990,13 @@
     if (app.state.settings.expenseCategories.some(category => category.id !== id && normaliseName(category.name) === normaliseName(name))) { showAppAlert('Cette catégorie existe déjà.'); return false; }
     const index = app.state.settings.expenseCategories.findIndex(category => category.id === id);
     if (index === -1 && app.state.settings.expenseCategories.length >= LIMITS.settingsItems) { showAppAlert('Le nombre maximal de catégories est atteint.'); return false; }
-    const previousState = cloneState(app.state), record = { id, name, active: true };
+    const record = { id, name, active: true };
     if (index === -1) app.state.settings.expenseCategories.push(record);
     else {
       app.state.settings.expenseCategories[index] = record;
       app.state.expenses.forEach(expense => { if (expense.categoryId === id) expense.categoryLabel = name; });
     }
-    if (!(await saveState(app.state, false, { reason: index === -1 ? 'expense-category-create' : 'expense-category-update' }))) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'expense-category-create' : 'expense-category-update' }))) return false;
     clearFormDraft('expenseCategory'); populateExpenseCategorySelect($('#expenseCategory').value || id); renderExpenseCategoryList(); resetExpenseCategoryForm(); showSuccess(index === -1 ? 'Catégorie ajoutée' : 'Catégorie mise à jour');
     return true;
   }
@@ -2709,9 +3008,8 @@
     if (category.active && activeCount <= 1) { showAppAlert('Garde au moins une catégorie disponible.'); return false; }
     const wording = used ? 'Cette catégorie est déjà utilisée. La masquer pour les prochaines dépenses ?' : 'Supprimer cette catégorie ?';
     if (!window.confirm(wording)) return false;
-    const previousState = cloneState(app.state);
     if (used) category.active = false; else app.state.settings.expenseCategories = app.state.settings.expenseCategories.filter(item => item.id !== id);
-    if (!(await saveState(app.state, false, { reason: used ? 'expense-category-hide' : 'expense-category-delete' }))) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: used ? 'expense-category-hide' : 'expense-category-delete' }))) return false;
     clearFormDraft('expenseCategory'); populateExpenseCategorySelect(selectedExpenseCategoryId); renderExpenseCategoryList(); resetExpenseCategoryForm(); showSuccess(used ? 'Catégorie masquée' : 'Catégorie supprimée');
     return true;
   }
@@ -2727,7 +3025,7 @@
     const items = type === 'confirm' ? pendingConfirmations() : pendingPayments();
     $('#todoTitle').textContent = type === 'confirm' ? 'Rendez-vous à confirmer' : 'Paiements à relancer';
     $('#todoList').innerHTML = items.length ? items.map(appointment => {
-      const client = clientFor(appointment), details = `${format(parseDate(appointment.date), { weekday: 'short', day: 'numeric', month: 'short' })} · ${appointment.time} · ${escapeHtml(appointment.service)}`;
+      const client = clientFor(appointment), details = `${format(parseDate(appointment.date), { weekday: 'short', day: 'numeric', month: 'short' })} · ${appointment.time} · ${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}`;
       if (type === 'payments') return `<article class="todo-payment-item"><button class="todo-item-main" data-edit="${escapeHtml(appointment.id)}"><span><strong>Relancer « ${escapeHtml(client.name)} »</strong><small>${details} · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}</small></span><b>${money(appointmentTotal(appointment)) || 'À définir'}</b></button><button class="todo-paid-button" data-reminder-paid="${escapeHtml(appointment.id)}">✓ Payé aujourd’hui</button></article>`;
       return `<button class="todo-item" data-edit="${escapeHtml(appointment.id)}"><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>›</b></button>`;
     }).join('') : '<p class="empty-route">Rien à faire pour le moment.</p>';
@@ -2777,6 +3075,7 @@
 
   function openReviewFinancialEditor(appointmentId) {
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
+    if (hasCollectedPayment(appointment)) { showAppAlert('Le montant d’un paiement enregistré est figé afin que le bilan reste exact. Corrige d’abord son état de paiement depuis le rendez-vous si nécessaire.'); return; }
     const client = clientFor(appointment);
     app.ui.reviewFinancialDraft = { appointmentId };
     $('#reviewFinancialAppointmentId').value = appointment.id; $('#reviewFinancialPrice').value = appointment.price ?? '';
@@ -2787,6 +3086,7 @@
 
   async function saveReviewFinancials(appointmentId, suppliedPrice, suppliedSupplements) {
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return false;
+    if (hasCollectedPayment(appointment)) { showAppAlert('Le montant d’un paiement enregistré ne peut pas être ajusté directement. Corrige d’abord son état de paiement depuis le rendez-vous.'); return false; }
     const usingForm = suppliedPrice === undefined && suppliedSupplements === undefined;
     if (usingForm && !$('#reviewFinancialForm').reportValidity()) return false;
     const rawPrice = usingForm ? $('#reviewFinancialPrice')?.value : suppliedPrice;
@@ -2801,7 +3101,7 @@
     const beforeTotal = appointmentTotal(appointment), previousState = cloneState(app.state);
     appointment.price = price; appointment.supplements = supplements; appointment.updatedAt = new Date().toISOString();
     appendAppointmentHistory(appointment, 'financial', 'Tarif ajusté en fin de journée', `${money(beforeTotal) || '0 €'} → ${money(appointmentTotal(appointment)) || '0 €'}`);
-    if (!(await saveState(app.state, false, { reason: 'appointment-financial-update' }))) { app.state = previousState; return false; }
+    if (!(await saveState(app.state, false, { reason: 'appointment-financial-update' }))) return false;
     offerUndo(previousState, 'Tarif du rendez-vous ajusté');
     app.ui.reviewFinancialDraft = null; render();
     if ($('#dayReviewDialog')?.open) renderDayReview();
@@ -2813,21 +3113,26 @@
     const key = dateKey(app.ui.reviewDate), appointments = appointmentsForDate(key), active = appointments.filter(activeAppointment);
     $('#reviewDateLabel').textContent = format(app.ui.reviewDate, { weekday: 'long', day: 'numeric', month: 'long' });
     const paidCount = active.filter(appointment => appointment.paymentStatus === 'paid').length;
-    const pendingCount = active.filter(appointment => appointment.paymentStatus === 'pending').length;
-    const reviewCount = active.filter(appointment => appointment.paymentStatus === 'unreviewed').length;
-    $('#reviewDaySummary').innerHTML = `<span><strong>${active.length}</strong> RDV actif${active.length > 1 ? 's' : ''}</span><span><strong>${paidCount}</strong> payé${paidCount > 1 ? 's' : ''}</span><span><strong>${pendingCount}</strong> à régler</span><span class="review-summary"><strong>${reviewCount}</strong> à vérifier</span>`;
+    const refundedCount = active.filter(appointment => appointment.paymentStatus === 'refunded').length;
+    const pendingCount = appointments.filter(appointment => appointment.paymentStatus === 'pending').length;
+    const reviewCount = active.filter(appointment => paymentNeedsReview(appointment)).length;
+    $('#reviewDaySummary').innerHTML = `<span><strong>${active.length}</strong> RDV actif${active.length > 1 ? 's' : ''}</span><span><strong>${paidCount}</strong> payé${paidCount > 1 ? 's' : ''}</span>${refundedCount ? `<span><strong>${refundedCount}</strong> remboursé${refundedCount > 1 ? 's' : ''}</span>` : ''}<span><strong>${pendingCount}</strong> à régler</span><span class="review-summary"><strong>${reviewCount}</strong> à vérifier</span>`;
     $('#reviewAppointmentList').innerHTML = appointments.length ? appointments.map(appointment => {
       const client = clientFor(appointment), inactive = !activeAppointment(appointment), chooseReminder = !inactive && (appointment.paymentStatus === 'pending' || app.ui.reviewPendingId === appointment.id);
-      const paymentControls = inactive ? `<span class="review-inactive">${STATUS[appointment.status]}</span>` : `<button class="review-adjust-button" data-review-adjust="${escapeHtml(appointment.id)}">✎ Ajuster prix et suppléments</button><div class="review-payment-actions"><button class="${appointment.paymentStatus === 'paid' ? 'active' : ''}" data-review-paid="${escapeHtml(appointment.id)}">✓ Payé</button><button class="${appointment.paymentStatus === 'pending' ? 'active' : ''}" data-review-pending="${escapeHtml(appointment.id)}">À régler</button></div>${chooseReminder ? `<div class="review-reminder-editor"><label>Date de relance<input type="date" data-review-reminder="${escapeHtml(appointment.id)}" value="${escapeHtml(appointment.paymentReminderDate || '')}"></label><button data-review-save="${escapeHtml(appointment.id)}">Enregistrer la relance</button></div>` : ''}`;
+      const paidLabel = appointment.paymentStatus === 'paid' ? '✓ Payé' : '✓ Payé aujourd’hui';
+      const paymentControls = inactive ? `<span class="review-inactive">${STATUS[appointment.status]} · ${PAYMENT[appointment.paymentStatus]}</span>` : appointment.paymentStatus === 'refunded' ? `<span class="review-inactive">Remboursé le ${escapeHtml(appointment.refundDate)}</span>` : `${appointment.paymentStatus === 'paid' ? '' : `<button class="review-adjust-button" data-review-adjust="${escapeHtml(appointment.id)}">✎ Ajuster prix et suppléments</button>`}<div class="review-payment-actions"><button class="${appointment.paymentStatus === 'paid' ? 'active' : ''}" data-review-paid="${escapeHtml(appointment.id)}">${paidLabel}</button><button class="${appointment.paymentStatus === 'pending' ? 'active' : ''}" data-review-pending="${escapeHtml(appointment.id)}">À régler</button></div>${chooseReminder ? `<div class="review-reminder-editor"><label>Date de relance<input type="date" data-review-reminder="${escapeHtml(appointment.id)}" value="${escapeHtml(appointment.paymentReminderDate || '')}"></label><button data-review-save="${escapeHtml(appointment.id)}">Enregistrer la relance</button></div>` : ''}`;
       return `<article class="review-appointment ${inactive ? 'inactive' : ''}"><div class="review-appointment-heading"><button data-edit="${escapeHtml(appointment.id)}"><span>${appointment.time} – ${endTime(appointment)}</span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}</small></button><span class="service-dot ${appointment.serviceColor || 'rose'}"></span></div>${paymentControls}</article>`;
     }).join('') : '<section class="empty-message"><h2>Aucun rendez-vous</h2><p>Il n’y a rien à vérifier pour cette journée.</p></section>';
   }
 
   async function markAppointmentPaid(appointmentId, paymentDate) {
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
-    if (appointment.paymentStatus === 'paid' && appointment.paymentDate === paymentDate && !appointment.paymentReminderDate) return;
-    const previousState = cloneState(app.state); appointment.paymentStatus = 'paid'; appointment.paymentDate = paymentDate; appointment.paymentReminderDate = ''; appointment.updatedAt = new Date().toISOString(); appendAppointmentHistory(appointment, 'payment', 'Paiement marqué comme payé', `Date ${paymentDate}`);
-    if (!(await saveState(app.state, false, { reason: 'payment-paid' }))) { app.state = previousState; return; }
+    if (appointment.paymentStatus === 'refunded') { showAppAlert('Ce paiement est remboursé. Ouvre le rendez-vous pour corriger son état sans effacer le remboursement par erreur.'); return; }
+    const effectivePaymentDate = appointment.paymentStatus === 'paid' && validDate(appointment.paymentDate) ? appointment.paymentDate : paymentDate;
+    if (!validDate(effectivePaymentDate) || effectivePaymentDate > todayKey()) { showAppAlert('Choisis une date de paiement valide, au plus tard aujourd’hui.'); return; }
+    if (appointment.paymentStatus === 'paid' && appointment.paymentDate === effectivePaymentDate && !appointment.paymentReminderDate) return;
+    const previousState = cloneState(app.state); appointment.paymentStatus = 'paid'; appointment.paymentDate = effectivePaymentDate; appointment.refundDate = ''; appointment.paymentReminderDate = ''; appointment.updatedAt = new Date().toISOString(); appendAppointmentHistory(appointment, 'payment', 'Paiement marqué comme payé', `Date ${effectivePaymentDate}`);
+    if (!(await saveState(app.state, false, { reason: 'payment-paid' }))) return;
     offerUndo(previousState, 'Paiement marqué comme payé');
     app.ui.reviewPendingId = null; render();
     if ($('#dayReviewDialog').open) renderDayReview();
@@ -2837,17 +3142,26 @@
   async function savePaymentReminder(appointmentId, reminderDate) {
     if (!validDate(reminderDate)) { showAppAlert('Choisis une date de relance valide.'); return; }
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
+    if (appointment.paymentStatus === 'refunded') { showAppAlert('Ce paiement est remboursé. Ouvre le rendez-vous pour corriger son état sans effacer le remboursement par erreur.'); return; }
     if (appointment.paymentStatus === 'pending' && appointment.paymentReminderDate === reminderDate && !appointment.paymentDate) return;
-    const previousState = cloneState(app.state); appointment.paymentStatus = 'pending'; appointment.paymentDate = ''; appointment.paymentMethod = ''; appointment.paymentReminderDate = reminderDate; appointment.updatedAt = new Date().toISOString(); appendAppointmentHistory(appointment, 'payment', 'Paiement à relancer', `Relance ${reminderDate}`);
-    if (!(await saveState(app.state, false, { reason: 'payment-reminder' }))) { app.state = previousState; return; }
+    const previousState = cloneState(app.state); appointment.paymentStatus = 'pending'; appointment.paymentDate = ''; appointment.refundDate = ''; appointment.paymentMethod = ''; appointment.paymentReminderDate = reminderDate; appointment.updatedAt = new Date().toISOString(); appendAppointmentHistory(appointment, 'payment', 'Paiement à relancer', `Relance ${reminderDate}`);
+    if (!(await saveState(app.state, false, { reason: 'payment-reminder' }))) return;
     offerUndo(previousState, 'Relance de paiement enregistrée');
     app.ui.reviewPendingId = null; render(); renderDayReview();
   }
 
  function clientStats(clientId) {
-    const history = clientHistory(clientId), visits = history.filter(activeAppointment), paid = visits.filter(appointment => appointment.paymentStatus === 'paid').reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
-    return { visits: visits.length, cancelled: history.filter(appointment => appointment.status === 'cancelled').length, late: lateCancellationCount(clientId), noShows: history.filter(appointment => appointment.status === 'no_show').length, paid };
+    const history = clientHistory(clientId), visits = history.filter(activeAppointment);
+    const gross = history.filter(hasCollectedPayment).reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+    const refunded = history.filter(appointment => appointment.paymentStatus === 'refunded').reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
+    return { visits: visits.length, cancelled: history.filter(appointment => appointment.status === 'cancelled').length, late: lateCancellationCount(clientId), noShows: history.filter(appointment => appointment.status === 'no_show').length, gross: numericAmount(gross), refunded: numericAmount(refunded), net: roundedAmount(gross - refunded) };
  }
+
+  function clientHistoryPaymentLabel(appointment) {
+    if (appointment.paymentStatus === 'refunded' && appointmentRefundDate(appointment) && appointmentPaymentDate(appointment)) return ` · Remboursé le ${format(appointmentRefundDate(appointment), { day: 'numeric', month: 'short' })} · payé le ${format(appointmentPaymentDate(appointment), { day: 'numeric', month: 'short' })}`;
+    if (appointment.paymentStatus === 'paid' && appointmentPaymentDate(appointment)) return ` · Payé le ${format(appointmentPaymentDate(appointment), { day: 'numeric', month: 'short' })}`;
+    return '';
+  }
 
   function syncProfileBadgeSummary(expanded = false) {
     const badge = badgeById($('#profileBadge').value);
@@ -2862,8 +3176,8 @@
    $('#profileKey').value = client.id; $('#profileName').value = client.name; $('#profilePhone').value = client.phone; $('#profileContactVia').value = client.contactVia || ''; $('#profileBadge').innerHTML = `<option value="">Aucun repère</option>${app.state.settings.clientBadges.map(badge => `<option value="${escapeHtml(badge.id)}">${escapeHtml(badge.emoji || badge.symbol)} ${escapeHtml(badge.name)}</option>`).join('')}`; $('#profileBadge').value = client.badgeId || ''; $('#profileAddress').value = client.address; $('#profileNotes').value = client.notes; $('#profileWaze').hidden = !client.address;
     syncProfileBadgeSummary(false);
     const stats = clientStats(client.id), history = clientHistory(client.id).slice(0, 12);
-    $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.late}</strong><span>tardive${stats.late > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.paid ? `<article><strong>${money(stats.paid)}</strong><span>encaissé</span></article>` : ''}`;
-    $('#clientHistory').innerHTML = `<p class="history-label">Historique</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${activeAppointment(appointment) && appointment.paymentStatus === 'unreviewed' ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' && activeAppointment(appointment) ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}`;
+    $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.late}</strong><span>tardive${stats.late > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.gross || stats.refunded ? `<article><strong>${money(stats.net)}</strong><span>encaissé net${stats.refunded ? ` · ${money(stats.gross)} brut · ${money(stats.refunded)} remboursé` : ''}</span></article>` : ''}`;
+    $('#clientHistory').innerHTML = `<p class="history-label">Historique</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${clientHistoryPaymentLabel(appointment)}${paymentNeedsReview(appointment) ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}`;
     app.ui.clientDraftBaseline = JSON.stringify(clientDraftValues()); $('#clientDialog').showModal(); captureFormBaseline('clientDialog');
   }
 
@@ -2938,7 +3252,8 @@
     renderBackupStatus();
     $('#appVersionLabel').textContent = `Mon agenda · version ${APP_VERSION}`;
     $('#aboutVersion').textContent = `Version ${APP_VERSION} · données v${CURRENT_DATA_VERSION}`;
-    $('#undoRestore').hidden = !safeJson(RESTORE_SAFETY_KEY, null) && !safeJson(V13_RESTORE_SAFETY_KEY, null) && !safeJson(V12_RESTORE_SAFETY_KEY, null) && !safeJson(V11_RESTORE_SAFETY_KEY, null) && !safeJson(V10_RESTORE_SAFETY_KEY, null) && !safeJson(V9_RESTORE_SAFETY_KEY, null) && !safeJson(V8_RESTORE_SAFETY_KEY, null);
+    try { $('#undoRestore').hidden = !readRestoreSafetyBackup(); }
+    catch { $('#undoRestore').hidden = true; }
     $('#undoMigration').hidden = !safeJson(MIGRATION_SAFETY_KEY, null);
     showSettingsPage('home', true); $('#settingsDialog').showModal();
     $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.screen === 'settings'));
@@ -2960,11 +3275,10 @@
       if (enabled && (breakStart || breakEnd) && (!validTime(breakStart) || !validTime(breakEnd) || toMinutes(breakStart) >= toMinutes(breakEnd) || toMinutes(breakStart) < toMinutes(start) || toMinutes(breakEnd) > toMinutes(end))) { showAppAlert(`Vérifie la pause du ${DAYS.find(item => item.key === day).label.toLowerCase()}.`); return; }
       hours[day] = { enabled, start: validTime(start) ? start : '09:00', end: validTime(end) ? end : '19:00', breakStart: breakStart || '', breakEnd: breakEnd || '' };
     }
-    const previousHours = app.state.settings.workingHours, previousDensity = app.state.settings.displayDensity, previousTheme = app.state.settings.colorTheme;
     app.state.settings.workingHours = hours;
     app.state.settings.displayDensity = $('#displayDensity').value === 'compact' ? 'compact' : 'comfortable';
     app.state.settings.colorTheme = $('#colorTheme').value === 'dark' ? 'dark' : 'light';
-    if (!(await saveState(app.state, false, { reason: 'agenda-settings' }))) { app.state.settings.workingHours = previousHours; app.state.settings.displayDensity = previousDensity; app.state.settings.colorTheme = previousTheme; return; }
+    if (!(await saveState(app.state, false, { reason: 'agenda-settings' }))) return;
     app.ui.settingsDirty = false; render(); renderWorkingHoursEditor(); renderSettingsHome(); showAppAlert('Apparence et horaires enregistrés.');
   }
 
@@ -2981,9 +3295,9 @@
     if (duplicate) { app.ui.serviceSaving = false; showAppAlert('Une prestation avec ce nom existe déjà.'); return; }
     const index = app.state.settings.services.findIndex(service => service.id === id);
     if (index === -1 && app.state.settings.services.length >= LIMITS.settingsItems) { app.ui.serviceSaving = false; showAppAlert('Le nombre maximal de prestations est atteint.'); return; }
-    const previousState = cloneState(app.state), record = { id, name, duration: Number($('#serviceDuration').value), price: $('#servicePrice').value.trim(), color: $('#serviceColor').value, active: $('#serviceActive').checked };
+    const record = { id, name, duration: Number($('#serviceDuration').value), price: $('#servicePrice').value.trim(), color: $('#serviceColor').value, active: $('#serviceActive').checked };
     if (index === -1) app.state.settings.services.push(record); else app.state.settings.services[index] = record;
-    if (!(await saveState(app.state, false, { reason: index === -1 ? 'service-create' : 'service-update' }))) { app.state = previousState; app.ui.serviceSaving = false; return; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'service-create' : 'service-update' }))) { app.ui.serviceSaving = false; return; }
     app.ui.serviceSaving = false; $('#serviceDialog').close(); renderSettingsServiceList(); renderSettingsHome();
   }
 
@@ -2998,9 +3312,9 @@
     if (app.state.settings.supplementTypes.some(type => type.id !== id && normaliseName(type.name) === normaliseName(name))) { app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; showAppAlert('Cette nature existe déjà.'); return; }
     const rawPrice = $('#supplementTypePrice').value.trim(), index = app.state.settings.supplementTypes.findIndex(type => type.id === id);
     if (index === -1 && app.state.settings.supplementTypes.length >= LIMITS.settingsItems) { app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; showAppAlert('Le nombre maximal de suppléments est atteint.'); return; }
-    const previousState = cloneState(app.state), record = { id, name, price: rawPrice === '' ? '' : String(numericAmount(rawPrice)), active: $('#supplementTypeActive').checked };
+    const record = { id, name, price: rawPrice === '' ? '' : String(numericAmount(rawPrice)), active: $('#supplementTypeActive').checked };
     if (index === -1) app.state.settings.supplementTypes.push(record); else app.state.settings.supplementTypes[index] = record;
-    if (!(await saveState(app.state, false, { reason: index === -1 ? 'supplement-type-create' : 'supplement-type-update' }))) { app.state = previousState; app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; return; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'supplement-type-create' : 'supplement-type-update' }))) { app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; return; }
     $('#supplementTypeDialog').close(); renderSettingsSupplementList(); renderSettingsHome();
   }
 
@@ -3022,9 +3336,9 @@
     if (!emoji) { app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; showAppAlert('Choisis un emoji pour ce repère.'); return; }
     const index = app.state.settings.clientBadges.findIndex(badge => badge.id === id);
     if (index === -1 && app.state.settings.clientBadges.length >= LIMITS.settingsItems) { app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; showAppAlert('Le nombre maximal de repères est atteint.'); return; }
-    const previousState = cloneState(app.state), record = { id, name, emoji, symbol: emoji };
+    const record = { id, name, emoji, symbol: emoji };
    if (index === -1) app.state.settings.clientBadges.push(record); else app.state.settings.clientBadges[index] = record;
-    if (!(await saveState(app.state, false, { reason: index === -1 ? 'badge-create' : 'badge-update' }))) { app.state = previousState; app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; return; }
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'badge-create' : 'badge-update' }))) { app.ui.badgeSaving = false; $('#badgeSubmitButton').disabled = false; return; }
     $('#badgeDialog').close(); renderSettingsBadgeList(); renderSettingsHome(); render(); showSuccess(index === -1 ? 'Repère ajouté' : 'Repère mis à jour');
  }
 
@@ -3032,22 +3346,22 @@
     const id = $('#badgeId').value, badge = badgeById(id); if (!badge) return;
     const assigned = app.state.clients.filter(client => client.badgeId === id).length;
     if (!window.confirm(`Supprimer « ${badge.name} » ?${assigned ? ` Il sera retiré de ${assigned} cliente${assigned > 1 ? 's' : ''}.` : ''}`)) return;
-    const previousState = cloneState(app.state); app.state.settings.clientBadges = app.state.settings.clientBadges.filter(item => item.id !== id); app.state.clients.forEach(client => { if (client.badgeId === id) client.badgeId = ''; });
-    if (!(await saveState(app.state, false, { reason: 'badge-delete' }))) { app.state = previousState; return; }
+    app.state.settings.clientBadges = app.state.settings.clientBadges.filter(item => item.id !== id); app.state.clients.forEach(client => { if (client.badgeId === id) client.badgeId = ''; });
+    if (!(await saveState(app.state, false, { reason: 'badge-delete' }))) return;
     $('#badgeDialog').close(); renderSettingsBadgeList(); renderSettingsHome(); render();
   }
 
   async function saveClientSettings() {
     const threshold = Number($('#lateCancellationThreshold').value);
     if (!Number.isInteger(threshold) || threshold < 1 || threshold > 20) { showAppAlert('Choisis un seuil entre 1 et 20.'); return; }
-    const previous = cloneState(app.state); app.state.settings.lateCancellationThreshold = threshold; app.state.settings.lateCancellationPromptEnabled = $('#lateCancellationPromptEnabled').checked;
-    if (!(await saveState(app.state, false, { reason: 'client-settings' }))) { app.state = previous; return; }
+    app.state.settings.lateCancellationThreshold = threshold; app.state.settings.lateCancellationPromptEnabled = $('#lateCancellationPromptEnabled').checked;
+    if (!(await saveState(app.state, false, { reason: 'client-settings' }))) return;
     app.ui.settingsDirty = false; renderSettingsHome(); showAppAlert('Réglages clientes enregistrés.');
   }
 
   async function saveReminderSettings() {
-    const days = Number($('#backupReminderDays').value), previous = app.state.settings.backupReminderDays; app.state.settings.backupReminderDays = days;
-    if (!(await saveState(app.state, false, { reason: 'backup-reminder-settings' }))) { app.state.settings.backupReminderDays = previous; return; }
+    const days = Number($('#backupReminderDays').value); app.state.settings.backupReminderDays = days;
+    if (!(await saveState(app.state, false, { reason: 'backup-reminder-settings' }))) return;
     app.ui.settingsDirty = false; renderSettingsHome(); renderHeader(); showAppAlert('Rappel enregistré.');
   }
 
@@ -3058,9 +3372,9 @@
       const used = estimate?.usage ? `${(estimate.usage / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo utilisés` : 'espace utilisé non disponible';
       target.textContent = `${persisted ? 'Stockage persistant accordé' : 'Stockage local standard'} · ${used}`;
       const verification = await storageAdapter.verify();
-      const mode = verification.mode === 'indexeddb' ? 'Base sécurisée active' : 'Stockage de compatibilité actif';
+      const mode = verification.mode === 'indexeddb' ? 'Base sécurisée active' : 'Base sécurisée indisponible';
       const appointments = Number(verification.counts?.appointments || 0), clients = Number(verification.counts?.clients || 0);
-      if (secure) secure.innerHTML = `<strong>${mode}</strong><span>${appointments} rendez-vous · ${clients} clientes · contrôle réussi</span>`;
+      if (secure) { secure.classList.toggle('warning', Boolean(app.ui.storageWarning)); secure.innerHTML = `<strong>${mode}</strong><span>${appointments} rendez-vous · ${clients} clientes · contrôle réussi${app.ui.storageWarning ? ` · ${escapeHtml(app.ui.storageWarning)}` : ''}</span>`; }
       const snapshots = await storageAdapter.snapshotList();
       if (snapshotTarget) snapshotTarget.textContent = snapshots.length ? `${snapshots.length} copie${snapshots.length > 1 ? 's' : ''} automatique${snapshots.length > 1 ? 's' : ''} · dernière le ${format(new Date(snapshots[0].createdAt), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'La première copie automatique sera créée avant la prochaine modification.';
       const restore = $('#restoreAutomaticSnapshot'); if (restore) restore.hidden = !snapshots.length;
@@ -3080,18 +3394,42 @@
   }
 
   async function restoreAutomaticSnapshot() {
-    const snapshots = await storageAdapter.snapshotList().catch(() => []), latest = snapshots[0];
-    if (!latest) { showAppAlert('Aucune copie automatique n’est encore disponible.'); return; }
-    const label = format(new Date(latest.createdAt), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-    if (!window.confirm(`Remplacer les données actuelles par la copie automatique du ${label} ? Une copie des données actuelles sera créée avant le retour.`)) return;
-    try {
-      const restored = await storageAdapter.restoreSnapshot(latest.id);
-      app.state = migrateState(restored, {}, { strict: true }); lastCommittedState = cloneState(app.state); clearAllFormDrafts();
-      $('#settingsDialog').close(); render(); showAppAlert(`La copie automatique du ${label} a été restaurée.`);
-    } catch (error) {
-      await storageAdapter.recordError?.(error, 'snapshot-restore', app.state);
-      showAppAlert('Cette copie automatique n’a pas pu être restaurée. Les données actuelles sont conservées.', 'À vérifier');
-    }
+    return runExclusiveReplacement(async () => {
+      const snapshots = await storageAdapter.snapshotList().catch(() => []), latest = snapshots[0];
+      if (!latest) { showAppAlert('Aucune copie automatique n’est encore disponible.'); return false; }
+      const label = format(new Date(latest.createdAt), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      if (!window.confirm(`Remplacer les données actuelles par la copie automatique du ${label} ? Une copie des données actuelles sera créée avant le retour.`)) return false;
+      const restoreSafetyId = uuid();
+      const safety = makeBackupPayload(app.state, 'before-automatic-snapshot-restore');
+      safety.restoreSafetyId = restoreSafetyId;
+      let journal;
+      try { journal = prepareRestoreSafetyJournal(safety); }
+      catch (error) {
+        await storageAdapter.recordError?.(error, 'snapshot-restore-safety-copy', app.state);
+        showAppAlert('Le retour a été annulé : la copie permettant de revenir aux données actuelles n’a pas pu être créée.', 'À vérifier');
+        return false;
+      }
+      let committed = false;
+      try {
+        const restored = await storageAdapter.restoreSnapshot(latest.id, { restoreSafetyId });
+        committed = true;
+        app.state = migrateStoredState(restored); lastCommittedState = cloneState(app.state);
+        try { promoteRestoreSafetyJournal(journal); }
+        catch (error) { await storageAdapter.recordError?.(error, 'snapshot-restore-safety-promotion', app.state); }
+        clearAllFormDrafts(); $('#settingsDialog').close(); render(); showAppAlert(`La copie automatique du ${label} a été restaurée.`);
+        return true;
+      } catch (error) {
+        if (!committed) {
+          try { rollbackRestoreSafetyJournal(journal); }
+          catch (rollbackError) { await storageAdapter.recordError?.(rollbackError, 'snapshot-restore-safety-rollback', app.state); }
+        }
+        await storageAdapter.recordError?.(error, 'snapshot-restore', app.state);
+        showAppAlert(committed
+          ? 'La copie a été enregistrée, mais son affichage n’a pas abouti. Redémarre l’application pour la recharger sans modifier les données.'
+          : 'Cette copie automatique n’a pas pu être restaurée. Les données actuelles sont conservées.', 'À vérifier');
+        return false;
+      }
+    });
   }
 
   async function exportStorageDiagnostic() {
@@ -3123,34 +3461,74 @@
   async function importRecoveryData(file) {
     const input = $('#recoveryImportData'); if (!file) return;
     try {
-      const { data, state: migrated } = await readValidatedBackupFile(file);
-      if (!window.confirm(backupPreview(data, migrated))) return;
-      if (!(await saveState(migrated, false, { reason: 'recovery-import', force: true }))) return;
-      app.state = migrated; lastCommittedState = cloneState(migrated);
-      showAppAlert('La sauvegarde est restaurée. L’application va maintenant redémarrer.');
-      setTimeout(() => globalThis.location?.reload?.(), 500);
-    } catch { showAppAlert('Cette sauvegarde ne peut pas être utilisée pour la récupération.', 'À vérifier'); }
-    finally { if (input) input.value = ''; }
+      return await runExclusiveReplacement(async () => {
+        try {
+          const { data, state: migrated } = await readValidatedBackupFile(file);
+          if (!window.confirm(backupPreview(data, migrated))) return false;
+          migrated.settings.restoreSafetyId = uuid();
+          if (typeof globalThis.AgendaStorage?.recoverFromState !== 'function') throw new Error('STORAGE_RECOVERY_MODULE_MISSING');
+          const recoveryMigrationDate = todayKey();
+          const result = await globalThis.AgendaStorage.recoverFromState({
+            indexedDB: globalThis.indexedDB,
+            localStorage,
+            legacyKey: STATE_KEY,
+            legacyReadKey: legacyLoadInfo.key,
+            legacyRawKey: legacyLoadInfo.rawKey,
+            legacyRawState: legacyLoadInfo.rawState,
+            legacyEvidence: legacyLoadInfo.evidence,
+            legacySource: legacyLoadInfo.source,
+            legacyReadUncertain: legacyLoadInfo.readUncertain,
+            validateState: (state, context = {}) => migrateStoredState(state, { migrationDate: context.migrationDate || recoveryMigrationDate }),
+            appVersion: APP_VERSION,
+            dataVersion: CURRENT_DATA_VERSION,
+            migrationDate: recoveryMigrationDate
+          }, migrated);
+          storageAdapter = result.storage; app.state = migrateStoredState(result.state); lastCommittedState = cloneState(app.state);
+          app.ui.storageMode = result.mode || storageAdapter.mode || 'indexeddb'; app.ui.storageWarning = result.warning || ''; app.ui.storageStartupError = null;
+          clearAllFormDrafts();
+          const dialog = $('#storageRecoveryDialog'); if (dialog?.open) dialog.close();
+          if (document.body?.dataset) delete document.body.dataset.storageRecovery;
+          finishStorageLoading(); render();
+          showAppAlert(result.warning || 'La sauvegarde est restaurée et la base sécurisée est de nouveau disponible.', result.warning ? 'À vérifier' : 'C’est enregistré');
+          return true;
+        } catch {
+          showAppAlert('Cette sauvegarde ne peut pas être utilisée pour la récupération.', 'À vérifier');
+          return false;
+        }
+      });
+    } finally { if (input) input.value = ''; }
   }
 
   async function initialiseSecureStorage() {
     try {
       if (!globalThis.AgendaStorage?.initialise) throw Object.assign(new Error('STORAGE_MODULE_MISSING'), { code: 'STORAGE_MODULE_MISSING', stage: 'startup' });
+      if (!legacyBootLoaded) {
+        legacyBootState = loadLegacyState(); legacyBootLoaded = true;
+        app.state = cloneState(legacyBootState); lastCommittedState = cloneState(legacyBootState); invalidateDataIndexes();
+      }
+      const startupMigrationDate = todayKey();
       const result = await globalThis.AgendaStorage.initialise({
         indexedDB: globalThis.indexedDB,
         localStorage,
         legacyKey: STATE_KEY,
+        legacyReadKey: legacyLoadInfo.key,
+        legacyRawKey: legacyLoadInfo.rawKey,
+        legacyRawState: legacyLoadInfo.rawState,
         legacyState: legacyBootState,
         legacyFallbackAllowed: legacyLoadInfo.usable,
-        validateState: state => migrateState(state, {}, { strict: true }),
+        legacyEvidence: legacyLoadInfo.evidence,
+        legacySource: legacyLoadInfo.source,
+        legacyReadUncertain: legacyLoadInfo.readUncertain,
+        validateState: (state, context = {}) => migrateStoredState(state, { migrationDate: context.migrationDate || startupMigrationDate }),
         appVersion: APP_VERSION,
-        dataVersion: CURRENT_DATA_VERSION
+        dataVersion: CURRENT_DATA_VERSION,
+        migrationDate: startupMigrationDate
       });
-      storageAdapter = result.storage; app.state = migrateState(result.state, {}, { strict: true }); lastCommittedState = cloneState(app.state);
+      storageAdapter = result.storage; app.state = migrateStoredState(result.state); lastCommittedState = cloneState(app.state);
       app.ui.storageMode = result.mode; app.ui.storageWarning = result.warning || ''; app.ui.storageStartupError = result.startupError || null;
       finishStorageLoading(); render();
       if (result.warning) setTimeout(() => showAppAlert(result.warning, 'À vérifier'), 0);
-      else if (startupLoadWarning && (result.migrated || result.mode !== 'indexeddb')) setTimeout(() => showAppAlert(startupLoadWarning, 'À vérifier'), 0);
+      else if (startupLoadWarning) setTimeout(() => showAppAlert(startupLoadWarning, 'À vérifier'), 0);
       return true;
     } catch (error) {
       finishStorageLoading(); showStorageRecovery(error); return false;
@@ -3159,18 +3537,134 @@
 
   function backupCounts(state) {
     return {
-      clients: state.clients.length,
-      appointments: state.appointments.length,
-      blocks: state.blocks.length,
-      expenses: Array.isArray(state.expenses) ? state.expenses.length : 0,
-      services: state.settings.services.length,
-      expenseCategories: Array.isArray(state.settings.expenseCategories) ? state.settings.expenseCategories.length : 0
+      clients: Array.isArray(state?.clients) ? state.clients.length : 0,
+      appointments: Array.isArray(state?.appointments) ? state.appointments.length : (Array.isArray(state) ? state.length : 0),
+      blocks: Array.isArray(state?.blocks) ? state.blocks.length : 0,
+      expenses: Array.isArray(state?.expenses) ? state.expenses.length : 0,
+      services: Array.isArray(state?.settings?.services) ? state.settings.services.length : 0,
+      supplements: Array.isArray(state?.settings?.supplementTypes) ? state.settings.supplementTypes.length : 0,
+      expenseCategories: Array.isArray(state?.settings?.expenseCategories) ? state.settings.expenseCategories.length : 0
     };
+  }
+
+  function applyBackupIntegrity(payload) {
+    payload.counts = backupCounts(payload.state);
+    const checksum = globalThis.AgendaStorage?.checksum;
+    if (typeof checksum === 'function') payload.checksum = checksum(payload.state);
+    return payload;
   }
 
   function makeBackupPayload(state = app.state, reason = 'manual') {
     const exportedAt = new Date().toISOString();
-    return { app: BACKUP_APP_ID, backupFormatVersion: BACKUP_FORMAT_VERSION, dataVersion: CURRENT_DATA_VERSION, exportedAt, reason, counts: backupCounts(state), state: cloneState(state) };
+    return applyBackupIntegrity({ app: BACKUP_APP_ID, backupFormatVersion: BACKUP_FORMAT_VERSION, dataVersion: CURRENT_DATA_VERSION, exportedAt, reason, state: cloneState(state) });
+  }
+
+  function readRestoreSafetyEntry(key) {
+    let raw;
+    try { raw = localStorage.getItem(key); }
+    catch (cause) { throw Object.assign(new Error('RESTORE_SAFETY_READ_FAILED'), { cause }); }
+    if (raw === null) return { key, raw: null, parsed: null, id: '', present: false };
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch (cause) { throw Object.assign(new Error('INVALID_SAFETY_COPY'), { cause }); }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('INVALID_SAFETY_COPY');
+    return { key, raw, parsed, id: String(parsed.restoreSafetyId || ''), present: true };
+  }
+
+  function currentRestoreSafetyEntries() {
+    // Les deux lectures sont obligatoires : une entrée pending illisible ne
+    // doit pas être masquée par une entrée active encore lisible.
+    return {
+      active: readRestoreSafetyEntry(RESTORE_SAFETY_KEY),
+      pending: readRestoreSafetyEntry(PENDING_RESTORE_SAFETY_KEY)
+    };
+  }
+
+  function stabilisePendingRestoreSafety() {
+    const entries = currentRestoreSafetyEntries();
+    const expectedId = String(app.state?.settings?.restoreSafetyId || '');
+    if (expectedId && entries.pending.present && entries.pending.id === expectedId
+      && (!entries.active.present || entries.active.id !== expectedId)) {
+      try { localStorage.setItem(RESTORE_SAFETY_KEY, entries.pending.raw); }
+      catch (cause) { throw Object.assign(new Error('RESTORE_SAFETY_PROMOTION_FAILED'), { cause }); }
+      entries.active = { ...entries.pending, key: RESTORE_SAFETY_KEY };
+    }
+    return entries;
+  }
+
+  function historicalRestoreSafetyAbsent() {
+    for (const key of HISTORICAL_RESTORE_SAFETY_KEYS) {
+      let raw;
+      try { raw = localStorage.getItem(key); }
+      catch (cause) { throw Object.assign(new Error('RESTORE_SAFETY_READ_FAILED'), { cause }); }
+      if (raw !== null) return false;
+    }
+    return true;
+  }
+
+  function prepareRestoreSafetyJournal(safety, { allowSnapshotOnly = false } = {}) {
+    const entries = stabilisePendingRestoreSafety();
+    const raw = JSON.stringify(safety);
+    try {
+      localStorage.setItem(PENDING_RESTORE_SAFETY_KEY, raw);
+      return { stored: true, raw, previousPendingRaw: entries.pending.raw };
+    } catch (cause) {
+      if (allowSnapshotOnly && storageAdapter.mode === 'indexeddb'
+        && !entries.active.present && !entries.pending.present
+        && historicalRestoreSafetyAbsent()) {
+        return { stored: false, raw: null, previousPendingRaw: null };
+      }
+      throw Object.assign(new Error('RESTORE_SAFETY_WRITE_FAILED'), { cause });
+    }
+  }
+
+  function rollbackRestoreSafetyJournal(journal) {
+    if (!journal?.stored) return;
+    if (journal.previousPendingRaw === null) localStorage.removeItem(PENDING_RESTORE_SAFETY_KEY);
+    else localStorage.setItem(PENDING_RESTORE_SAFETY_KEY, journal.previousPendingRaw);
+  }
+
+  function promoteRestoreSafetyJournal(journal) {
+    if (!journal?.stored) return;
+    localStorage.setItem(RESTORE_SAFETY_KEY, journal.raw);
+    localStorage.removeItem(PENDING_RESTORE_SAFETY_KEY);
+  }
+
+  function readRestoreSafetyBackup() {
+    const { active, pending } = currentRestoreSafetyEntries();
+    const expectedId = String(app.state?.settings?.restoreSafetyId || '');
+    if (expectedId) {
+      if (active.present && pending.present && active.id === expectedId && pending.id === expectedId && active.raw !== pending.raw) {
+        throw new Error('AMBIGUOUS_RESTORE_SAFETY');
+      }
+      if (active.present && active.id === expectedId) return active.parsed;
+      if (pending.present && pending.id === expectedId) return pending.parsed;
+      if (active.present || pending.present) throw new Error('STALE_RESTORE_SAFETY');
+      for (const key of HISTORICAL_RESTORE_SAFETY_KEYS) {
+        const historical = readRestoreSafetyEntry(key);
+        if (historical.present) throw new Error('STALE_RESTORE_SAFETY');
+      }
+      return null;
+    }
+    if (active.present) {
+      if (active.id) throw new Error('STALE_RESTORE_SAFETY');
+      return active.parsed;
+    }
+    // Une pending moderne sans identifiant courant correspond à une opération
+    // non validée : elle est ignorée, mais seulement après parsing strict.
+    if (pending.present && !pending.id) throw new Error('INVALID_SAFETY_COPY');
+    for (const key of HISTORICAL_RESTORE_SAFETY_KEYS) {
+      const historical = readRestoreSafetyEntry(key);
+      if (!historical.present) continue;
+      if (historical.id) throw new Error('STALE_RESTORE_SAFETY');
+      return historical.parsed;
+    }
+    return null;
+  }
+
+  function clearRestoreSafetyBackups() {
+    [V8_RESTORE_SAFETY_KEY, V9_RESTORE_SAFETY_KEY, V10_RESTORE_SAFETY_KEY, V11_RESTORE_SAFETY_KEY, V12_RESTORE_SAFETY_KEY, V13_RESTORE_SAFETY_KEY, V14_RESTORE_SAFETY_KEY, PENDING_RESTORE_SAFETY_KEY, RESTORE_SAFETY_KEY]
+      .forEach(key => localStorage.removeItem(key));
   }
 
   function backupVersion(data) {
@@ -3192,14 +3686,71 @@
     return `Sauvegarde du ${when} · version ${backupVersion(data)}\n${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''} personnel${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}, ${counts.services} prestation${counts.services > 1 ? 's' : ''}.\nLes horaires, repères, catégories et autres réglages sont inclus.\n\nRemplacer les données actuelles ? Une copie de secours sera conservée sur cet appareil.`;
   }
 
+  function backupFormat(data) {
+    if (!Object.prototype.hasOwnProperty.call(data || {}, 'backupFormatVersion')) return 1;
+    const value = Number(data.backupFormatVersion);
+    if (!Number.isSafeInteger(value) || value < 1) throw new Error('INVALID_BACKUP_FORMAT');
+    return value;
+  }
+
+  function validateBackupEnvelope(data) {
+    if (!recognisedBackup(data) || (data.app && data.app !== BACKUP_APP_ID)) throw new Error('UNKNOWN_BACKUP');
+    const formatVersion = backupFormat(data);
+    if (formatVersion > BACKUP_FORMAT_VERSION || backupVersion(data) > CURRENT_DATA_VERSION) throw new Error('FUTURE_BACKUP');
+    if (formatVersion >= INTEGRITY_BACKUP_FORMAT_VERSION && data.app !== BACKUP_APP_ID) throw new Error('UNKNOWN_BACKUP');
+    const rawState = data?.state && typeof data.state === 'object' ? data.state : data;
+    const hasEnvelopeVersion = Object.prototype.hasOwnProperty.call(data || {}, 'dataVersion');
+    const hasStateVersion = Object.prototype.hasOwnProperty.call(rawState || {}, 'version');
+    const envelopeVersion = Number(data?.dataVersion), stateVersion = Number(rawState?.version);
+    const declaresCurrentSchema = hasEnvelopeVersion && envelopeVersion >= CURRENT_DATA_VERSION
+      || hasStateVersion && stateVersion >= CURRENT_DATA_VERSION;
+    const completeCurrentEnvelope = formatVersion >= INTEGRITY_BACKUP_FORMAT_VERSION
+      && data?.app === BACKUP_APP_ID
+      && data?.state && typeof data.state === 'object' && !Array.isArray(data.state);
+    // Même les anciennes enveloppes doivent annoncer des versions cohérentes.
+    // Sinon une fausse version source peut effacer des champs récents pendant
+    // la migration (par exemple un remboursement).
+    if ((hasEnvelopeVersion && (!Number.isSafeInteger(envelopeVersion) || envelopeVersion < 1))
+      || (hasStateVersion && (!Number.isSafeInteger(stateVersion) || stateVersion < 1))
+      || (hasEnvelopeVersion && hasStateVersion && envelopeVersion !== stateVersion)
+      || (formatVersion >= INTEGRITY_BACKUP_FORMAT_VERSION && (!hasEnvelopeVersion || !hasStateVersion))) {
+      throw new Error('INVALID_BACKUP_VERSION');
+    }
+    if (declaresCurrentSchema && !completeCurrentEnvelope) throw new Error('INVALID_BACKUP_FORMAT');
+    if (Object.prototype.hasOwnProperty.call(data || {}, 'migrationDate') && !validDate(pickDate(data.migrationDate))) throw new Error('INVALID_MIGRATION_DATE');
+    const countsRequired = formatVersion >= INTEGRITY_BACKUP_FORMAT_VERSION;
+    const hasCounts = Object.prototype.hasOwnProperty.call(data || {}, 'counts');
+    if (countsRequired && !hasCounts) throw new Error('INVALID_BACKUP_COUNTS');
+    if (hasCounts) {
+      if (!data.counts || typeof data.counts !== 'object' || Array.isArray(data.counts)) throw new Error('INVALID_BACKUP_COUNTS');
+      const actual = backupCounts(rawState);
+      const required = countsRequired ? Object.keys(actual) : ['clients', 'appointments', 'blocks', 'expenses', 'services'];
+      const declaredKeys = Object.keys(data.counts);
+      if (!required.every(key => Object.prototype.hasOwnProperty.call(data.counts, key))
+        || (countsRequired && declaredKeys.length !== required.length)
+        || declaredKeys.some(key => !Object.prototype.hasOwnProperty.call(actual, key)
+          || !Number.isSafeInteger(Number(data.counts[key]))
+          || Number(data.counts[key]) < 0
+          || Number(data.counts[key]) !== actual[key])) throw new Error('INVALID_BACKUP_COUNTS');
+    }
+    const checksumRequired = formatVersion >= INTEGRITY_BACKUP_FORMAT_VERSION;
+    const hasChecksum = Object.prototype.hasOwnProperty.call(data || {}, 'checksum');
+    if (checksumRequired && !hasChecksum) throw new Error('INVALID_BACKUP_CHECKSUM');
+    if (hasChecksum) {
+      const checksum = globalThis.AgendaStorage?.checksum;
+      if (typeof checksum !== 'function' || typeof data.checksum !== 'string' || data.checksum !== checksum(rawState)) throw new Error('INVALID_BACKUP_CHECKSUM');
+    }
+    return rawState;
+  }
+
   async function readValidatedBackupFile(file) {
     if (!file) throw new Error('UNKNOWN_BACKUP');
     if (Number(file.size) > MAX_BACKUP_BYTES) throw new Error('INVALID_FILE_SIZE');
     let data = null;
     try { data = JSON.parse(await file.text()); } catch { throw new Error('INVALID_JSON'); }
-    if (!recognisedBackup(data) || (data.app && data.app !== BACKUP_APP_ID)) throw new Error('UNKNOWN_BACKUP');
-    if (Number(data.backupFormatVersion || 1) > BACKUP_FORMAT_VERSION || backupVersion(data) > CURRENT_DATA_VERSION) throw new Error('FUTURE_BACKUP');
-    const state = migrateState(data, data.clientProfiles || data.state?.clientProfiles || {}, { strict: true });
+    validateBackupEnvelope(data);
+    const anchoredMigrationDate = pickDate(data?.migrationDate) || pickDate(data?.exportedAt) || todayKey();
+    const state = migrateState(data, data.clientProfiles || data.state?.clientProfiles || {}, { strict: true, migrationDate: anchoredMigrationDate });
     return { data, state };
   }
 
@@ -3207,6 +3758,9 @@
     if (error?.message === 'FUTURE_BACKUP') return 'Cette sauvegarde vient d’une version plus récente. Mets d’abord l’application à jour.';
     if (error?.message === 'INVALID_FILE_SIZE') return 'Ce fichier dépasse la taille maximale autorisée de 25 Mo.';
     if (error?.message === 'INVALID_JSON') return 'Ce fichier n’est pas un document JSON lisible.';
+    if (error?.message === 'INVALID_BACKUP_FORMAT') return 'Le format de cette sauvegarde est invalide.';
+    if (error?.message === 'INVALID_BACKUP_COUNTS') return 'Les compteurs ne correspondent pas au contenu : le fichier est incomplet ou a été modifié.';
+    if (error?.message === 'INVALID_BACKUP_CHECKSUM') return 'L’empreinte ne correspond pas au contenu : le fichier est incomplet ou a été modifié.';
     if (String(error?.message || '').startsWith('INVALID_')) return 'La sauvegarde contient au moins une donnée incomplète, incohérente ou abîmée.';
     return 'Ce fichier ne semble pas être une sauvegarde valide de Mon agenda.';
   }
@@ -3243,78 +3797,146 @@
   }
 
   async function exportData() {
-    const previousDate = app.state.settings.lastBackupAt, content = makeBackupPayload();
+    const content = makeBackupPayload();
     content.state.settings.lastBackupAt = content.exportedAt;
+    applyBackupIntegrity(content);
     const now = new Date(), stamp = `${todayKey()}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     const blob = new Blob([JSON.stringify(content)], { type: 'application/json' });
+    if (blob.size > MAX_BACKUP_BYTES) {
+      showAppAlert('La sauvegarde dépasse 25 Mo et ne pourrait pas être restaurée de façon sûre sur cet appareil. Contacte le support avant de modifier tes données.', 'Sauvegarde trop volumineuse');
+      return false;
+    }
     const delivered = await shareOrDownload(blob, `sauvegarde-agenda-${stamp}.json`, 'Sauvegarde Mon agenda');
     if (!delivered) return false;
     app.state.settings.lastBackupAt = content.exportedAt;
-    if (!(await saveState(app.state, false, { reason: 'manual-backup-created', snapshot: false }))) { app.state.settings.lastBackupAt = previousDate; return false; }
+    if (!(await saveState(app.state, false, { reason: 'manual-backup-created', snapshot: false }))) return false;
     renderHeader(); renderSettingsHome(); renderBackupStatus(); showSuccess('Sauvegarde créée'); return true;
   }
 
   async function importData(file) {
     const input = $('#importData'); if (!file) return;
     try {
-      const { data, state: migrated } = await readValidatedBackupFile(file);
-      if (!window.confirm(backupPreview(data, migrated))) return;
-      const safety = makeBackupPayload(app.state, 'before-restore');
-      let compatibilitySafetyStored = true;
-      try { localStorage.setItem(RESTORE_SAFETY_KEY, JSON.stringify(safety)); }
-      catch (error) {
-        compatibilitySafetyStored = false;
-        await storageAdapter.recordError?.(error, 'restore-compatibility-copy', app.state);
-      }
-      if (!compatibilitySafetyStored && storageAdapter.mode !== 'indexeddb') {
-        showAppAlert('La restauration a été annulée : la copie de sécurité n’a pas pu être créée dans le mode de compatibilité.', 'À vérifier');
-        return;
-      }
-      if (!(await saveState(migrated, false, { reason: 'backup-restore' }))) { try { localStorage.removeItem(RESTORE_SAFETY_KEY); } catch {} return; }
-      app.state = migrated; clearAllFormDrafts(); $('#settingsDialog').close(); render(); showAppAlert('Sauvegarde restaurée et adaptée à la version actuelle. Toutes les données compatibles ont été conservées.');
-    } catch (error) {
-      if (error?.message === 'FUTURE_BACKUP') showAppAlert('Cette sauvegarde vient d’une version plus récente. Mets d’abord l’application à jour : tes données actuelles n’ont pas été modifiées.');
-      else if (error?.message === 'INVALID_FILE_SIZE') showAppAlert('Ce fichier est trop volumineux. La taille maximale acceptée est de 25 Mo. Tes données actuelles n’ont pas été modifiées.');
-      else if (error?.message === 'INVALID_JSON') showAppAlert('Ce fichier JSON est illisible ou incomplet. Tes données actuelles n’ont pas été modifiées.');
-      else if (String(error?.message || '').startsWith('INVALID_')) showAppAlert('La sauvegarde contient au moins une donnée incomplète ou abîmée. Rien n’a été restauré afin d’éviter une perte partielle.');
-      else showAppAlert('Ce fichier ne semble pas être une sauvegarde valide de Mon agenda.');
+      return await runExclusiveReplacement(async operationToken => {
+        let journal = null, committed = false;
+        try {
+          const { data, state: migrated } = await readValidatedBackupFile(file);
+          if (!window.confirm(backupPreview(data, migrated))) return false;
+          const restoreSafetyId = uuid();
+          const safety = makeBackupPayload(app.state, 'before-restore');
+          safety.restoreSafetyId = restoreSafetyId;
+          migrated.settings.restoreSafetyId = restoreSafetyId;
+          try { journal = prepareRestoreSafetyJournal(safety, { allowSnapshotOnly: true }); }
+          catch (error) {
+            await storageAdapter.recordError?.(error, 'restore-safety-journal', app.state);
+            showAppAlert('La restauration a été annulée : la copie de sécurité locale n’a pas pu être contrôlée ou préparée. Tes données actuelles sont conservées.', 'À vérifier');
+            return false;
+          }
+          if (!(await saveState(migrated, false, {
+            reason: 'backup-restore',
+            requireSnapshot: true,
+            operationToken
+          }))) {
+            try { rollbackRestoreSafetyJournal(journal); }
+            catch (error) { await storageAdapter.recordError?.(error, 'restore-safety-rollback', app.state); }
+            return false;
+          }
+          committed = true;
+          app.state = migrated;
+          try { promoteRestoreSafetyJournal(journal); }
+          catch (error) { await storageAdapter.recordError?.(error, 'restore-safety-promotion', app.state); }
+          clearAllFormDrafts(); $('#settingsDialog').close(); render();
+          showAppAlert('Sauvegarde restaurée et adaptée à la version actuelle. Toutes les données compatibles ont été conservées.');
+          return true;
+        } catch (error) {
+          if (!committed && journal) {
+            try { rollbackRestoreSafetyJournal(journal); }
+            catch (rollbackError) { await storageAdapter.recordError?.(rollbackError, 'restore-safety-rollback', app.state); }
+          }
+          if (committed) showAppAlert('La sauvegarde a été enregistrée, mais son affichage n’a pas abouti. Redémarre l’application pour la recharger sans modifier les données.', 'À vérifier');
+          else if (error?.message === 'FUTURE_BACKUP') showAppAlert('Cette sauvegarde vient d’une version plus récente. Mets d’abord l’application à jour : tes données actuelles n’ont pas été modifiées.');
+          else if (error?.message === 'INVALID_FILE_SIZE') showAppAlert('Ce fichier est trop volumineux. La taille maximale acceptée est de 25 Mo. Tes données actuelles n’ont pas été modifiées.');
+          else if (error?.message === 'INVALID_JSON') showAppAlert('Ce fichier JSON est illisible ou incomplet. Tes données actuelles n’ont pas été modifiées.');
+          else if (String(error?.message || '').startsWith('INVALID_')) showAppAlert('La sauvegarde contient au moins une donnée incomplète ou abîmée. Rien n’a été restauré afin d’éviter une perte partielle.');
+          else showAppAlert('Ce fichier ne semble pas être une sauvegarde valide de Mon agenda.');
+          return false;
+        }
+      });
     } finally { input.value = ''; }
   }
 
   async function undoLastRestore() {
-    const backup = safeJson(RESTORE_SAFETY_KEY, null) || safeJson(V13_RESTORE_SAFETY_KEY, null) || safeJson(V12_RESTORE_SAFETY_KEY, null) || safeJson(V11_RESTORE_SAFETY_KEY, null) || safeJson(V10_RESTORE_SAFETY_KEY, null) || safeJson(V9_RESTORE_SAFETY_KEY, null) || safeJson(V8_RESTORE_SAFETY_KEY, null);
-    if (!backup || !window.confirm('Revenir aux données présentes juste avant la dernière restauration ?')) return;
-    try {
-      if (!recognisedBackup(backup) || (backup.app && backup.app !== BACKUP_APP_ID) || backupVersion(backup) > CURRENT_DATA_VERSION) throw new Error('INVALID_SAFETY_COPY');
-      const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, { strict: true });
-      if (!(await saveState(restored, false, { reason: 'undo-backup-restore' }))) return;
-      app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(RESTORE_SAFETY_KEY); localStorage.removeItem(V13_RESTORE_SAFETY_KEY); localStorage.removeItem(V12_RESTORE_SAFETY_KEY); localStorage.removeItem(V11_RESTORE_SAFETY_KEY); localStorage.removeItem(V10_RESTORE_SAFETY_KEY); localStorage.removeItem(V9_RESTORE_SAFETY_KEY); localStorage.removeItem(V8_RESTORE_SAFETY_KEY); } catch {} $('#settingsDialog').close(); render(); showAppAlert('Les données d’avant la restauration ont été récupérées.');
-    } catch { showAppAlert('La copie de secours locale n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); }
+    return runExclusiveReplacement(async operationToken => {
+      let backup = null;
+      try { backup = readRestoreSafetyBackup(); }
+      catch { showAppAlert('La copie de secours locale la plus récente ne peut pas être lue. Aucune ancienne copie ne sera utilisée à sa place.', 'À vérifier'); return false; }
+      if (!backup || !window.confirm('Revenir aux données présentes juste avant la dernière restauration ?')) return false;
+      try {
+        try { validateBackupEnvelope(backup); } catch (error) { throw Object.assign(new Error('INVALID_SAFETY_COPY'), { cause: error }); }
+        const sourceVersion = backupVersion(backup);
+        const migrationDate = pickDate(backup.migrationDate) || pickDate(backup.exportedAt);
+        if (sourceVersion < CURRENT_DATA_VERSION && !validDate(migrationDate)) throw new Error('INVALID_MIGRATION_DATE');
+        const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, {
+          strict: true,
+          allowFutureFinancialDates: true,
+          migrationDate: validDate(migrationDate) ? migrationDate : todayKey()
+        });
+        restored.settings.restoreSafetyId = uuid();
+        if (!(await saveState(restored, false, { reason: 'undo-backup-restore', requireSnapshot: true, operationToken }))) return false;
+        app.state = restored; clearAllFormDrafts(); try { clearRestoreSafetyBackups(); } catch {} $('#settingsDialog').close(); render(); showAppAlert('Les données d’avant la restauration ont été récupérées.');
+        return true;
+      } catch { showAppAlert('La copie de secours locale n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); return false; }
+    });
   }
 
   async function undoLastMigration() {
-    const backup = safeJson(MIGRATION_SAFETY_KEY, null);
-    if (!backup || !window.confirm('Récupérer la copie créée juste avant la mise à jour ? Les ajouts effectués depuis seront remplacés.')) return;
-    try {
-      if (!recognisedBackup(backup) || (backup.app && backup.app !== BACKUP_APP_ID) || backupVersion(backup) > CURRENT_DATA_VERSION) throw new Error('INVALID_MIGRATION_COPY');
-      const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, { strict: true });
-      if (!(await saveState(restored, false, { reason: 'undo-migration' }))) return;
-      app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(MIGRATION_SAFETY_KEY); } catch {}
-      $('#settingsDialog').close(); render(); showAppAlert('Les données présentes avant la mise à jour ont été récupérées et adaptées à cette version.');
-    } catch { showAppAlert('La copie d’avant mise à jour n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); }
+    return runExclusiveReplacement(async operationToken => {
+      const backup = safeJson(MIGRATION_SAFETY_KEY, null);
+      if (!backup || !window.confirm('Récupérer la copie créée juste avant la mise à jour ? Les ajouts effectués depuis seront remplacés.')) return false;
+      try {
+        try { validateBackupEnvelope(backup); } catch (error) { throw Object.assign(new Error('INVALID_MIGRATION_COPY'), { cause: error }); }
+        const sourceVersion = backupVersion(backup);
+        const migrationDate = pickDate(backup.migrationDate) || pickDate(backup.exportedAt);
+        if (sourceVersion < CURRENT_DATA_VERSION && !validDate(migrationDate)) throw new Error('INVALID_MIGRATION_DATE');
+        const restored = migrateState(backup, backup.clientProfiles || backup.state?.clientProfiles || {}, {
+          strict: true,
+          allowFutureFinancialDates: true,
+          migrationDate: validDate(migrationDate) ? migrationDate : todayKey()
+        });
+        if (!(await saveState(restored, false, { reason: 'undo-migration', requireSnapshot: true, operationToken }))) return false;
+        app.state = restored; clearAllFormDrafts(); try { localStorage.removeItem(MIGRATION_SAFETY_KEY); } catch {}
+        $('#settingsDialog').close(); render(); showAppAlert('Les données présentes avant la mise à jour ont été récupérées et adaptées à cette version.');
+        return true;
+      } catch { showAppAlert('La copie d’avant mise à jour n’est pas exploitable. Tes données actuelles n’ont pas été modifiées.'); return false; }
+    });
   }
 
-  function showUpdateNotice(registration) {
+  function showUpdateNotice(registration, activated = false) {
     app.ui.updateRegistration = registration;
-    const notice = $('#updateNotice'); notice.hidden = !registration?.waiting;
+    app.ui.updateActivated = Boolean(activated);
+    const notice = $('#updateNotice');
+    notice.hidden = !(activated || registration?.waiting);
+    notice.innerHTML = activated ? 'Mise à jour installée <strong>Recharger</strong>' : 'Nouvelle version disponible <strong>Mettre à jour</strong>';
   }
 
-  function activateWaitingWorker() {
+  async function activateWaitingWorker() {
     const worker = app.ui.updateRegistration?.waiting;
-    if (!worker) return;
     saveOpenFormDrafts();
-    if (hasOpenUnsavedChanges()) { showAppAlert('Une saisie a été modifiée. Enregistre-la ou ferme-la avant d’appliquer la mise à jour.'); return; }
-    app.ui.reloadingForUpdate = true; worker.postMessage({ type: 'SKIP_WAITING' });
+    if (storageSaveCount || hasOpenUnsavedChanges()) { showAppAlert('Une saisie ou un enregistrement est en cours. Termine-le avant d’appliquer la mise à jour.'); return; }
+    if (app.ui.updateActivated) { app.ui.reloadingForUpdate = true; globalThis.location?.reload?.(); return; }
+    if (!worker) return;
+    app.ui.reloadingForUpdate = true;
+    try {
+      const status = await requestServiceWorkerStatus(worker, 'SKIP_WAITING');
+      if (!status.accepted) {
+        app.ui.reloadingForUpdate = false;
+        showAppAlert(status.clientCount > 1
+          ? 'Ferme les autres onglets ou fenêtres de Mon agenda, puis réessaie la mise à jour.'
+          : 'La mise à jour ne peut pas être activée en sécurité. Réessaie dans un instant.');
+      } else if (status.activated) globalThis.location?.reload?.();
+    } catch {
+      app.ui.reloadingForUpdate = false;
+      showAppAlert('Impossible de vérifier que Mon agenda est ouvert dans une seule fenêtre. Ferme ses autres onglets ou fenêtres, puis réessaie.');
+    }
   }
 
  function saveOpenFormDrafts() {
@@ -3325,20 +3947,178 @@
     if ($('#expenseCategoriesDialog')?.open) saveExpenseCategoryDraft();
  }
 
+  function serviceWorkerBuild(worker) {
+    try { return new URL(worker?.scriptURL || '', globalThis.location?.href).searchParams.get('v') || ''; }
+    catch { return ''; }
+  }
+
+  function requestServiceWorkerStatus(worker, type = 'WORKER_STATUS', timeoutMs = 5000) {
+    return new Promise((resolve, reject) => {
+      if (!globalThis.MessageChannel || !worker?.postMessage) { reject(new Error('SERVICE_WORKER_STATUS_UNAVAILABLE')); return; }
+      let channel;
+      try { channel = new globalThis.MessageChannel(); }
+      catch (cause) { reject(Object.assign(new Error('SERVICE_WORKER_STATUS_UNAVAILABLE'), { cause })); return; }
+      let settled = false;
+      const finish = (error, status = null) => {
+        if (settled) return;
+        settled = true; clearTimeout(timer);
+        channel.port1.onmessage = null; channel.port1.onmessageerror = null;
+        try { channel.port1.close?.(); channel.port2.close?.(); } catch {}
+        if (error) reject(error); else resolve(status);
+      };
+      const timer = setTimeout(() => finish(new Error('SERVICE_WORKER_STATUS_TIMEOUT')), timeoutMs);
+      channel.port1.onmessage = event => {
+        const status = event.data;
+        const valid = typeof status?.activated === 'boolean'
+          && Number.isInteger(status?.clientCount) && status.clientCount >= 1
+          && (type !== 'SKIP_WAITING' || typeof status?.accepted === 'boolean');
+        if (!valid) { finish(new Error('SERVICE_WORKER_STATUS_INVALID')); return; }
+        finish(null, status);
+      };
+      channel.port1.onmessageerror = () => finish(new Error('SERVICE_WORKER_STATUS_INVALID'));
+      channel.port1.start?.();
+      try { worker.postMessage({ type }, [channel.port2]); }
+      catch (cause) { finish(Object.assign(new Error('SERVICE_WORKER_STATUS_UNAVAILABLE'), { cause })); }
+    });
+  }
+
+  function waitForWorkerInstalled(worker, timeoutMs = 15000) {
+    if (worker?.state === 'installed' || worker?.state === 'activated') return Promise.resolve(worker);
+    return new Promise((resolve, reject) => {
+      if (!worker?.addEventListener) { reject(new Error('SERVICE_WORKER_INSTALLATION_MISSING')); return; }
+      const finish = (error = null) => {
+        clearTimeout(timer); worker.removeEventListener?.('statechange', onStateChange);
+        if (error) reject(error); else resolve(worker);
+      };
+      const onStateChange = () => {
+        if (worker.state === 'installed' || worker.state === 'activated') finish();
+        else if (worker.state === 'redundant') finish(new Error('SERVICE_WORKER_INSTALLATION_FAILED'));
+      };
+      const timer = setTimeout(() => finish(new Error('SERVICE_WORKER_INSTALLATION_TIMEOUT')), timeoutMs);
+      worker.addEventListener('statechange', onStateChange);
+      onStateChange();
+    });
+  }
+
+  function waitForCurrentController(timeoutMs = 15000) {
+    if (serviceWorkerBuild(navigator.serviceWorker?.controller) === BUILD_ID) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const finish = (error = null) => {
+        clearTimeout(timer); navigator.serviceWorker?.removeEventListener?.('controllerchange', onControllerChange);
+        if (error) reject(error); else resolve();
+      };
+      const onControllerChange = () => { if (serviceWorkerBuild(navigator.serviceWorker?.controller) === BUILD_ID) finish(); };
+      const timer = setTimeout(() => finish(new Error('SERVICE_WORKER_ACTIVATION_TIMEOUT')), timeoutMs);
+      navigator.serviceWorker?.addEventListener?.('controllerchange', onControllerChange);
+      onControllerChange();
+    });
+  }
+
+  function showServiceWorkerBarrier(reason = 'unavailable') {
+    if (document.body?.dataset) document.body.dataset.updateBarrier = 'true';
+    const loading = $('#storageLoading');
+    const card = loading?.querySelector('.storage-loading-card');
+    const spinner = card?.querySelector('.storage-loading-spinner'); if (spinner) spinner.hidden = true;
+    const multipleWindows = reason === 'multiple-windows';
+    const titleText = multipleWindows ? 'Ferme les autres fenêtres' : 'Mise à jour à terminer';
+    const detailText = multipleWindows
+      ? 'Ferme les autres onglets ou fenêtres de Mon agenda sur cet appareil, puis touche Réessayer. Tes données n’ont pas été ouvertes ni modifiées.'
+      : 'Reconnecte cet appareil, puis réessaie. Tes données n’ont pas été ouvertes ni modifiées.';
+    loading?.setAttribute?.('aria-label', titleText);
+    const title = card?.querySelector('strong'); if (title) title.textContent = titleText;
+    const detail = card?.querySelector('small'); if (detail) detail.textContent = detailText;
+    if (card && !$('#updateBarrierRetry')) {
+      const retry = document.createElement('button'); retry.id = 'updateBarrierRetry'; retry.type = 'button'; retry.className = 'primary-button'; retry.textContent = 'Réessayer';
+      retry.addEventListener('click', () => globalThis.location?.reload?.()); card.append(retry);
+    }
+  }
+
+  async function ensureCurrentServiceWorker() {
+    if (!('serviceWorker' in navigator)) return true;
+    const controller = navigator.serviceWorker.controller;
+    if (!controller) return true;
+    try {
+      if (serviceWorkerBuild(controller) === BUILD_ID) {
+        const status = await requestServiceWorkerStatus(controller);
+        if (!status.activated) throw new Error('CURRENT_SERVICE_WORKER_INACTIVE');
+        if (status.clientCount !== 1) { showServiceWorkerBarrier(status.clientCount > 1 ? 'multiple-windows' : 'unavailable'); return false; }
+        return true;
+      }
+      const registration = await navigator.serviceWorker.register(`./sw.js?v=${BUILD_ID}`, { updateViaCache: 'none' });
+      let worker = registration.waiting || registration.installing;
+      if (!worker || serviceWorkerBuild(worker) !== BUILD_ID) {
+        await registration.update?.();
+        worker = registration.waiting || registration.installing;
+      }
+      if (!worker && serviceWorkerBuild(registration.active) === BUILD_ID) worker = registration.active;
+      if (!worker || serviceWorkerBuild(worker) !== BUILD_ID) throw new Error('CURRENT_SERVICE_WORKER_MISSING');
+      await waitForWorkerInstalled(worker);
+      worker = registration.waiting || worker;
+      let status = await requestServiceWorkerStatus(worker);
+      if (status.clientCount !== 1) { showServiceWorkerBarrier(status.clientCount > 1 ? 'multiple-windows' : 'unavailable'); return false; }
+      const controllerReady = waitForCurrentController();
+      if (!status.activated) {
+        try { status = await requestServiceWorkerStatus(worker, 'SKIP_WAITING'); }
+        catch (error) { controllerReady.catch(() => {}); throw error; }
+        if (!status.accepted) {
+          controllerReady.catch(() => {});
+          showServiceWorkerBarrier(status.clientCount > 1 ? 'multiple-windows' : 'unavailable');
+          return false;
+        }
+      }
+      await controllerReady;
+      status = await requestServiceWorkerStatus(navigator.serviceWorker.controller);
+      if (!status.activated) throw new Error('CURRENT_SERVICE_WORKER_INACTIVE');
+      if (status.clientCount !== 1) { showServiceWorkerBarrier(status.clientCount > 1 ? 'multiple-windows' : 'unavailable'); return false; }
+      app.ui.reloadingForUpdate = true;
+      globalThis.location?.reload?.();
+      return false;
+    } catch {
+      showServiceWorkerBarrier();
+      return false;
+    }
+  }
+
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
+    let lastUpdateCheck = 0, hadController = Boolean(navigator.serviceWorker.controller);
+    const observedWorkers = new WeakSet();
+    const recordWorkerError = (error, stage) => storageAdapter.recordError?.(error, stage, app.state).catch?.(() => {});
     navigator.serviceWorker.addEventListener?.('controllerchange', () => {
-      if (!app.ui.reloadingForUpdate) return;
-      app.ui.reloadingForUpdate = false; globalThis.location?.reload?.();
+      if (!hadController) { hadController = true; return; }
+      saveOpenFormDrafts();
+      if (!storageSaveCount && !hasOpenUnsavedChanges()) {
+        app.ui.reloadingForUpdate = false; globalThis.location?.reload?.(); return;
+      }
+      app.ui.reloadingForUpdate = false;
+      showUpdateNotice(null, true);
+      showAppAlert('La mise à jour est installée. Termine ta saisie, puis touche « Recharger » dans l’avis de mise à jour.');
     });
-    navigator.serviceWorker.register('./sw.js?v=12.5', { updateViaCache: 'none' }).then(registration => {
+    navigator.serviceWorker.register(`./sw.js?v=${BUILD_ID}`, { updateViaCache: 'none' }).then(registration => {
       if (registration.waiting) showUpdateNotice(registration);
+      const observeInstallingWorker = worker => {
+        if (!worker || observedWorkers.has(worker)) return;
+        observedWorkers.add(worker);
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdateNotice(registration);
+        });
+      };
+      observeInstallingWorker(registration.installing);
       registration.addEventListener?.('updatefound', () => {
-        const worker = registration.installing; if (!worker) return;
-        worker.addEventListener('statechange', () => { if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdateNotice(registration); });
+        observeInstallingWorker(registration.installing);
       });
-      registration.update?.().catch?.(() => {});
-    }).catch(() => {});
+      const checkForUpdate = (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastUpdateCheck < 5 * 60 * 1000) return;
+        lastUpdateCheck = now;
+        registration.update?.().catch?.(error => recordWorkerError(error, 'service-worker-update'));
+      };
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') checkForUpdate();
+      });
+      globalThis.addEventListener?.('pageshow', () => checkForUpdate());
+      checkForUpdate(true);
+    }).catch(error => recordWorkerError(error, 'service-worker-registration'));
   }
 
   function setMode(mode) {
@@ -3365,16 +4145,13 @@
     if (target.dataset.reportDetailKind) { openReportDetail(target.dataset.reportDetailKind, target.dataset.reportDetailKey); return; }
     if (target.dataset.expenseView) { app.ui.expenseReportView = target.dataset.expenseView; renderReport(); return; }
     if (target.id === 'backToAgenda') { showScreen('agenda'); return; }
-    if (target.id === 'addAppointment') { openQuickAdd(); return; }
+    if (target.id === 'addAppointment') { openAppointment(null, { date: dateKey(app.ui.selectedDate), time: '10:00' }); return; }
     if (target.id === 'dismissFeatureCoach') { dismissFeatureCoach(); return; }
     if (target.id === 'appAlertClose') { closeAppAlert(); return; }
     if (target.id === 'closeMonthDay') { closeMonthDay(true); return; }
     if (target.id === 'monthDayAddAppointment') { const key = app.ui.monthDayKey; prepareMonthDayReturn(); openAppointment(null, { date: key, time: '10:00' }); return; }
     if (target.id === 'monthDayAddBlock') { const key = app.ui.monthDayKey; prepareMonthDayReturn(); openBlock(null, { date: key, time: '10:00' }); return; }
     if (target.id === 'appointmentSearchButton') { openAppointmentSearch(); return; }
-    if (target.id === 'quickAddAppointment') { $('#quickAddDialog').close(); openAppointment(null, { date: app.ui.quickAddDate, time: app.ui.quickAddTime }); return; }
-    if (target.id === 'quickAddBlock') { $('#quickAddDialog').close(); openBlock(null, { date: app.ui.quickAddDate, time: app.ui.quickAddTime }); return; }
-    if (target.id === 'quickAddExpense') { $('#quickAddDialog').close(); openExpense(null, { date: app.ui.quickAddDate }); return; }
     if (target.id === 'resumeDraft') { resumeLatestDraft(); return; }
     if (target.id === 'discardDraft') { if (window.confirm('Supprimer cette saisie en cours ?')) clearFormDraft(); return; }
     if (target.id === 'previousPeriod') { app.ui.selectedDate = addDays(app.ui.selectedDate, -7); app.ui.weekStart = mondayOf(app.ui.selectedDate); renderAgenda(); return; }
@@ -3397,7 +4174,7 @@
     if (target.id === 'deleteAppointment') {
       if (app.ui.editingAppointmentId && window.confirm('Supprimer ce rendez-vous ?')) {
         const previousState = cloneState(app.state); app.state.appointments = app.state.appointments.filter(appointment => appointment.id !== app.ui.editingAppointmentId);
-        if (!(await saveState(app.state, false, { reason: 'appointment-delete' }))) app.state = previousState; else { clearAppointmentDraft(); $('#appointmentDialog').close(); render(); offerUndo(previousState, 'Rendez-vous supprimé'); }
+        if (await saveState(app.state, false, { reason: 'appointment-delete' })) { clearAppointmentDraft(); $('#appointmentDialog').close(); render(); offerUndo(previousState, 'Rendez-vous supprimé'); }
       }
       return;
     }
@@ -3405,7 +4182,7 @@
       const id = $('#blockId').value;
       if (id && window.confirm('Supprimer cet événement personnel ?')) {
         const previousState = cloneState(app.state); app.state.blocks = app.state.blocks.filter(block => block.id !== id);
-        if (!(await saveState(app.state, false, { reason: 'event-delete' }))) app.state = previousState; else { clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, 'Événement personnel supprimé'); }
+        if (await saveState(app.state, false, { reason: 'event-delete' })) { clearFormDraft('block'); $('#blockDialog').close(); render(); offerUndo(previousState, 'Événement personnel supprimé'); }
       }
       return;
     }
@@ -3419,7 +4196,7 @@
       if (pending?.draft) continueDraftSubmission(pending.draft); else setAppointmentSaving(false); return;
     }
     if (target.id === 'useDuplicate') {
-      const pending = app.ui.pendingDuplicate, client = pending ? clientById(pending.clientId) : null; $('#duplicateClientDialog').close(); app.ui.pendingDuplicate = null;
+      const pending = app.ui.pendingDuplicate, selectedId = $('#duplicateClientChoice')?.value || pending?.clientIds?.[0], client = selectedId ? clientById(selectedId) : null; $('#duplicateClientDialog').close(); app.ui.pendingDuplicate = null;
       if (pending?.draft && client) continueDraftSubmission({ ...pending.draft, clientId: client.id, clientName: client.name, phone: pending.draft.phone || client.phone, contactVia: pending.draft.contactVia || client.contactVia, address: pending.draft.address || client.address });
       else setAppointmentSaving(false); return;
     }
@@ -3478,16 +4255,23 @@
     if (target.dataset.editLinked) { const appointment = app.state.appointments.find(item => item.id === target.dataset.editLinked); if (appointment) { saveAppointmentDraft(); $('#appointmentDialog').close(); openAppointment(appointment); } return; }
     if (target.dataset.repeatFrom) { const appointment = app.state.appointments.find(item => item.id === target.dataset.repeatFrom); if (appointment) { saveClientDraft(); $('#clientDialog').close(); openAppointment(null, { from: appointment }); } return; }
     if (target.dataset.waze) { openWaze(decodeURIComponent(target.dataset.waze)); return; }
-    if (target.dataset.createTime) { const requestedDate = target.dataset.createDate || dateKey(app.ui.selectedDate); app.ui.selectedDate = parseDate(requestedDate) || app.ui.selectedDate; openQuickAdd(requestedDate, target.dataset.createTime); return; }
+    if (target.dataset.createTime) { const requestedDate = target.dataset.createDate || dateKey(app.ui.selectedDate); app.ui.selectedDate = parseDate(requestedDate) || app.ui.selectedDate; openAppointment(null, { date: requestedDate, time: target.dataset.createTime }); return; }
     if (target.dataset.suggestion) { const client = clientById(target.dataset.suggestion); if (client) fillFromClient(client); return; }
     if (target.dataset.todo) { openTodo(target.dataset.todo); return; }
-    if (target.dataset.reviewPaid) { const appointment = app.state.appointments.find(item => item.id === target.dataset.reviewPaid); if (appointment) markAppointmentPaid(appointment.id, appointment.date); return; }
+    if (target.dataset.reviewPaid) { const appointment = app.state.appointments.find(item => item.id === target.dataset.reviewPaid); if (appointment) markAppointmentPaid(appointment.id, todayKey()); return; }
     if (target.dataset.reviewAdjust) { openReviewFinancialEditor(target.dataset.reviewAdjust); return; }
     if (target.dataset.reviewPending) { app.ui.reviewPendingId = target.dataset.reviewPending; renderDayReview(); return; }
     if (target.dataset.reviewSave) { const input = $$('[data-review-reminder]').find(item => item.dataset.reviewReminder === target.dataset.reviewSave); savePaymentReminder(target.dataset.reviewSave, input?.value || ''); return; }
     if (target.dataset.reminderPaid) { markAppointmentPaid(target.dataset.reminderPaid, todayKey()); return; }
     if (target.dataset.client) { openClient(target.dataset.client); }
   });
+
+  const blockInputDuringReplacement = event => {
+    if (!exclusiveReplacementToken) return;
+    event.preventDefault?.();
+    event.stopImmediatePropagation?.();
+  };
+  ['click', 'submit', 'change', 'input'].forEach(type => document.addEventListener(type, blockInputDuringReplacement, true));
 
   $('#appointmentForm').addEventListener('submit', event => {
     event.preventDefault();
@@ -3496,11 +4280,15 @@
     const draft = getDraft();
     if (!draft.clientName || !draft.service || !draft.date || !draft.time) { setAppointmentSaving(false); showAppAlert('Renseigne la cliente et la prestation.'); return; }
     if (!validDate(draft.date) || !validTime(draft.time) || !Number.isFinite(draft.duration) || draft.duration < 15) { setAppointmentSaving(false); showAppAlert('Vérifie la date, l’heure et la durée du rendez-vous.'); return; }
+    if (app.ui.editingAppointmentId && ['paid', 'refunded'].includes(draft.paymentStatus) && (!validDate(draft.paymentDate) || draft.paymentDate > todayKey())) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis une date réelle de paiement, au plus tard aujourd’hui.'); $('#paymentDate').focus(); return; }
+    if (app.ui.editingAppointmentId && draft.paymentStatus === 'refunded' && (!validDate(draft.refundDate) || draft.refundDate < draft.paymentDate || draft.refundDate > todayKey())) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis une date de remboursement réelle, comprise entre la date du paiement et aujourd’hui.'); $('#refundDate')?.focus(); return; }
     if (app.ui.editingAppointmentId && draft.paymentStatus === 'pending' && !validDate(draft.paymentReminderDate)) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis la date à laquelle tu veux relancer la cliente pour le paiement.'); $('#paymentReminderDate').focus(); return; }
+    const existingAppointment = app.ui.editingAppointmentId ? appointmentById(app.ui.editingAppointmentId) : null;
+    if (existingAppointment && hasCollectedPayment(existingAppointment) && appointmentFinancialSignature(existingAppointment) !== appointmentFinancialSignature(draft)) { setAppointmentSaving(false); showAppAlert('Le tarif, la prestation et les suppléments d’un paiement enregistré sont figés pour préserver le bilan. Corrige d’abord l’état du paiement, enregistre, puis ajuste le montant si nécessaire.'); return; }
     if (draft.repeatWeeks && (!validDate(draft.repeatDate) || dateTimeMs(draft.repeatDate, '00:00') <= dateTimeMs(draft.date, '00:00'))) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis une date du prochain RDV après le rendez-vous actuel.'); $('#repeatDate').focus(); return; }
     if (draft.repeatWeeks && !validTime(draft.repeatTime)) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis une heure valide pour le prochain rendez-vous.'); $('#repeatTime').focus(); return; }
-    const duplicate = similarClient(draft);
-    if (duplicate) { openDuplicateClientDialog(draft, duplicate); return; }
+    const duplicates = similarClients(draft);
+    if (duplicates.length) { openDuplicateClientDialog(draft, duplicates); return; }
     continueDraftSubmission(draft);
   });
   $('#blockForm').addEventListener('submit', event => { event.preventDefault(); saveBlock(); });
@@ -3510,8 +4298,8 @@
    event.preventDefault(); if (app.ui.clientSaving || !$('#clientForm').reportValidity()) return; app.ui.clientSaving = true;
     $('#clientSubmitButton').disabled = true;
     const client = clientById($('#profileKey').value); if (!client) { app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
-    const previousState = cloneState(app.state); client.name = $('#profileName').value.trim(); client.phone = $('#profilePhone').value.trim(); client.contactVia = $('#profileContactVia').value; client.badgeId = $('#profileBadge').value; client.address = $('#profileAddress').value.trim(); client.notes = $('#profileNotes').value.trim(); client.updatedAt = new Date().toISOString();
-    if (!(await saveState(app.state, false, { reason: 'client-update' }))) { app.state = previousState; app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
+    client.name = $('#profileName').value.trim(); client.phone = $('#profilePhone').value.trim(); client.contactVia = $('#profileContactVia').value; client.badgeId = $('#profileBadge').value; client.address = $('#profileAddress').value.trim(); client.notes = $('#profileNotes').value.trim(); client.updatedAt = new Date().toISOString();
+    if (!(await saveState(app.state, false, { reason: 'client-update' }))) { app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; return; }
     app.ui.clientSaving = false; $('#clientSubmitButton').disabled = false; clearFormDraft('client'); $('#clientDialog').close(); render(); showSuccess('Fiche cliente enregistrée');
   });
   $('#serviceForm').addEventListener('submit', event => { event.preventDefault(); saveService(); });
@@ -3519,9 +4307,10 @@
   $('#badgeForm').addEventListener('submit', event => { event.preventDefault(); saveBadge(); });
   $('#reviewFinancialForm').addEventListener('submit', event => { event.preventDefault(); saveReviewFinancials($('#reviewFinancialAppointmentId').value); });
   $('#clientName').addEventListener('input', event => {
-    const exact = app.state.clients.filter(client => normaliseName(client.name) === normaliseName(event.target.value));
-    if (exact.length === 1) fillFromClient(exact[0]);
-    else { app.ui.formClientId = null; app.ui.appointmentContactExpanded = true; renderSelectedClientInfo(null); renderSuggestions(); }
+    // Un nom n'est pas un identifiant : deux clientes peuvent porter exactement
+    // le même. La fiche n'est liée qu'après un choix explicite dans les
+    // suggestions ou dans l'alerte de doublon.
+    app.ui.formClientId = null; app.ui.appointmentContactExpanded = true; renderSelectedClientInfo(null); renderSuggestions();
   });
   $('#clientName').addEventListener('blur', () => setTimeout(() => { $('#clientSuggestions').hidden = true; }, 150));
  $('#serviceSelect').addEventListener('change', applyServicePreset);
@@ -3533,6 +4322,8 @@
   $('#reviewSupplementRows').addEventListener('input', updateReviewFinancialTotal);
   $('#reviewSupplementRows').addEventListener('change', event => { if (event.target.matches('[data-review-supplement-type]')) applyReviewSupplementDefaultPrice(event.target); else updateReviewFinancialTotal(); });
   $('#paymentStatus').addEventListener('change', syncPaymentFields);
+  $('#paymentDate').addEventListener('change', syncPaymentFields);
+  $('#duplicateClientChoice').addEventListener('change', updateDuplicateClientDetails);
   $('#status').addEventListener('change', () => { syncStatusFields(); updateConflictHint(); });
   $('#date').addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); });
   ['#time', '#duration'].forEach(selector => $(selector).addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); updateAppointmentServiceSummary(); }));
@@ -3612,9 +4403,13 @@
     if (app.ui.mode === 'day') renderAgenda();
     else if (app.ui.mode === 'week') updateWeekCurrentTimeLine();
   }, 60 * 1000);
-  registerServiceWorker();
   navigator.storage?.persist?.().catch?.(() => {});
   globalThis.addEventListener?.('error', event => storageAdapter.recordError?.(event.error || new Error('APPLICATION_ERROR'), 'window-error', app.state).catch?.(() => {}));
   globalThis.addEventListener?.('unhandledrejection', event => storageAdapter.recordError?.(event.reason || new Error('UNHANDLED_REJECTION'), 'unhandled-rejection', app.state).catch?.(() => {}));
-  app.ready = initialiseSecureStorage();
+  app.ready = (async () => {
+    if (!(await ensureCurrentServiceWorker())) return false;
+    const ready = await initialiseSecureStorage();
+    registerServiceWorker();
+    return ready;
+  })();
 })();

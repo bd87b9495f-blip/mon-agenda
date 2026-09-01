@@ -2,3 +2,6 @@ sauvegarde-agenda-*.json
 bilan-*.csv
 depenses-*.csv
 *.zip
+node_modules/
+coverage/
+test-results/

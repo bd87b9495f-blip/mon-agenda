@@ -1,57 +1,152 @@
-# Mettre Mon agenda à jour vers la version 12.5 bêta
+# Mettre Mon agenda à jour de la v12.5 bêta vers 2026.15
 
-La V12.5 migre automatiquement les données existantes vers une base locale plus fiable. La copie V12.4.1 reste intacte tant que la nouvelle base n’a pas été écrite puis vérifiée.
+La 2026.15 est une candidate avant lancement. La suite automatisée doit être verte et la recette sur un vrai iPhone doit encore être exécutée avant de la déclarer stable.
 
-## 1. Sauvegarder avant la mise à jour
+## État de validation
 
-1. Sur l’iPhone, ouvre **Mon agenda → Réglages → Données et sauvegardes**.
-2. Touche **Sauvegarder dans Fichiers**.
-3. Choisis **Enregistrer dans Fichiers** puis un dossier personnel.
-4. Vérifie que le fichier JSON est bien présent.
+- **Automatisé** : `131 / 131` tests réussis sur l’archive finale avec `node --test tests/*.test.mjs`.
+- **iPhone réel** : non effectué à ce stade ; compléter la checklist de ce guide et consigner les résultats dans `TESTS-2026.15.md`.
 
-Ne place jamais ce fichier sur GitHub : il contient tes données professionnelles.
+## 1. Sauvegarder la v12.5 avant toute mise à jour
 
-## 2. Remplacer les fichiers
+- [ ] Ouvrir **Mon agenda → Réglages → Données et sauvegardes** sur l’iPhone qui contient les données de test.
+- [ ] Toucher **Sauvegarder dans Fichiers** et enregistrer le JSON dans un dossier personnel.
+- [ ] Utiliser **Vérifier une sauvegarde** sur ce même fichier.
+- [ ] Noter les nombres de clientes, rendez-vous, événements personnels et dépenses.
+- [ ] Garder une copie intacte du dossier ou de l’archive v12.5.
 
-1. Décompresse l’archive `mon-agenda-v12.5-beta.zip`.
-2. Dans GitHub Desktop, ouvre le dépôt `mon-agenda` avec **Show in Explorer**.
-3. Copie tous les fichiers du dossier `mon-agenda-v12.5-beta` dans le dépôt et accepte leur remplacement.
-4. Vérifie impérativement que le nouveau fichier `storage.js` se trouve à côté de `app.js` et `index.html`.
-5. Ne supprime pas le dossier caché `.git` et ne copie pas ta sauvegarde JSON dans le dépôt.
+La sauvegarde JSON contient les données professionnelles ou de test. Ne jamais la copier dans GitHub, l’archive publique ou un dossier partagé publiquement.
 
-Si ces anciens fichiers sont encore présents, ils peuvent être supprimés : `assistant.js`, `client-ui.js`, `clients.css`, `visual.js`, `visual.css` et `overrides.css`.
+## 2. Préparer la candidate 2026.15
 
-## 3. Publier avec GitHub Desktop
+1. Décompresser `mon-agenda-2026.15.zip`.
+2. Dans GitHub Desktop, ouvrir le dépôt `mon-agenda` avec **Show in Explorer**.
+3. Copier tout le contenu du dossier `mon-agenda-2026.15` dans le dépôt et accepter le remplacement des fichiers.
+4. Vérifier que `index.html`, `style.css`, `app.js`, `storage.js`, `sw.js`, `icon.svg`, `icon-180.png`, `icon-192.png` et `icon-512.png` sont à la racine, et que `tests/` est présent.
+5. Ne pas supprimer le dossier caché `.git`.
+6. Vérifier qu’aucun JSON de sauvegarde ni CSV métier n’a été copié dans le dépôt.
 
-1. Vérifie qu’aucun fichier JSON de sauvegarde ni export CSV personnel n’apparaît dans les changements.
-2. Utilise le résumé `Version 12.5 beta`.
-3. Clique sur **Commit to main**, puis sur **Push origin**.
+Les anciens fichiers supprimés dans cette livraison ne doivent pas être réintroduits : `assistant.js`, `client-ui.js`, `clients.css`, `visual.js`, `visual.css` et `overrides.css`.
 
-## 4. Appliquer la mise à jour sur l’iPhone
+## 3. Exécuter les contrôles automatisés
 
-1. Attends une à deux minutes après le Push.
-2. Dans Safari, ouvre `https://bd87b9495f-blip.github.io/mon-agenda/?v=12.5`.
-3. Laisse la page ouverte quelques secondes et accepte **Nouvelle version disponible** si le bandeau apparaît.
-4. Ferme puis relance Mon agenda depuis l’écran d’accueil.
-5. Ouvre **Réglages → À propos** et vérifie `Mon agenda · version 12.5 bêta`.
+Depuis le dossier du projet, avec Node.js installé :
 
-Ne désinstalle pas l’application et n’efface pas les données Safari pour forcer l’actualisation.
+```bash
+node --test tests/*.test.mjs
+```
 
-## 5. Contrôler la migration
+- [ ] La commande termine sans échec.
+- [ ] Le nombre final de tests réussis est reporté dans `TESTS-2026.15.md` après le gel de l’archive.
+- [ ] `Mon agenda · version 2026.15`, le build `2026.15.0` et le schéma `v15` sont cohérents dans les contrôles.
 
-1. Vérifie quelques anciens rendez-vous, clientes, paiements, événements et dépenses.
-2. Ouvre **Réglages → Données et sauvegardes**.
-3. Dans **Sécurité des données**, vérifie que **Base sécurisée active** est affiché.
-4. Touche **Vérifier maintenant** : le contrôle doit confirmer le nombre de rendez-vous et de clientes.
-5. Crée puis modifie un élément de test. Une première copie automatique doit ensuite être indiquée dans cette rubrique.
-6. Supprime l’élément de test si nécessaire, puis réalise une nouvelle sauvegarde dans Fichiers.
+## 4. Créer le quinzième commit et publier
 
-## 6. Si un écran de récupération apparaît
+1. Dans GitHub Desktop, vérifier une dernière fois qu’aucun fichier personnel n’apparaît dans les changements.
+2. Utiliser le résumé `Version 2026.15`.
+3. Cliquer sur **Commit to main**, puis sur **Push origin**.
+4. Dans la page **Actions** du dépôt, attendre que **Contrôles de qualité** et le déploiement **GitHub Pages** soient tous les deux terminés avec succès.
 
-- Ne désinstalle pas l’application.
-- N’efface pas l’historique ni les données de Safari.
-- Touche d’abord **Réessayer l’ouverture**.
-- Si le problème persiste, utilise **Restaurer depuis Fichiers** avec la sauvegarde créée avant la mise à jour.
-- **Créer un diagnostic technique** produit un fichier sans noms, coordonnées, adresses ni notes ; conserve-le pour l’analyse du problème.
+Cette règle suppose que le dépôt possède quatorze commits avant cette publication. Si GitHub indique déjà un autre total, arrêter la publication et aligner le numéro visible sur le vrai compteur. Toute correction de code nécessitant un nouveau commit doit recevoir le numéro suivant ; il ne faut pas republier un code différent sous le même `2026.15`.
 
-Si l’application indique seulement **Stockage de compatibilité actif**, elle reste utilisable. Les modifications faites dans ce mode seront réintégrées automatiquement lorsque la base sécurisée redeviendra disponible.
+## 5. Déclencher la mise à jour sur l’iPhone
+
+1. Fermer toutes les autres fenêtres et tous les autres onglets Safari ouverts sur Mon agenda, puis fermer complètement toutes les instances de la PWA lancées depuis l’écran d’accueil.
+2. Relancer une seule instance avec Internet, dans Safari, puis ouvrir :
+
+   `https://bd87b9495f-blip.github.io/mon-agenda/?v=2026.15.0`
+
+3. Accepter **Nouvelle version disponible** si le message apparaît.
+4. Fermer puis relancer Mon agenda depuis l’écran d’accueil.
+5. Ouvrir **Réglages → À propos** et vérifier `Mon agenda · version 2026.15` ainsi que `données v15`.
+
+L’ancien onglet ou l’ancienne instance ne doit pas rester actif pendant la migration. Ne pas désinstaller la PWA et ne pas effacer l’historique ou les données de Safari pour forcer la mise à jour.
+
+Si une autre fenêtre est encore détectée, Mon agenda affiche **Ferme les autres fenêtres** et n’ouvre aucune donnée. Fermer les autres instances puis toucher **Réessayer**.
+
+## 6. Valider la migration v12.5 → 2026.15
+
+Au premier démarrage, l’application contrôle l’ancien état avant sa conversion au schéma v15. Une copie locale d’avant migration est conservée lorsqu’un ancien état exploitable est effectivement converti.
+
+- [ ] La base s’ouvre sans écran de récupération inattendu.
+- [ ] **Réglages → Données et sauvegardes** affiche **Base sécurisée active**.
+- [ ] Si IndexedDB est indisponible, illisible ou si les sources sont ambiguës, l’écran de récupération apparaît et aucune création, modification ni écriture du miroir n’est possible.
+- [ ] **Vérifier maintenant** réussit.
+- [ ] Les nombres de clientes, rendez-vous, événements et dépenses correspondent aux nombres notés avant migration.
+- [ ] Plusieurs anciennes fiches clientes, anciens rendez-vous, événements, catégories historiques et dépenses sont intacts.
+- [ ] Les statuts, dates, tarifs, suppléments, paiements et moyens de paiement de plusieurs rendez-vous sont cohérents.
+- [ ] Si un ancien paiement possédait une date future erronée, sa date a été ramenée au jour de migration et l’historique du rendez-vous porte la correction.
+- [ ] Si un ancien paiement **À régler** ne possédait pas de date de relance, il a reçu la date de migration et une trace d’historique.
+- [ ] **Récupérer les données d’avant la mise à jour** est proposé lorsqu’une copie d’avant migration a effectivement été créée ; ne l’utiliser que pour le scénario de retour contrôlé décrit plus bas.
+- [ ] Après fermeture complète et relance, les données migrées sont toujours présentes.
+- [ ] Lors d’un contrôle effectué un autre jour, les dates corrigées et leur historique restent identiques ; si un ancien miroir subsiste, seule sa version exactement attestée est reconnue.
+
+## 7. Recette métier manuelle sur iPhone
+
+Utiliser uniquement des données fictives et noter chaque résultat dans `TESTS-2026.15.md`.
+
+### Agenda et clientes
+
+- [ ] Créer, modifier, déplacer puis supprimer un rendez-vous de test.
+- [ ] Effectuer plusieurs enregistrements rapides successifs ; aucun doublon ne doit apparaître et le dernier état enregistré doit rester visible après relance.
+- [ ] Créer deux fiches portant exactement le même nom mais avec des téléphones différents.
+- [ ] Saisir un nouveau rendez-vous avec ce nom : le dialogue doit proposer toutes les fiches homonymes et enregistrer celle qui a été choisie.
+- [ ] Tester une annulation et une absence sans perte de l’historique.
+
+### Paiements et Bilan
+
+- [ ] Créer un rendez-vous terminé avec un montant fictif et le marquer **Payé** à une date différente de celle du rendez-vous.
+- [ ] Vérifier le brut au jour, à la semaine, au mois et à l’année de la date de paiement.
+- [ ] Vérifier que la fin de journée affiche **✓ Payé aujourd’hui** pour un rendez-vous non payé, puis **✓ Payé** après enregistrement sans déplacer la date d’un paiement déjà saisi.
+- [ ] Tenter une date de paiement future : l’enregistrement doit être refusé.
+- [ ] Avec un rendez-vous payé, tenter de modifier directement la prestation, le prix ou les suppléments : le verrou doit refuser la modification.
+- [ ] Suivre la procédure documentée pour corriger le montant, puis réenregistrer le paiement.
+- [ ] Annuler ou marquer absent un rendez-vous payé : l’encaissement doit rester dans le Bilan.
+- [ ] Passer ce paiement à **Remboursé** avec une date postérieure au paiement ; vérifier le brut à la date du paiement, le remboursement à sa date et le net des deux périodes.
+- [ ] Tenter un remboursement antérieur au paiement ou futur : l’enregistrement doit être refusé.
+- [ ] Placer un autre rendez-vous en **À régler** avec une date de relance, puis l’annuler : il doit rester visible dans les rappels, la fiche cliente, le Bilan et le CSV.
+- [ ] Vérifier qu’un rendez-vous futur en **À vérifier** n’est pas présenté comme paiement à contrôler.
+- [ ] Exporter chaque rubrique du Bilan et vérifier dans Numbers que les montants calculés sont des nombres et correspondent à l’écran.
+
+### Sauvegarde et retour arrière
+
+- [ ] Créer et vérifier une nouvelle sauvegarde JSON de la 2026.15.
+- [ ] Ajouter ensuite un rendez-vous fictif nommé clairement `APRÈS SAUVEGARDE`.
+- [ ] Restaurer le JSON vérifié et confirmer que ce rendez-vous ajouté après la sauvegarde n’est plus présent.
+- [ ] Toucher **Revenir aux données d’avant la restauration** et confirmer que `APRÈS SAUVEGARDE` réapparaît.
+- [ ] Vérifier de nouveau la base après le retour arrière.
+
+Ce scénario doit être fait avec des données de recette et une sauvegarde vérifiée. Ne pas expérimenter une restauration pour la première fois sur l’unique copie de données réelles.
+
+## 8. Recette PWA et interface sur iPhone
+
+- [ ] Tester la page dans Safari, puis la PWA lancée depuis l’écran d’accueil.
+- [ ] Après une première ouverture en ligne, fermer l’application, activer le mode Avion et relancer Agenda, Clientes et Bilan.
+- [ ] Hors ligne, créer un élément fictif, fermer complètement l’application, la relancer et vérifier sa présence.
+- [ ] Revenir en ligne et vérifier qu’aucune donnée n’a disparu.
+- [ ] Laisser un formulaire modifié mais non enregistré pendant la prise de contrôle d’une mise à jour de test : le brouillon doit rester disponible et le rechargement automatique doit être différé.
+- [ ] Tester les thèmes Clair et Sombre, les orientations utiles, les boutons tactiles de la grille et les dialogues.
+- [ ] Activer VoiceOver pour vérifier les boutons principaux, les noms des dialogues, les champs de fichiers et les messages d’erreur essentiels.
+
+## 9. Si un écran de récupération apparaît
+
+- Ne pas désinstaller l’application.
+- Ne pas effacer l’historique ni les données de Safari.
+- Toucher d’abord **Réessayer l’ouverture**.
+- Si le problème persiste, créer et conserver un diagnostic technique.
+- Restaurer une sauvegarde vérifiée seulement après avoir identifié qu’aucune base exploitable ne peut être ouverte.
+
+Il n’existe aucun mode local de compatibilité inscriptible : le miroir sert uniquement de preuve, de diagnostic ou de candidate de récupération. Une source vide, ancienne ou ambiguë ne doit jamais être appliquée automatiquement à la place d’une base potentiellement plus récente, et l’écran de récupération ne doit effectuer aucune écriture avant une restauration explicitement confirmée. Une ouverture ou une relecture IndexedDB qui ne répond pas finit volontairement sur cet écran au lieu de laisser l’application figée ; réessayer ne rejoue pas une création ou une migration déjà validée.
+
+## 10. Décision de lancement ou retour arrière
+
+La 2026.15 peut devenir la version de lancement uniquement si :
+
+- la suite automatisée finale est entièrement verte ;
+- les deux Actions GitHub sont vertes ;
+- toutes les cases manuelles iPhone sont réussies et documentées ;
+- aucun défaut connu ne risque une perte de données, une incohérence financière ou un blocage au démarrage.
+
+Si un problème provient des fichiers publiés, créer un **Revert** du commit `Version 2026.15` dans GitHub Desktop puis pousser ce nouveau commit. Ne jamais remplacer ce retour de code par la suppression de la PWA ou des données Safari.
+
+Après une recette complète réussie, créer une nouvelle sauvegarde dans Fichiers. Si une correction de code est nécessaire, elle doit être retestée et publiée sous le prochain numéro de commit.

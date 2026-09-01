@@ -1,0 +1,9 @@
+{
+  "name": "mon-agenda",
+  "private": true,
+  "version": "2026.15.0",
+  "description": "Tests de cohérence de Mon agenda 2026.15",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}
