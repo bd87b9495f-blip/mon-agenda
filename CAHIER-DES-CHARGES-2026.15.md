@@ -6,7 +6,7 @@
 - Corriger les défauts détectés dans la v12.5 bêta sans ouvrir de grand chantier fonctionnel.
 - Conserver les vues Jour, Semaine et Mois ainsi que les clientes, événements personnels, dépenses, recherches, réglages et sauvegardes.
 - Ne pas ajouter la vue « Aujourd’hui » ni de nouvelles fonctions de relation cliente.
-- Afficher la version `2026.15`, correspondant au quinzième commit prévu, et utiliser le build technique `2026.15.0`.
+- Afficher la version `2026.15`, correspondant au quinzième commit prévu, et utiliser le build technique `2026.15.1`.
 - Livrer une **candidate** : les contrôles automatisés sont requis avant publication et la recette sur un vrai iPhone reste obligatoire avant de déclarer la version stable.
 
 ## 2. Données et migration
@@ -62,6 +62,7 @@
 - Dans la fin de journée, **✓ Payé aujourd’hui** affecte la date du jour uniquement à un rendez-vous non payé ; **✓ Payé** conserve la date d’un paiement existant.
 - Dès qu’un paiement ou un remboursement est enregistré, la prestation, le prix de base et les suppléments du rendez-vous sont figés. La correction exige d’abord l’enregistrement d’un état non encaissé, puis l’ajustement du montant, puis le nouvel enregistrement du flux réel.
 - Le résumé quotidien, le Bilan et l’export CSV appliquent les mêmes règles.
+- La suppression d’un rendez-vous payé ou remboursé est refusée ; l’annulation conserve les flux. Un nouveau paiement exige un prix renseigné, y compris `0` pour une prestation offerte.
 - Les catégories historiques de dépenses restent distinctes même si elles ne sont plus actives.
 
 ## 6. Vue Bilan et CSV
@@ -81,6 +82,7 @@
 - Le nom seul ne déclenche jamais la modification automatique d’une fiche existante.
 - Si plusieurs fiches correspondent au même téléphone ou au même nom, elles sont toutes proposées et l’utilisatrice choisit explicitement la bonne fiche ou la création d’une nouvelle.
 - Les anciennes fiches homonymes restent reliées à leurs propres rendez-vous par leur identifiant.
+- La fiche cliente permet d’afficher l’historique complet au-delà des douze derniers rendez-vous, avec les années.
 
 ## 8. Interface et accessibilité
 
@@ -93,7 +95,7 @@
 
 ## 9. PWA et mises à jour
 
-- Les scripts, feuilles de style, manifeste, enregistrement du service worker et nom du cache sont cohérents avec le build `2026.15.0`.
+- Les scripts, feuilles de style, manifeste, enregistrement du service worker et nom du cache sont cohérents avec le build `2026.15.1`.
 - Le service worker installe tout le shell, icônes comprises, avec une revalidation réseau et sans réutiliser l’ancien cache HTTP.
 - Un cache de build n’est jamais mélangé avec celui d’une autre livraison et les anciens caches de Mon agenda sont supprimés à l’activation.
 - La navigation tente le réseau puis utilise l’interface locale validée en mode hors ligne.

@@ -1,4 +1,4 @@
-const BUILD_ID = '2026.15.0';
+const BUILD_ID = '2026.15.1';
 const CACHE_PREFIX = 'mon-agenda-shell-';
 const CACHE_NAME = `${CACHE_PREFIX}${BUILD_ID}`;
 const LEGACY_CACHE_NAMES = new Set(['mon-agenda-v12-5-beta-1']);
@@ -34,10 +34,11 @@ self.addEventListener('message', event => {
   if (!['WORKER_STATUS', 'SKIP_WAITING'].includes(event.data?.type)) return;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const appWindows = windows.filter(client => typeof client.url === 'string' && client.url.startsWith(self.registration.scope));
     const activeUrl = self.registration?.active?.scriptURL || '';
     const status = {
       activated: Boolean(activeUrl) && new URL(activeUrl, self.location.href).href === self.location.href,
-      clientCount: windows.length
+      clientCount: appWindows.length
     };
     if (event.data.type === 'SKIP_WAITING') {
       const accepted = status.clientCount === 1;

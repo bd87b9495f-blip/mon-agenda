@@ -8,9 +8,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-    <link rel="manifest" href="manifest.webmanifest?v=2026.15.0">
+    <link rel="manifest" href="manifest.webmanifest?v=2026.15.1">
     <link rel="apple-touch-icon" href="icon-180.png">
-    <link rel="stylesheet" href="style.css?v=2026.15.0">
+    <link rel="stylesheet" href="style.css?v=2026.15.1">
     <title>Mon agenda</title>
   </head>
   <body data-storage-loading="true">
@@ -276,7 +276,7 @@
           <p id="automaticSnapshotStatus" class="automatic-snapshot-status"></p>
           <div class="storage-action-grid">
             <button id="verifySecureStorage" class="secondary-button" type="button">Vérifier maintenant</button>
-            <button id="restoreAutomaticSnapshot" class="secondary-button" type="button" hidden>Revenir à la dernière copie</button>
+            <button id="restoreAutomaticSnapshot" class="secondary-button" type="button" hidden>Choisir une copie automatique</button>
           </div>
           <button id="exportStorageDiagnostic" class="text-button full-width diagnostic-button" type="button">Créer un diagnostic technique</button>
           <div class="storage-status" id="storageStatus"></div>
@@ -292,6 +292,14 @@
     <dialog id="badgeDialog" class="modal" aria-labelledby="badgeDialogTitle"><form id="badgeForm"><div class="modal-heading"><div><p class="eyebrow">Repère cliente</p><h2 id="badgeDialogTitle">Nouveau repère</h2></div><button type="button" class="close-button" data-close="badgeDialog" aria-label="Fermer">×</button></div><input id="badgeId" type="hidden"><section class="form-section"><div class="form-section-heading simple"><div><h3>Nom et emoji</h3><p>L’emoji sera visible discrètement près du nom de la cliente.</p></div></div><label class="field">Nom<input id="badgeName" maxlength="60" required placeholder="Ex. Cliente appréciée"></label><label class="field emoji-field">Emoji<input id="badgeSymbol" maxlength="16" required autocomplete="off" placeholder="Touchez pour choisir un emoji" aria-describedby="badgeEmojiHelp"><small id="badgeEmojiHelp" class="field-help">Ouvre le clavier emoji de l’iPhone et choisis-en un seul.</small></label><div class="emoji-preview"><span id="badgeEmojiPreview" aria-hidden="true">🙂</span><div><strong>Aperçu</strong><small id="badgePreviewName">Nouveau repère</small></div></div></section><div class="form-actions sticky-form-actions"><button id="deleteBadge" class="danger-button" type="button" hidden>Supprimer</button><button id="badgeSubmitButton" class="primary-button" type="submit">Ajouter le repère</button></div></form></dialog>
     <dialog id="lateBadgeDialog" class="modal conflict-modal" aria-labelledby="lateBadgeDialogTitle"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2 id="lateBadgeDialogTitle">Annulations tardives</h2><p id="lateBadgeText"></p><label class="field">Repère proposé<select id="lateBadgeChoice"></select></label><div class="stacked-actions"><button id="applyLateBadge" class="primary-button" type="button">Appliquer ce repère</button><button id="dismissLateBadge" class="secondary-button" type="button">Pas maintenant</button><button id="disableLateBadge" class="text-button" type="button">Ne plus proposer pour cette cliente</button></div></div></dialog>
     <dialog id="unsavedChangesDialog" class="modal conflict-modal" aria-labelledby="unsavedChangesDialogTitle" aria-describedby="unsavedChangesText"><div class="conflict-dialog-content"><span class="warning-symbol">!</span><h2 id="unsavedChangesDialogTitle">Modifications non enregistrées</h2><p id="unsavedChangesText">Veux-tu enregistrer avant de fermer ?</p><div class="stacked-actions"><button id="unsavedSave" class="primary-button" type="button">Enregistrer et fermer</button><button id="unsavedDiscard" class="secondary-button" type="button">Quitter sans enregistrer</button><button id="unsavedContinue" class="text-button" type="button">Continuer la modification</button></div></div></dialog>
+    <dialog id="automaticSnapshotDialog" class="modal" aria-labelledby="automaticSnapshotTitle" aria-describedby="automaticSnapshotHelp">
+      <div>
+        <div class="modal-heading"><h2 id="automaticSnapshotTitle">Copies automatiques</h2><button type="button" class="close-button" data-close="automaticSnapshotDialog" aria-label="Fermer">×</button></div>
+        <p id="automaticSnapshotHelp" class="small-copy">Choisis les données à récupérer parmi les cinq dernières copies disponibles. Les données actuelles seront remplacées ; une copie de secours sera créée avant la restauration.</p>
+        <div id="automaticSnapshotChoices" role="radiogroup" aria-label="Copie à restaurer"></div>
+        <div class="form-actions"><button type="button" class="secondary-button" data-close="automaticSnapshotDialog">Annuler</button><button id="confirmAutomaticSnapshot" type="button" class="primary-button">Restaurer cette copie</button></div>
+      </div>
+    </dialog>
     <dialog id="storageRecoveryDialog" class="storage-recovery-dialog" aria-labelledby="storageRecoveryTitle" aria-describedby="storageRecoveryDetails">
       <div>
         <span class="storage-recovery-icon" aria-hidden="true">!</span>
@@ -310,7 +318,7 @@
 
     <section id="successToast" class="success-toast" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span><strong id="successMessage">Enregistré</strong></section>
     <section id="undoToast" class="undo-toast" role="status" aria-live="polite" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
-    <script src="storage.js?v=2026.15.0"></script>
-    <script src="app.js?v=2026.15.0"></script>
+    <script src="storage.js?v=2026.15.1"></script>
+    <script src="app.js?v=2026.15.1"></script>
   </body>
 </html>

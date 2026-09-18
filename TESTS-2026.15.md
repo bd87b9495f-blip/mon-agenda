@@ -1,19 +1,22 @@
 # Validation de la candidate 2026.15
 
-Version visible `2026.15` · build `2026.15.0` · données `v15`.
+Version visible `2026.15` · build `2026.15.1` · données `v15`.
 
 ## Statut au moment de la livraison
 
 | Validation | État |
 |---|---|
 | Suite automatisée Node.js | réussie sur l’archive finale |
-| Décompte final | `131 / 131` réussis, `0` échec |
+| Décompte final | `154 / 154` réussis, `0` échec |
 | Actions GitHub | à vérifier après le push |
 | Safari sur vrai iPhone | non exécuté |
 | PWA installée sur vrai iPhone | non exécuté |
+| Rendu dans un navigateur local | non exécuté : navigateurs absents de l’environnement |
 | Décision de lancement | en attente de la recette manuelle |
 
 Les tests automatisés apportent une preuve reproductible sur les fonctions isolées et la cohérence des fichiers. Ils ne simulent pas complètement WebKit, le stockage persistant d’un appareil, la feuille de partage Fichiers, les gestes tactiles, VoiceOver ou le cycle réel d’une PWA iOS.
+
+Validation automatisée effectuée le **18 septembre 2026** : 154 tests réussis, dont 23 nouveaux contrôles par rapport à la première candidate. Aucun essai Safari, WebKit ou PWA sur appareil réel n’est inclus dans ce résultat.
 
 ## 1. Rejouer la suite automatisée
 
@@ -37,19 +40,20 @@ Critères :
 | Livraison | syntaxe JavaScript, version/build, présence des ressources, manifeste et icônes |
 | HTML et accessibilité structurelle | identifiants uniques, références DOM, noms de dialogues, relations ARIA et labels |
 | Bilan et CSV | périodes, onglets, brut/remboursé/net, colonnes numériques, cohérence des totaux |
-| Paiements | dates réelles, dates futures refusées, remboursement cohérent, net nul le même jour |
+| Paiements | dates réelles, dates futures refusées, remboursement cohérent, net nul le même jour ; prix vide refusé, zéro explicite accepté |
 | Annulation et absence | paiements/remboursements conservés ; état À régler présent dans Bilan, rappel et CSV |
-| Historique financier | prestation, prix et suppléments figés après paiement ou remboursement |
+| Historique financier | prestation, prix et suppléments figés ; suppression payée/remboursée bloquée sans effacer les totaux |
 | Fin de journée | garde-fous des raccourcis et conservation de la date d’un paiement existant |
-| Clientes | tous les homonymes exacts proposés séparément |
+| Clientes | tous les homonymes exacts proposés séparément ; historique complet au-delà de 12 rendez-vous avec les années |
 | Migration | contrôle brut, v14 vers v15, date ancrée, rappel manquant tracé, reprise identique et source v1 invalide bloquée sans migration partielle |
 | Sauvegarde JSON | compteurs et empreinte v4, refus d’un état v15 sans enveloppe v4 complète, versions v3/v4 cohérentes et compatibilité historique v1/v3 |
 | Remplacements complets | snapshot IndexedDB obligatoire, journal pending résistant aux interruptions, journaux homonymes divergents refusés, exclusion d’une seconde restauration et rollback concurrent |
 | IndexedDB | première création atomique, intégrité, base orpheline, révision invalide bloquée, nouvelle lignée de récupération sous CAS, quarantaine et conflit entre fenêtres |
+| Récupération et statut | statut de succès retiré après erreur, fichier valide distingué d’un échec stockage/quota, sélection précise de copie et annulation sans mutation |
 | Copies automatiques | état et contexte de migration protégés, ordre de fraîcheur, rotation à cinq, quota signalé sans perte du commit ordinaire et opération protégée refusée sans mutation |
 | Stockage fail-closed et miroir | aucun repli inscriptible, provenance persistante après rotation, ancienne source exacte seule reconnue, variantes/lignées/alias ambigus préservés |
 | Reprise après échec | délai borné sur ouverture et lectures de démarrage ; nouvel essai après premier commit échoué ou après relecture muette sans rejouer création, migration ni snapshot |
-| PWA | cache limité au build courant, barrière avant toute lecture legacy, exactement une fenêtre exigée, brouillon conservé et rechargement différé |
+| PWA | cache limité au build courant, barrière avant toute lecture legacy, exactement une fenêtre de Mon agenda exigée, sites extérieurs exclus du comptage, brouillon conservé et rechargement différé |
 | Interface mobile | contrôles essentiels du Bilan et demi-heures tactiles sans chevauchement |
 
 ## 2. Fiche de recette iPhone à remplir
@@ -85,6 +89,7 @@ Cette partie est volontairement laissée en attente. Elle doit être remplie par
 - [ ] Créer, modifier, déplacer et supprimer des données de test depuis l’iPhone.
 - [ ] Enchaîner plusieurs sauvegardes rapides et doubles touchers ; vérifier l’absence de doublon et la persistance du dernier état.
 - [ ] Créer deux clientes homonymes et choisir successivement chacune dans le dialogue multi-choix.
+- [ ] Ouvrir une fiche avec plus de 12 rendez-vous, afficher tout l’historique puis les 12 derniers sans perdre les modifications saisies dans la fiche.
 - [ ] Contrôler les thèmes Clair/Sombre, la grille tactile, les dialogues, les erreurs et le clavier.
 - [ ] Parcourir les actions principales avec VoiceOver.
 
@@ -93,6 +98,8 @@ Cette partie est volontairement laissée en attente. Elle doit être remplie par
 - [ ] Enregistrer un paiement à une date différente du rendez-vous et retrouver le brut dans la bonne période.
 - [ ] Contrôler **✓ Payé aujourd’hui** pour un nouveau paiement et **✓ Payé** sans changement de date pour un paiement existant.
 - [ ] Confirmer le refus des dates de paiement futures.
+- [ ] Laisser le prix vide et confirmer le refus du paiement dans le formulaire et la fin de journée ; saisir `0` et confirmer qu’une prestation offerte peut être enregistrée comme payée.
+- [ ] Tenter de supprimer un rendez-vous payé puis remboursé : la suppression est refusée et les totaux restent présents au Bilan.
 - [ ] Confirmer le verrou de la prestation, du prix et des suppléments après paiement/remboursement, puis tester la procédure de correction en trois enregistrements.
 - [ ] Annuler puis marquer absent un rendez-vous payé sans faire disparaître le flux.
 - [ ] Enregistrer un remboursement ultérieur et contrôler brut, remboursé et net sur les bonnes périodes.
@@ -107,7 +114,9 @@ Cette partie est volontairement laissée en attente. Elle doit être remplie par
 - [ ] Créer une sauvegarde dans Fichiers et la vérifier.
 - [ ] Restaurer cette sauvegarde avec des données de recette.
 - [ ] Utiliser **Revenir aux données d’avant la restauration** et vérifier le retour exact de l’état précédent.
-- [ ] Créer une copie automatique, restaurer la dernière copie et vérifier le résultat.
+- [ ] Consulter les copies automatiques avec dates et compteurs ; annuler le choix et vérifier qu’aucune donnée n’a changé.
+- [ ] Choisir une copie plus ancienne que la dernière, confirmer sa restauration puis vérifier le résultat et le retour aux données d’avant restauration.
+- [ ] En environnement de recette, simuler une vérification impossible et confirmer que l’ancien statut de réussite disparaît ; un fichier valide refusé par le stockage ne doit pas être présenté comme un fichier invalide.
 - [ ] Provoquer seulement dans un environnement de recette l’ouverture de l’écran de récupération prévu, puis vérifier **Réessayer l’ouverture** et la création d’un diagnostic sans données personnelles.
 - [ ] Pendant cet écran, vérifier qu’aucune donnée métier ni aucun miroir n’est écrit et qu’aucun mode de repli local ne permet de continuer à modifier l’agenda.
 
@@ -119,6 +128,7 @@ Cette partie est volontairement laissée en attente. Elle doit être remplie par
 - [ ] Revenir en ligne sans perte de données.
 - [ ] Pendant une mise à jour de test, conserver un formulaire non enregistré et vérifier que le brouillon subsiste quand le nouveau contrôleur prend la main, sans rechargement automatique immédiat.
 - [ ] Vérifier que la nouvelle interface est bien celle du build attendu après fermeture et relance.
+- [ ] Ouvrir un autre projet du même hébergement dans Safari : Mon agenda reste accessible. Ouvrir deux fenêtres de Mon agenda : l’ouverture doit demander d’en fermer une.
 
 ## 4. Anomalies de recette
 

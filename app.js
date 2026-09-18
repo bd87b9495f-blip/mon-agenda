@@ -2,7 +2,7 @@
   'use strict';
 
   const APP_VERSION = '2026.15';
-  const BUILD_ID = '2026.15.0';
+  const BUILD_ID = '2026.15.1';
   const CURRENT_DATA_VERSION = 15;
   const BACKUP_FORMAT_VERSION = 4;
   const INTEGRITY_BACKUP_FORMAT_VERSION = 4;
@@ -2112,6 +2112,13 @@
     return appointment?.paymentStatus === 'paid' || appointment?.paymentStatus === 'refunded';
   }
 
+  function hasExplicitPaymentPrice(appointment) {
+    const price = appointment?.price;
+    if (!['number', 'string'].includes(typeof price) || String(price).trim() === '') return false;
+    const amount = Number(String(price).replace(',', '.'));
+    return Number.isFinite(amount) && amount >= 0 && amount <= LIMITS.amount;
+  }
+
   function collectedInRange(appointment, start, end) {
     const paidDate = appointmentPaymentDate(appointment);
     // Le statut du rendez-vous et le flux financier sont indépendants : un
@@ -2748,6 +2755,11 @@
   }
 
   async function commitDraft(draft) {
+    if (hasCollectedPayment(draft) && !hasExplicitPaymentPrice(draft)) {
+      setAppointmentSaving(false); setAppointmentAdjustments(true);
+      showAppAlert('Renseigne un prix de base valide avant d’enregistrer le paiement. Pour une prestation offerte, saisis 0 €.'); $('#price').focus();
+      return false;
+    }
     const previousState = cloneState(app.state);
     const existing = app.state.appointments.find(item => item.id === draft.id), previousClient = existing ? previousState.clients.find(item => item.id === existing.clientId) : null, client = ensureClient(draft, existing);
     const createdAt = existing?.createdAt || new Date().toISOString();
@@ -3128,6 +3140,7 @@
   async function markAppointmentPaid(appointmentId, paymentDate) {
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
     if (appointment.paymentStatus === 'refunded') { showAppAlert('Ce paiement est remboursé. Ouvre le rendez-vous pour corriger son état sans effacer le remboursement par erreur.'); return; }
+    if (!hasExplicitPaymentPrice(appointment)) { showAppAlert('Ouvre le rendez-vous et renseigne un prix de base valide avant d’enregistrer le paiement. Pour une prestation offerte, saisis 0 €.'); return; }
     const effectivePaymentDate = appointment.paymentStatus === 'paid' && validDate(appointment.paymentDate) ? appointment.paymentDate : paymentDate;
     if (!validDate(effectivePaymentDate) || effectivePaymentDate > todayKey()) { showAppAlert('Choisis une date de paiement valide, au plus tard aujourd’hui.'); return; }
     if (appointment.paymentStatus === 'paid' && appointment.paymentDate === effectivePaymentDate && !appointment.paymentReminderDate) return;
@@ -3175,10 +3188,16 @@
     app.ui.clientSaving = false;
    $('#profileKey').value = client.id; $('#profileName').value = client.name; $('#profilePhone').value = client.phone; $('#profileContactVia').value = client.contactVia || ''; $('#profileBadge').innerHTML = `<option value="">Aucun repère</option>${app.state.settings.clientBadges.map(badge => `<option value="${escapeHtml(badge.id)}">${escapeHtml(badge.emoji || badge.symbol)} ${escapeHtml(badge.name)}</option>`).join('')}`; $('#profileBadge').value = client.badgeId || ''; $('#profileAddress').value = client.address; $('#profileNotes').value = client.notes; $('#profileWaze').hidden = !client.address;
     syncProfileBadgeSummary(false);
-    const stats = clientStats(client.id), history = clientHistory(client.id).slice(0, 12);
+    const stats = clientStats(client.id);
     $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.late}</strong><span>tardive${stats.late > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.gross || stats.refunded ? `<article><strong>${money(stats.net)}</strong><span>encaissé net${stats.refunded ? ` · ${money(stats.gross)} brut · ${money(stats.refunded)} remboursé` : ''}</span></article>` : ''}`;
-    $('#clientHistory').innerHTML = `<p class="history-label">Historique</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${clientHistoryPaymentLabel(appointment)}${paymentNeedsReview(appointment) ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}`;
+    renderClientHistory(client.id);
     app.ui.clientDraftBaseline = JSON.stringify(clientDraftValues()); $('#clientDialog').showModal(); captureFormBaseline('clientDialog');
+  }
+
+  function renderClientHistory(clientId, expanded = false) {
+    const fullHistory = clientHistory(clientId);
+    const history = expanded ? fullHistory : fullHistory.slice(0, 12);
+    $('#clientHistory').innerHTML = `<p class="history-label">Historique · ${history.length} sur ${fullHistory.length}</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short', year: 'numeric' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${clientHistoryPaymentLabel(appointment)}${paymentNeedsReview(appointment) ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}${fullHistory.length > 12 ? `<button type="button" class="secondary-button" data-client-history="${expanded ? 'recent' : 'all'}" aria-expanded="${expanded}" aria-controls="clientHistory">${expanded ? 'Voir les 12 derniers' : `Voir tout l’historique (${fullHistory.length})`}</button>` : ''}`;
   }
 
   function renderWorkingHoursEditor() {
@@ -3365,39 +3384,84 @@
     app.ui.settingsDirty = false; renderSettingsHome(); renderHeader(); showAppAlert('Rappel enregistré.');
   }
 
-  async function updateStorageStatus() {
-    const target = $('#storageStatus'), secure = $('#secureStorageStatus'), snapshotTarget = $('#automaticSnapshotStatus'); if (!target) return;
+  function showStorageVerificationFailure() {
+    const secure = $('#secureStorageStatus');
+    if (secure) {
+      secure.classList.add('warning');
+      secure.innerHTML = '<strong>Vérification impossible</strong><span>La base ne peut pas être confirmée comme valide. Réessaie la vérification ; si le problème persiste, sauvegarde dans Fichiers puis crée un diagnostic.</span>';
+    }
+  }
+
+  async function updateStorageStatus(verifiedResult = null) {
+    const target = $('#storageStatus'), secure = $('#secureStorageStatus'), snapshotTarget = $('#automaticSnapshotStatus'); if (!target) return false;
+    if (secure) { secure.classList.remove('warning'); secure.innerHTML = '<strong>Vérification en cours…</strong>'; }
     try {
       const persisted = await navigator.storage?.persisted?.(), estimate = await navigator.storage?.estimate?.();
       const used = estimate?.usage ? `${(estimate.usage / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo utilisés` : 'espace utilisé non disponible';
       target.textContent = `${persisted ? 'Stockage persistant accordé' : 'Stockage local standard'} · ${used}`;
-      const verification = await storageAdapter.verify();
+    } catch { target.textContent = 'Espace disponible non communiqué par ce navigateur.'; }
+    let verificationPassed = false;
+    try {
+      const verification = verifiedResult || await storageAdapter.verify();
+      if (verification.ok === false || verification.mode !== 'indexeddb') throw new Error('STORAGE_VERIFICATION_FAILED');
       const mode = verification.mode === 'indexeddb' ? 'Base sécurisée active' : 'Base sécurisée indisponible';
       const appointments = Number(verification.counts?.appointments || 0), clients = Number(verification.counts?.clients || 0);
       if (secure) { secure.classList.toggle('warning', Boolean(app.ui.storageWarning)); secure.innerHTML = `<strong>${mode}</strong><span>${appointments} rendez-vous · ${clients} clientes · contrôle réussi${app.ui.storageWarning ? ` · ${escapeHtml(app.ui.storageWarning)}` : ''}</span>`; }
+      verificationPassed = true;
+    } catch { showStorageVerificationFailure(); }
+    try {
       const snapshots = await storageAdapter.snapshotList();
       if (snapshotTarget) snapshotTarget.textContent = snapshots.length ? `${snapshots.length} copie${snapshots.length > 1 ? 's' : ''} automatique${snapshots.length > 1 ? 's' : ''} · dernière le ${format(new Date(snapshots[0].createdAt), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'La première copie automatique sera créée avant la prochaine modification.';
       const restore = $('#restoreAutomaticSnapshot'); if (restore) restore.hidden = !snapshots.length;
-    } catch { target.textContent = 'État du stockage non disponible sur ce navigateur.'; }
+    } catch {
+      if (snapshotTarget) snapshotTarget.textContent = 'Les copies automatiques ne peuvent pas être vérifiées pour le moment. Réessaie ou crée un diagnostic.';
+      const restore = $('#restoreAutomaticSnapshot'); if (restore) restore.hidden = true;
+    }
+    return verificationPassed;
   }
 
   async function verifySecureStorage() {
     const button = $('#verifySecureStorage'); if (button) button.disabled = true;
     try {
       const result = await storageAdapter.verify();
-      await updateStorageStatus();
+      if (result.ok === false || result.mode !== 'indexeddb') throw new Error('STORAGE_VERIFICATION_FAILED');
+      await updateStorageStatus(result);
       showAppAlert(`La base est valide : ${result.counts.appointments} rendez-vous et ${result.counts.clients} clientes vérifiés.`, 'C’est enregistré');
     } catch (error) {
-      await storageAdapter.recordError?.(error, 'manual-verification', app.state);
+      showStorageVerificationFailure();
+      try { await storageAdapter.recordError?.(error, 'manual-verification', app.state); } catch {}
       showAppAlert('La vérification a détecté une anomalie. Tes données n’ont pas été modifiées. Crée une sauvegarde dans Fichiers puis exporte le diagnostic.', 'À vérifier');
     } finally { if (button) button.disabled = false; }
   }
 
-  async function restoreAutomaticSnapshot() {
+  function automaticSnapshotLabel(snapshot) {
+    return format(new Date(snapshot.createdAt), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  async function openAutomaticSnapshotChooser() {
+    try {
+      const snapshots = await storageAdapter.snapshotList();
+      if (!snapshots.length) { showAppAlert('Aucune copie automatique n’est encore disponible.'); return false; }
+      $('#automaticSnapshotChoices').innerHTML = snapshots.map((snapshot, index) => {
+        const counts = snapshot.counts || {};
+        return `<label class="check-field"><input type="radio" name="automaticSnapshotId" value="${escapeHtml(snapshot.id)}"${index === 0 ? ' checked' : ''}><span><strong>${escapeHtml(automaticSnapshotLabel(snapshot))}${index === 0 ? ' · la plus récente' : ''}</strong><small>${Number(counts.appointments || 0)} rendez-vous · ${Number(counts.clients || 0)} clientes · ${Number(counts.blocks || 0)} événements · ${Number(counts.expenses || 0)} dépenses</small></span></label>`;
+      }).join('');
+      $('#automaticSnapshotDialog').showModal();
+      return true;
+    } catch {
+      showAppAlert('Les copies automatiques ne peuvent pas être consultées pour le moment. Réessaie ou crée un diagnostic.', 'À vérifier');
+      return false;
+    }
+  }
+
+  async function restoreAutomaticSnapshot(snapshotId = '') {
     return runExclusiveReplacement(async () => {
-      const snapshots = await storageAdapter.snapshotList().catch(() => []), latest = snapshots[0];
-      if (!latest) { showAppAlert('Aucune copie automatique n’est encore disponible.'); return false; }
-      const label = format(new Date(latest.createdAt), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      let snapshots;
+      try { snapshots = await storageAdapter.snapshotList(); }
+      catch { showAppAlert('Les copies automatiques ne peuvent pas être vérifiées. Réessaie ou crée un diagnostic.', 'À vérifier'); return false; }
+      const selected = snapshotId ? snapshots.find(snapshot => snapshot.id === snapshotId) : snapshots[0];
+      if (!selected) { showAppAlert(snapshotId ? 'Cette copie n’est plus disponible. Ferme cette fenêtre puis consulte à nouveau les copies automatiques.' : 'Aucune copie automatique n’est encore disponible.'); return false; }
+      const label = automaticSnapshotLabel(selected);
       if (!window.confirm(`Remplacer les données actuelles par la copie automatique du ${label} ? Une copie des données actuelles sera créée avant le retour.`)) return false;
       const restoreSafetyId = uuid();
       const safety = makeBackupPayload(app.state, 'before-automatic-snapshot-restore');
@@ -3411,12 +3475,12 @@
       }
       let committed = false;
       try {
-        const restored = await storageAdapter.restoreSnapshot(latest.id, { restoreSafetyId });
+        const restored = await storageAdapter.restoreSnapshot(selected.id, { restoreSafetyId });
         committed = true;
         app.state = migrateStoredState(restored); lastCommittedState = cloneState(app.state);
         try { promoteRestoreSafetyJournal(journal); }
         catch (error) { await storageAdapter.recordError?.(error, 'snapshot-restore-safety-promotion', app.state); }
-        clearAllFormDrafts(); $('#settingsDialog').close(); render(); showAppAlert(`La copie automatique du ${label} a été restaurée.`);
+        clearAllFormDrafts(); $('#automaticSnapshotDialog')?.close(); $('#settingsDialog').close(); render(); showAppAlert(`La copie automatique du ${label} a été restaurée.`);
         return true;
       } catch (error) {
         if (!committed) {
@@ -3462,8 +3526,10 @@
     const input = $('#recoveryImportData'); if (!file) return;
     try {
       return await runExclusiveReplacement(async () => {
+        let backupValidated = false, committed = false;
         try {
           const { data, state: migrated } = await readValidatedBackupFile(file);
+          backupValidated = true;
           if (!window.confirm(backupPreview(data, migrated))) return false;
           migrated.settings.restoreSafetyId = uuid();
           if (typeof globalThis.AgendaStorage?.recoverFromState !== 'function') throw new Error('STORAGE_RECOVERY_MODULE_MISSING');
@@ -3483,6 +3549,7 @@
             dataVersion: CURRENT_DATA_VERSION,
             migrationDate: recoveryMigrationDate
           }, migrated);
+          committed = true;
           storageAdapter = result.storage; app.state = migrateStoredState(result.state); lastCommittedState = cloneState(app.state);
           app.ui.storageMode = result.mode || storageAdapter.mode || 'indexeddb'; app.ui.storageWarning = result.warning || ''; app.ui.storageStartupError = null;
           clearAllFormDrafts();
@@ -3491,8 +3558,20 @@
           finishStorageLoading(); render();
           showAppAlert(result.warning || 'La sauvegarde est restaurée et la base sécurisée est de nouveau disponible.', result.warning ? 'À vérifier' : 'C’est enregistré');
           return true;
-        } catch {
-          showAppAlert('Cette sauvegarde ne peut pas être utilisée pour la récupération.', 'À vérifier');
+        } catch (error) {
+          if (committed) {
+            showAppAlert('La sauvegarde a été enregistrée, mais son affichage n’a pas abouti. Redémarre l’application pour la recharger sans modifier les données.', 'À vérifier');
+          } else if (!backupValidated) {
+            showAppAlert(backupErrorText(error), 'À vérifier');
+          } else {
+            let cause = error, quotaExceeded = false;
+            for (let depth = 0; cause && depth < 8; depth += 1, cause = cause.cause) {
+              if (cause.name === 'QuotaExceededError' || cause.code === 'SNAPSHOT_QUOTA_EXCEEDED') quotaExceeded = true;
+            }
+            showAppAlert(quotaExceeded
+              ? 'Le fichier de sauvegarde est valide, mais sa restauration manque d’espace sur cet appareil. Conserve ce fichier, libère de l’espace puis réessaie. Ne supprime pas les données de Safari.'
+              : 'Le fichier de sauvegarde est valide, mais la base locale n’a pas pu être restaurée. Conserve ce fichier, réessaie l’ouverture puis crée un diagnostic si le problème persiste. Ne supprime pas les données de Safari.', 'À vérifier');
+          }
           return false;
         }
       });
@@ -4172,7 +4251,12 @@
     if (target.id === 'previousReviewDay') { app.ui.reviewDate = addDays(app.ui.reviewDate, -1); app.ui.reviewPendingId = null; renderDayReview(); return; }
     if (target.id === 'nextReviewDay') { app.ui.reviewDate = addDays(app.ui.reviewDate, 1); app.ui.reviewPendingId = null; renderDayReview(); return; }
     if (target.id === 'deleteAppointment') {
-      if (app.ui.editingAppointmentId && window.confirm('Supprimer ce rendez-vous ?')) {
+      const appointment = appointmentById(app.ui.editingAppointmentId);
+      if (hasCollectedPayment(appointment)) {
+        showAppAlert('Ce rendez-vous contient un paiement ou un remboursement enregistré. Sa suppression modifierait le bilan. Choisis le statut « Annulé » puis enregistre pour conserver son historique financier.');
+        return;
+      }
+      if (appointment && window.confirm('Supprimer ce rendez-vous ?')) {
         const previousState = cloneState(app.state); app.state.appointments = app.state.appointments.filter(appointment => appointment.id !== app.ui.editingAppointmentId);
         if (await saveState(app.state, false, { reason: 'appointment-delete' })) { clearAppointmentDraft(); $('#appointmentDialog').close(); render(); offerUndo(previousState, 'Rendez-vous supprimé'); }
       }
@@ -4202,7 +4286,12 @@
     }
     if (target.id === 'exportData' || target.id === 'backupButton' || target.id === 'backupNotice') { exportData(); return; }
     if (target.id === 'verifySecureStorage') { await verifySecureStorage(); return; }
-    if (target.id === 'restoreAutomaticSnapshot') { await restoreAutomaticSnapshot(); return; }
+    if (target.id === 'restoreAutomaticSnapshot') { await openAutomaticSnapshotChooser(); return; }
+    if (target.id === 'confirmAutomaticSnapshot') {
+      const selected = $('#automaticSnapshotChoices input:checked')?.value;
+      if (selected) await restoreAutomaticSnapshot(selected);
+      return;
+    }
     if (target.id === 'exportStorageDiagnostic' || target.id === 'exportRecoveryDiagnostic') { await exportStorageDiagnostic(); return; }
     if (target.id === 'retryStorageStartup') { globalThis.location?.reload?.(); return; }
     if (target.id === 'undoRestore') { undoLastRestore(); return; }
@@ -4224,6 +4313,7 @@
     if (target.id === 'editAppointmentContact') { const client = app.ui.formClientId ? clientById(app.ui.formClientId) : null; syncAppointmentContactSummary(client, true); $('#phone').focus(); return; }
     if (target.id === 'toggleAppointmentAdjustments') { setAppointmentAdjustments(!app.ui.appointmentAdjustmentsExpanded); return; }
     if (target.id === 'changeProfileBadge') { $('#profileBadgeSummary').hidden = true; $('#profileBadgeField').hidden = false; $('#profileBadge').focus(); return; }
+    if (target.dataset.clientHistory) { renderClientHistory($('#profileKey').value, target.dataset.clientHistory === 'all'); $('#clientHistory [data-client-history]')?.focus(); return; }
     if (target.id === 'deleteBadge') { deleteBadge(); return; }
     if (target.id === 'saveClientSettings') { saveClientSettings(); return; }
     if (target.id === 'saveReminderSettings') { saveReminderSettings(); return; }
@@ -4280,6 +4370,7 @@
     const draft = getDraft();
     if (!draft.clientName || !draft.service || !draft.date || !draft.time) { setAppointmentSaving(false); showAppAlert('Renseigne la cliente et la prestation.'); return; }
     if (!validDate(draft.date) || !validTime(draft.time) || !Number.isFinite(draft.duration) || draft.duration < 15) { setAppointmentSaving(false); showAppAlert('Vérifie la date, l’heure et la durée du rendez-vous.'); return; }
+    if (hasCollectedPayment(draft) && !hasExplicitPaymentPrice(draft)) { setAppointmentSaving(false); setAppointmentAdjustments(true); showAppAlert('Renseigne un prix de base valide avant d’enregistrer le paiement. Pour une prestation offerte, saisis 0 €.'); $('#price').focus(); return; }
     if (app.ui.editingAppointmentId && ['paid', 'refunded'].includes(draft.paymentStatus) && (!validDate(draft.paymentDate) || draft.paymentDate > todayKey())) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis une date réelle de paiement, au plus tard aujourd’hui.'); $('#paymentDate').focus(); return; }
     if (app.ui.editingAppointmentId && draft.paymentStatus === 'refunded' && (!validDate(draft.refundDate) || draft.refundDate < draft.paymentDate || draft.refundDate > todayKey())) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis une date de remboursement réelle, comprise entre la date du paiement et aujourd’hui.'); $('#refundDate')?.focus(); return; }
     if (app.ui.editingAppointmentId && draft.paymentStatus === 'pending' && !validDate(draft.paymentReminderDate)) { setAppointmentSaving(false); $('#appointmentAdvanced').open = true; showAppAlert('Choisis la date à laquelle tu veux relancer la cliente pour le paiement.'); $('#paymentReminderDate').focus(); return; }

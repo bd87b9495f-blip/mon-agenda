@@ -4,7 +4,7 @@
   "short_name": "Mon agenda",
   "description": "Agenda personnel hors ligne pour gérer rendez-vous, clientes, événements, dépenses, paiements et bilans.",
   "lang": "fr",
-  "start_url": "./?v=2026.15.0",
+  "start_url": "./?v=2026.15.1",
   "scope": "./",
   "display": "standalone",
   "background_color": "#fbf6f7",

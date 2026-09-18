@@ -121,6 +121,11 @@ function applicationHarness(options = {}) {
       app.state = cloneState(state); invalidateDataIndexes();
       return pendingPayments().map(appointment => appointment.id);
     },
+    renderClientHistory: (state, clientId, expanded = false) => {
+      app.state = cloneState(state); invalidateDataIndexes();
+      renderClientHistory(clientId, expanded);
+      return $('#clientHistory').innerHTML;
+    },
     financialEditBlocked: (existing, draft) => hasCollectedPayment(existing) && appointmentFinancialSignature(existing) !== appointmentFinancialSignature(draft),
     renderPaymentsReport: (state, start, end) => {
       app.state = cloneState(state); invalidateDataIndexes();
@@ -528,6 +533,24 @@ test('le tarif est figé dès qu’un paiement ou remboursement est enregistré'
   }
   const pending = appointment({ paymentStatus: 'pending', paymentDate: '', paymentMethod: '', paymentReminderDate: '2026-06-10' });
   assert.equal(hooks.financialEditBlocked(pending, { ...pending, price: '101' }), false);
+});
+
+test('la fiche cliente permet de retrouver tout l’historique avec les années sans mélanger les clientes', () => {
+  const { hooks } = applicationHarness();
+  const state = baseState();
+  state.appointments = Array.from({ length: 13 }, (_, index) => appointment({
+    id: `history-${index}`, date: `2025-05-${String(index + 1).padStart(2, '0')}`
+  }));
+  state.appointments.push(appointment({ id: 'other-client', clientId: 'client-2', service: 'AUTRE CLIENTE' }));
+  const recent = hooks.renderClientHistory(state, 'client-1');
+  assert.equal((recent.match(/class="history-item"/g) || []).length, 12);
+  assert.match(recent, /Voir tout l’historique \(13\)/);
+  const complete = hooks.renderClientHistory(state, 'client-1', true);
+  assert.equal((complete.match(/class="history-item"/g) || []).length, 13);
+  assert.match(complete, /2025/);
+  assert.match(complete, /data-repeat-from="history-0"/);
+  assert.match(complete, /Voir les 12 derniers/);
+  assert.doesNotMatch(complete, /AUTRE CLIENTE/);
 });
 
 test('toutes les fiches portant exactement le même nom sont proposées', () => {

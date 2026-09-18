@@ -4,7 +4,19 @@ Ce journal décrit les changements visibles et les corrections de fiabilité. La
 
 ## 2026.15 — candidate avant lancement
 
-Version visible `2026.15` · build `2026.15.0` · données `v15` · sauvegarde JSON format `v4`.
+Version visible `2026.15` · build `2026.15.1` · données `v15` · sauvegarde JSON format `v4`.
+
+### Consolidation du build 2026.15.1
+
+- Suppression refusée pour un rendez-vous payé ou remboursé afin de conserver les flux historiques ; l’annulation reste possible.
+- Prix explicite exigé avant paiement, depuis le formulaire et les raccourcis ; `0` reste autorisé pour une prestation offerte.
+- Choix d’une copie automatique par sa date et ses compteurs avant restauration.
+- Messages de récupération distinguant un fichier invalide d’un échec de stockage ; un contrôle échoué retire l’ancien statut de réussite.
+- Historique complet accessible dans la fiche cliente et années affichées.
+- Seules les fenêtres de Mon agenda sont comptées pour autoriser la mise à jour.
+- Guide de mise à jour corrigé : pas de retour direct à la v12.5 sur la base migrée.
+
+Ce build corrige la première archive avant le quinzième commit prévu. Le numéro public reste `2026.15` ; aucun commit ni déploiement n’est effectué par cette livraison.
 
 ### Ajouts
 
@@ -68,7 +80,7 @@ Version visible `2026.15` · build `2026.15.0` · données `v15` · sauvegarde J
 
 ### Validation
 
-- La suite automatisée finale réussit `131 / 131` tests, sans échec.
+- La suite automatisée finale réussit `154 / 154` tests, sans échec.
 - La validation sur un vrai iPhone n’a pas encore été effectuée. La version reste candidate tant que la checklist de `TESTS-2026.15.md` n’est pas entièrement réussie et consignée.
 
 ## v12.5 bêta — base précédente

@@ -47,14 +47,14 @@ function serviceWorkerHarness({ cacheNames = [], clientCount = 1, activeScriptUr
       return new Response('network', { status: 200 });
     },
     self: {
-      location: new URL('https://agenda.test/app/sw.js?v=2026.15.0'),
+      location: new URL('https://agenda.test/app/sw.js?v=2026.15.1'),
       addEventListener(type, handler) { handlers.set(type, handler); },
-      registration: { active: activeScriptUrl ? { scriptURL: activeScriptUrl } : null },
+      registration: { scope: 'https://agenda.test/app/', active: activeScriptUrl ? { scriptURL: activeScriptUrl } : null },
       clients: {
         async claim() { claimedClients += 1; },
         async matchAll(options) {
           clientQueries.push({ ...options });
-          return Array.from({ length: windowClientCount }, (_, index) => ({ id: `client-${index + 1}` }));
+          return Array.from({ length: windowClientCount }, (_, index) => ({ id: `client-${index + 1}`, url: `https://agenda.test/app/?window=${index + 1}` }));
         }
       },
       async skipWaiting() { skipWaitingCount += 1; }
@@ -94,7 +94,7 @@ function serviceWorkerHarness({ cacheNames = [], clientCount = 1, activeScriptUr
   };
 }
 
-function applicationStartupHarness({ controllerBuild = '2026.15.0', clientCount = 1, messageChannel = true } = {}) {
+function applicationStartupHarness({ controllerBuild = '2026.15.1', clientCount = 1, messageChannel = true } = {}) {
   const pwaStart = app.indexOf('  function serviceWorkerBuild(');
   const pwaEnd = app.indexOf('\n  function registerServiceWorker()', pwaStart);
   const startup = app.match(/app\.ready = \(async \(\) => \{([\s\S]*?)\n\s*\}\)\(\);/)?.[1] || '';
@@ -169,8 +169,8 @@ function applicationStartupHarness({ controllerBuild = '2026.15.0', clientCount 
     activated: true,
     state: 'activated'
   }) : null;
-  const currentWorker = controllerBuild === '2026.15.0' ? oldWorker : makeWorker({
-    build: '2026.15.0',
+  const currentWorker = controllerBuild === '2026.15.1' ? oldWorker : makeWorker({
+    build: '2026.15.1',
     activated: false,
     state: 'installed'
   });
@@ -210,7 +210,7 @@ function applicationStartupHarness({ controllerBuild = '2026.15.0', clientCount 
   context.globalThis = context;
   const pwaSource = app.slice(pwaStart, pwaEnd);
   vm.runInNewContext(`
-    const BUILD_ID = '2026.15.0';
+    const BUILD_ID = '2026.15.1';
     const app = { ui: {} };
     const $ = globalThis.__select;
     ${pwaSource}
@@ -241,11 +241,11 @@ test('les scripts JavaScript ont une syntaxe valide', () => {
 
 test('la version visible et le build sont cohérents', () => {
   assert.match(app, /const APP_VERSION = ['"]2026\.15['"]/);
-  assert.match(app, /const BUILD_ID = ['"]2026\.15\.0['"]/);
-  assert.match(worker, /const BUILD_ID = ['"]2026\.15\.0['"]/);
-  assert.equal(manifest.start_url, './?v=2026.15.0');
+  assert.match(app, /const BUILD_ID = ['"]2026\.15\.1['"]/);
+  assert.match(worker, /const BUILD_ID = ['"]2026\.15\.1['"]/);
+  assert.equal(manifest.start_url, './?v=2026.15.1');
   for (const resource of ['manifest.webmanifest', 'style.css', 'storage.js', 'app.js']) {
-    assert.match(html, new RegExp(`${resource.replace('.', '\\.')}\\?v=2026\\.15\\.0`));
+    assert.match(html, new RegExp(`${resource.replace('.', '\\.')}\\?v=2026\\.15\\.1`));
   }
   assert.match(app, /serviceWorker\.register\(`\.\/sw\.js\?v=\$\{BUILD_ID\}`/);
 });
@@ -494,14 +494,14 @@ test('le service worker communique son activation et le nombre de fenêtres par 
 
   const active = serviceWorkerHarness({
     clientCount: 1,
-    activeScriptUrl: 'https://agenda.test/app/sw.js?v=2026.15.0'
+    activeScriptUrl: 'https://agenda.test/app/sw.js?v=2026.15.1'
   });
   const activeStatus = await active.message({ type: 'WORKER_STATUS' });
   assert.deepEqual({ ...activeStatus }, { activated: true, clientCount: 1 });
 });
 
 test('le nettoyage supprime seulement les caches de cette application et le cache historique connu', async () => {
-  const current = 'mon-agenda-shell-2026.15.0';
+  const current = 'mon-agenda-shell-2026.15.1';
   const harness = serviceWorkerHarness({
     cacheNames: [
       current,

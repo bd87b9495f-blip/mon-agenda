@@ -1,4 +1,4 @@
-# Mon agenda — candidate 2026.15
+# Mon agenda — 2026.15 corrigée
 
 Application personnelle hors ligne pour organiser une activité de prothésiste ongulaire sur iPhone.
 
@@ -7,10 +7,10 @@ Application personnelle hors ligne pour organiser une activité de prothésiste 
 | Élément | Valeur |
 |---|---|
 | Version visible | `2026.15` |
-| Build technique et cache PWA | `2026.15.0` |
+| Build technique et cache PWA | `2026.15.1` |
 | Schéma des données | `v15` |
 | Convention | `année.nombre total de commits` |
-| Statut | candidate avant lancement |
+| Statut | version consolidée, essais iPhone avant lancement |
 
 La version 2026.15 correspond au quinzième commit prévu. Elle a passé la suite automatisée du projet, mais elle n’est pas encore déclarée stable sur iPhone réel : la checklist manuelle de `TESTS-2026.15.md` reste à exécuter avant le lancement.
 
@@ -24,7 +24,7 @@ La version 2026.15 correspond au quinzième commit prévu. Elle a passé la suit
 - export CSV et sauvegarde JSON ;
 - thème Clair ou Sombre et fonctionnement hors connexion.
 
-Le périmètre de cette candidate est figé : aucune vue « Aujourd’hui » ni nouvelle fonction de relation cliente n’est ajoutée.
+Cette livraison consolide les fonctions existantes. La fiche cliente permet de consulter tout l’historique, au-delà des douze derniers rendez-vous, avec l’année de chaque visite.
 
 ## Règles du Bilan
 
@@ -44,10 +44,12 @@ L’export CSV reprend la période et la rubrique affichées. Les colonnes finan
 
 - **À vérifier** : état initial d’un rendez-vous ; il ne devient visible dans les contrôles qu’après la fin du créneau.
 - **À régler** : une date de relance est obligatoire et la dette reste visible dans les rappels, la fiche cliente, le Bilan et le CSV.
-- **Payé** : une date réelle de paiement, au plus tard aujourd’hui, est obligatoire.
+- **Payé** : un prix renseigné et une date réelle de paiement, au plus tard aujourd’hui, sont obligatoires. Saisir explicitement `0` pour une prestation offerte ; un prix vide ne vaut pas un paiement de zéro euro.
 - **Remboursé** : la date du paiement est conservée et une date de remboursement comprise entre le paiement et aujourd’hui est obligatoire.
 
 Dans la fin de journée, **✓ Payé aujourd’hui** enregistre aujourd’hui seulement si le rendez-vous n’était pas déjà payé. Pour un paiement existant, le bouton affiche **✓ Payé** et conserve sa date.
+
+Un rendez-vous payé ou remboursé ne peut pas être supprimé. Utiliser **Annulé** pour conserver ses mouvements dans le Bilan et les exports.
 
 Dès qu’un rendez-vous est payé ou remboursé, sa prestation, son prix de base et ses suppléments sont figés afin de préserver les bilans historiques. Pour corriger un montant :
 
@@ -62,7 +64,7 @@ Dès qu’un rendez-vous est payé ou remboursé, sa prestation, son prix de bas
 - Une révision de stockage invalide bloque l’ouverture. La récupération explicitement confirmée repart alors sur une nouvelle lignée et vérifie par comparaison atomique que la source observée n’a pas changé.
 - Chaque migration est ancrée à une date locale explicite et persistée. Une reprise, une copie automatique ou un retour arrière reproduit donc les mêmes corrections financières sans dépendre du jour courant.
 - La provenance exacte d’une source migrée ou remplacée — empreinte brute, version, révision, base, clé et date — survit aux enregistrements suivants et à la rotation des copies. Un snapshot brut est également créé au moment du remplacement. Si le miroir n’a pas été réécrit, seule l’ancienne source exactement attestée est tolérée ; toute variante bloque l’ouverture.
-- Jusqu’à cinq états valides précédant les dernières modifications sont conservés comme copies automatiques locales. Pour un enregistrement ordinaire, un manque de quota est signalé sans annuler la modification métier déjà enregistrée ; une opération qui exige une copie de sécurité est au contraire refusée avant toute mutation.
+- Jusqu’à cinq états valides précédant les dernières modifications sont conservés comme copies automatiques locales. Une liste permet de choisir la copie par sa date et ses compteurs avant confirmation. Pour un enregistrement ordinaire, un manque de quota est signalé sans annuler la modification métier déjà enregistrée ; une opération qui exige une copie de sécurité est au contraire refusée avant toute mutation.
 - Une source vide, ancienne, divergente ou sans métadonnées suffisantes ne remplace pas automatiquement une base potentiellement plus récente.
 - Si IndexedDB est indisponible, ne peut pas être ouvert, tarde anormalement à répondre, ou si la lecture ou la provenance des sources est ambiguë, l’application s’arrête sur l’écran de récupération et n’écrit ni données métier ni miroir. Les relectures après création ou migration sont également bornées et ne rejouent pas un commit déjà réussi au prochain démarrage.
 - Une donnée remplacée lors d’une récupération est conservée localement en quarantaine lorsque cela est possible.
@@ -75,17 +77,17 @@ Ces protections locales ne remplacent pas une sauvegarde régulière dans l’ap
 
 ## PWA et fonctionnement hors ligne
 
-Le service worker utilise uniquement le cache du build `2026.15.0`, supprime les anciens caches de l’application et charge les fichiers versionnés. L’application peut ensuite s’ouvrir hors ligne tant que sa base IndexedDB reste disponible et vérifiable.
+Le service worker utilise uniquement le cache du build `2026.15.1`, supprime les anciens caches de l’application et charge les fichiers versionnés. L’application peut ensuite s’ouvrir hors ligne tant que sa base IndexedDB reste disponible et vérifiable.
 
 Lorsqu’une nouvelle version prend le contrôle, le rechargement est différé si un formulaire contient des modifications non enregistrées. Une mise à jour publiée ne doit pas être forcée en désinstallant la PWA ou en effaçant les données de Safari.
 
-Avant toute mise à jour, fermer toutes les autres fenêtres et tous les autres onglets Safari ouverts sur Mon agenda, ainsi que toutes les instances de la PWA. Relancer ensuite une seule instance : l’application vérifie automatiquement cette condition et refuse d’ouvrir les données tant qu’elle ne voit pas exactement une fenêtre.
+Avant toute mise à jour, fermer toutes les autres fenêtres et tous les autres onglets Safari ouverts sur Mon agenda, ainsi que toutes les instances de la PWA. Relancer ensuite une seule instance : l’application vérifie automatiquement cette condition et refuse d’ouvrir les données tant qu’elle ne voit pas exactement une fenêtre de Mon agenda. Les autres sites ouverts dans Safari ne sont pas comptés.
 
 ## Installation et mise à jour
 
 Après publication sur GitHub Pages, ouvrir :
 
-`https://bd87b9495f-blip.github.io/mon-agenda/?v=2026.15.0`
+`https://bd87b9495f-blip.github.io/mon-agenda/?v=2026.15.1`
 
 Dans **Réglages → À propos**, vérifier `Mon agenda · version 2026.15` et `données v15`. La migration détaillée depuis la v12.5 bêta se trouve dans `GUIDE-MISE-A-JOUR.md`.
 
@@ -99,7 +101,7 @@ node --test tests/*.test.mjs
 
 La suite couvre notamment la cohérence de la livraison, les règles du Bilan et du CSV, les dates de paiement et de remboursement, le verrou financier, les homonymes, les migrations, les sauvegardes rapides, le journal de restauration, les conflits de révision, les délais de démarrage, le blocage fail-closed du stockage, la filiation du miroir, les copies automatiques, le cache PWA et plusieurs contrôles d’accessibilité.
 
-L’archive finale a réussi **131 tests sur 131**, sans échec. Les contrôles automatisés ne remplacent pas la validation manuelle sur un vrai iPhone décrite dans `TESTS-2026.15.md`.
+L’archive finale a réussi **154 tests sur 154**, sans échec. Les contrôles automatisés ne remplacent pas la validation manuelle sur un vrai iPhone décrite dans `TESTS-2026.15.md`.
 
 ## Fichiers principaux
 
