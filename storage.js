@@ -2,12 +2,12 @@
   'use strict';
 
   const DATABASE_NAME = 'mon-agenda-secure-v1';
-  const DATABASE_VERSION = 2;
+  const DATABASE_VERSION = 3;
   const SNAPSHOT_LIMIT = 5;
   const RECOVERY_LIMIT = 3;
   const DIAGNOSTIC_LIMIT = 40;
   const DEFAULT_STARTUP_TIMEOUT_MS = 12000;
-  const ENTITY_STORES = ['clients', 'appointments', 'blocks', 'expenses'];
+  const ENTITY_STORES = ['clients', 'appointments', 'blocks', 'expenses', 'tasks'];
   const LINEAGE_META_FIELDS = [
     'migrationReason', 'migratedFromDataVersion', 'migratedFromChecksum', 'migratedFromChecksumKind',
     'migratedFromRevision', 'migratedFromDatabaseId', 'migratedFromSource', 'migratedFromLegacyKey',
@@ -108,7 +108,7 @@
   }
 
   function counts(state) {
-    return {
+    const result = {
       clients: Array.isArray(state?.clients) ? state.clients.length : 0,
       appointments: Array.isArray(state?.appointments) ? state.appointments.length : 0,
       blocks: Array.isArray(state?.blocks) ? state.blocks.length : 0,
@@ -116,10 +116,13 @@
       services: Array.isArray(state?.settings?.services) ? state.settings.services.length : 0,
       supplements: Array.isArray(state?.settings?.supplementTypes) ? state.settings.supplementTypes.length : 0
     };
+    // Les anciennes empreintes et les compteurs de leurs copies restent inchangés.
+    if (Number(state?.version || 0) >= 16) result.tasks = Array.isArray(state?.tasks) ? state.tasks.length : 0;
+    return result;
   }
 
   function canonicalState(state) {
-    return {
+    const result = {
       version: Number(state?.version || 0),
       clients: state?.clients || [],
       appointments: state?.appointments || [],
@@ -127,6 +130,8 @@
       expenses: state?.expenses || [],
       settings: state?.settings || {}
     };
+    if (Number(state?.version || 0) >= 16) result.tasks = state?.tasks || [];
+    return result;
   }
 
   function checksum(state) {
@@ -257,6 +262,13 @@
       expenses: unpackRecords(entityValues[3]),
       settings: clone(settingsRecord?.value || {})
     };
+    if (state.version >= 16) state.tasks = unpackRecords(entityValues[4]);
+    else if (entityValues[4].length) {
+      state.tasks = unpackRecords(entityValues[4]);
+      const error = storageError('INTEGRITY_CHECK_FAILED', 'verification');
+      error.observedState = state;
+      throw error;
+    }
     if (!meta) {
       const hasStoredContent = entityValues.some(records => records.length > 0) || Boolean(settingsRecord);
       if (!hasStoredContent) return null;
@@ -669,7 +681,7 @@
       ENTITY_STORES.forEach(name => applyEntityDiff(transaction.objectStore(name), lastState?.[name], candidate[name]));
       if (serialised(lastState?.settings) !== serialised(candidate.settings)) transaction.objectStore('settings').put({ id: 'settings', value: clone(candidate.settings) });
 
-      let snapshotWrite = null;
+      let snapshotWrite = null, snapshotWriteError = null;
       if (shouldSnapshot) {
         const snapshotStore = transaction.objectStore('snapshots');
         const removeCount = Math.max(0, existingSnapshots.length - SNAPSHOT_LIMIT + 1);
@@ -685,7 +697,7 @@
           counts: counts(lastState),
           checksum: previousChecksum,
           state: clone(lastState)
-        }));
+        })).catch(error => { snapshotWriteError = error; throw error; });
       }
 
       const nextRevision = Number(currentMeta?.revision || revision || 0) + 1;
@@ -707,10 +719,10 @@
       if (!currentMeta && expectedRevision === 0) metaStore.delete('bootstrap');
       metaStore.put(nextMeta);
       if (snapshotWrite) {
-        try { await snapshotWrite; }
+        try { await Promise.all([snapshotWrite, completed]); }
         catch (error) {
           await completed.catch(() => {});
-          if (error?.name === 'QuotaExceededError') throw storageError('SNAPSHOT_QUOTA_EXCEEDED', 'snapshot', error);
+          if (snapshotWriteError?.name === 'QuotaExceededError') throw storageError('SNAPSHOT_QUOTA_EXCEEDED', 'snapshot', snapshotWriteError);
           throw error;
         }
       }
@@ -841,6 +853,7 @@
       });
     }
     const empty = { version: options.dataVersion, clients: [], appointments: [], blocks: [], expenses: [], settings: {} };
+    if (options.dataVersion >= 16) empty.tasks = [];
     const adapter = createDatabaseAdapter(database, options, empty, { revision: 0 });
     const saveResult = await adapter.save(state, { snapshot: false, reason });
     const stored = await readDatabaseState(database, options.startupTimeoutMs);
@@ -900,7 +913,7 @@
     ENTITY_STORES.forEach(name => {
       const store = transaction.objectStore(name);
       store.clear();
-      candidate[name].forEach((value, order) => store.put({ id: String(value.id), order, value: clone(value) }));
+      (candidate[name] || []).forEach((value, order) => store.put({ id: String(value.id), order, value: clone(value) }));
     });
     const settingsStore = transaction.objectStore('settings');
     settingsStore.clear(); settingsStore.put({ id: 'settings', value: clone(candidate.settings) });
@@ -1257,6 +1270,7 @@
       && stored.meta.databaseId
       && legacyCandidate.meta.databaseId === stored.meta.databaseId);
     const canonicalMirrorKeys = ['version', 'clients', 'appointments', 'blocks', 'expenses', 'settings'];
+    if (Number(legacyCandidate.rawState?.version || 0) >= 16) canonicalMirrorKeys.push('tasks');
     const rawMirrorKeys = legacyCandidate.rawState && typeof legacyCandidate.rawState === 'object' && !Array.isArray(legacyCandidate.rawState)
       ? Object.keys(legacyCandidate.rawState)
       : [];

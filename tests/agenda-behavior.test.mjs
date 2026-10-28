@@ -252,7 +252,7 @@ function parseSemicolonCsv(text) {
   return rows;
 }
 
-test('la migration stricte v14 vers v15 conserve le paiement et ajoute refundDate', () => {
+test('la migration stricte v14 vers v16 conserve le paiement et ajoute refundDate', () => {
   const { hooks } = applicationHarness();
   const legacy = baseState(14);
   const legacyAppointment = appointment();
@@ -260,7 +260,7 @@ test('la migration stricte v14 vers v15 conserve le paiement et ajoute refundDat
   legacy.appointments.push(legacyAppointment);
 
   const migrated = hooks.migrateState(legacy);
-  assert.equal(migrated.version, 15);
+  assert.equal(migrated.version, 16);
   assert.equal(migrated.clients.length, 1);
   assert.equal(migrated.appointments.length, 1);
   assert.equal(migrated.appointments[0].paymentStatus, 'paid');
@@ -643,7 +643,7 @@ test('l’empreinte et les compteurs de stockage couvrent les données métier',
     services: 1,
     supplements: 0
   });
-  assert.equal(storage.constants.databaseVersion, 2);
+  assert.equal(storage.constants.databaseVersion, 3);
   assert.equal(storage.constants.snapshotLimit, 5);
 });
 
@@ -674,8 +674,8 @@ test('les sauvegardes v4 manuelles et avant migration portent compteurs et empre
   const migration = hooks.migrationSafety(migrationSource, 14);
   assert.equal(migration.backupFormatVersion, 4);
   assert.equal(migration.reason, 'before-migration');
-  assert.equal(migration.dataVersion, 15);
-  assert.equal(migration.state.version, 15);
+  assert.equal(migration.dataVersion, 16);
+  assert.equal(migration.state.version, 16);
   assert.equal(migration.sourceDataVersion, 14);
   assert.deepEqual({ ...migration.counts }, {
     clients: 1,
@@ -684,7 +684,8 @@ test('les sauvegardes v4 manuelles et avant migration portent compteurs et empre
     expenses: 0,
     services: 1,
     supplements: 3,
-    expenseCategories: 7
+    expenseCategories: 7,
+    tasks: 0
   });
   assert.equal(migration.checksum, storage.checksum(migration.state));
   assert.match(applicationSource, /async function exportData\(\) \{[\s\S]*?const content = makeBackupPayload\(\)[\s\S]*?applyBackupIntegrity\(content\)/);
@@ -719,8 +720,8 @@ test('la safety v4 des formes v1 sans version reste validable et conserve profil
 
     const safety = hooks.migrationSafety(legacy, 1);
     assert.equal(safety.backupFormatVersion, 4);
-    assert.equal(safety.dataVersion, 15);
-    assert.equal(safety.state.version, 15);
+    assert.equal(safety.dataVersion, 16);
+    assert.equal(safety.state.version, 16);
     const verified = await hooks.readValidatedBackupFile(backupFile(safety));
     assert.equal(verified.state.appointments.length, 1);
     assert.equal(verified.state.appointments[0].service, 'Pose historique');
@@ -745,8 +746,8 @@ test('la safety v4 des formes v1 sans version reste validable et conserve profil
     }];
     const safety = hooks.migrationSafety(legacy, 1);
     assert.equal(safety.backupFormatVersion, 4);
-    assert.equal(safety.dataVersion, 15);
-    assert.equal(safety.state.version, 15);
+    assert.equal(safety.dataVersion, 16);
+    assert.equal(safety.state.version, 16);
     const verified = await hooks.readValidatedBackupFile(backupFile(safety));
     assert.equal(verified.state.appointments.length, 1);
     assert.equal(verified.state.appointments[0].service, 'RDV tableau v1');
@@ -1442,14 +1443,14 @@ test('une sauvegarde historique v3 cohérente reste importable mais ses versions
 
   const result = await hooks.readValidatedBackupFile(backupFile(historical));
   assert.equal(result.data.backupFormatVersion, 3);
-  assert.equal(result.state.version, 15);
+  assert.equal(result.state.version, 16);
   assert.equal(result.state.appointments.length, 1);
   assert.equal(result.state.appointments[0].refundDate, '');
 
   const withoutHeaderVersion = structuredClone(historical);
   delete withoutHeaderVersion.dataVersion;
   const withoutHeaderResult = await hooks.readValidatedBackupFile(backupFile(withoutHeaderVersion));
-  assert.equal(withoutHeaderResult.state.version, 15);
+  assert.equal(withoutHeaderResult.state.version, 16);
   assert.equal(withoutHeaderResult.state.appointments.length, 1);
 
   const decimalHistoricalHeader = structuredClone(historical);

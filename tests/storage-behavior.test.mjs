@@ -12,7 +12,7 @@ const legacyKey = 'agenda-storage-test';
 const legacyMetaKey = `${legacyKey}-storage-meta-v1`;
 const legacyV14Key = 'agenda-storage-test-v14';
 const legacyV14MetaKey = `${legacyV14Key}-storage-meta-v1`;
-const storeNames = ['clients', 'appointments', 'blocks', 'expenses', 'settings', 'meta', 'snapshots', 'diagnostics', 'recoveries'];
+const storeNames = ['clients', 'appointments', 'blocks', 'expenses', 'tasks', 'settings', 'meta', 'snapshots', 'diagnostics', 'recoveries'];
 const clone = value => value === undefined ? undefined : structuredClone(value);
 const plain = value => JSON.parse(JSON.stringify(value));
 
@@ -506,7 +506,7 @@ test('la première création écrit une base complète, sa méta et son miroir',
   assert.equal(result.migrated, false);
   assert.equal(clientNameFromDatabase(indexedDB), 'Première création');
   const meta = indexedDB.record('meta', 'state');
-  assert.equal(meta.databaseVersion, 2);
+  assert.equal(meta.databaseVersion, 3);
   assert.equal(meta.dataVersion, 15);
   assert.equal(meta.revision, 1);
   assert.match(meta.databaseId, /^database-/);

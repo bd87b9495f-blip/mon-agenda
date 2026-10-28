@@ -2,7 +2,23 @@
 
 Ce journal décrit les changements visibles et les corrections de fiabilité. La version publique suit `année.nombre total de commits` ; un troisième nombre identifie le build technique utilisé par la PWA.
 
-## 2026.15 — candidate avant lancement
+## 2026.15 Atelier — build 2026.15.2
+
+Version visible `2026.15` · build `2026.15.2` · données `v16` · IndexedDB technique `v3` · sauvegarde JSON format `v4`.
+
+- Direction B Atelier : agenda prioritaire, navigation nommée, outils Journée, suivi global À suivre, apparence claire/sombre et densité conservées.
+- Ajout d’une To Do personnelle avec échéance facultative, état terminé, reprise de brouillon, sauvegardes et contrôles d’intégrité.
+- Création de rendez-vous libre, choix de prestation proposant durée et tarif, suggestions facultatives de créneaux ; avertissement de chevauchement conservé.
+- Duplication d’une dépense dans un formulaire à valider, avec catégorie historique conservée.
+- Discrétion de l’affichage des montants, sans modification des calculs ni des exports.
+- Rafraîchissement minute de la ligne d’heure sans reconstruire tous les rendez-vous du planning Jour.
+- Migration v15 vers v16 ajoutant les tâches sans réinterpréter les règles financières v15. Empreintes historiques v15 conservées ; tâches comprises dans les transactions, copies et restitutions v16.
+- Correction d’un cas de quota : l’échec d’une écriture métier annule la transaction et ne peut pas être confondu avec le quota d’une simple copie automatique.
+- Les 154 tests historiques sont conservés, avec de nouveaux tests de stockage et de parcours Atelier. Voir `VALIDATION-NODE.txt` pour le décompte livré et `TESTS-ATELIER.md` pour la couverture et les limites.
+
+Aucun justificatif de dépense, suivi de matériel ou nouvelle fonction de relation cliente. Aucun commit ou déploiement effectué. La recette Safari/PWA sur un véritable iPhone reste à exécuter avant usage quotidien.
+
+## 2026.15 — candidate avant lancement (archive de départ)
 
 Version visible `2026.15` · build `2026.15.1` · données `v15` · sauvegarde JSON format `v4`.
 

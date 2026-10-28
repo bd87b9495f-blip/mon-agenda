@@ -1,4 +1,4 @@
-const BUILD_ID = '2026.15.1';
+const BUILD_ID = '2026.15.2';
 const CACHE_PREFIX = 'mon-agenda-shell-';
 const CACHE_NAME = `${CACHE_PREFIX}${BUILD_ID}`;
 const LEGACY_CACHE_NAMES = new Set(['mon-agenda-v12-5-beta-1']);

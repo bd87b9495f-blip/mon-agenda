@@ -2,8 +2,10 @@
   'use strict';
 
   const APP_VERSION = '2026.15';
-  const BUILD_ID = '2026.15.1';
-  const CURRENT_DATA_VERSION = 15;
+  const BUILD_ID = '2026.15.2';
+  const CURRENT_DATA_VERSION = 16;
+  const FINANCIAL_DATA_VERSION = 15;
+  const TASKS_DATA_VERSION = 16;
   const BACKUP_FORMAT_VERSION = 4;
   const INTEGRITY_BACKUP_FORMAT_VERSION = 4;
   const BACKUP_APP_ID = 'mon-agenda-prothesiste';
@@ -53,7 +55,7 @@
   const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
   const SEARCH_RESULT_LIMIT = 100;
   const REPORT_DETAIL_LIMIT = 250;
-  const LIMITS = { clients: 20000, appointments: 100000, blocks: 20000, expenses: 50000, settingsItems: 500, text: 5000, shortText: 200, duration: 24 * 60, amount: 1000000 };
+  const LIMITS = { clients: 20000, appointments: 100000, blocks: 20000, expenses: 50000, tasks: 20000, settingsItems: 500, text: 5000, shortText: 200, duration: 24 * 60, amount: 1000000 };
   const COMFORTABLE_HOUR_HEIGHT = 68;
   const COMPACT_HOUR_HEIGHT = 54;
   // Une demi-heure reste une vraie cible tactile de 24 px, sans que deux
@@ -382,9 +384,34 @@
     return { id: String(raw.id || uuid()), allDay: false, startDate, startTime, endDate, endTime, reason: boundedText(raw.reason || raw.title || raw.label || 'Événement personnel', LIMITS.shortText) || 'Événement personnel', ...details };
   }
 
+  function validTaskTimestamp(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+    const date = new Date(value);
+    return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+  }
+
+  function validateTasks(tasks) {
+    if (!Array.isArray(tasks)) throw new Error('INVALID_TASKS_STRUCTURE');
+    if (tasks.length > LIMITS.tasks) throw new Error('INVALID_TOO_MANY_ITEMS');
+    const ids = new Set();
+    tasks.forEach(task => {
+      if (!task || typeof task !== 'object' || Array.isArray(task)
+        || typeof task.id !== 'string' || !task.id.trim() || task.id !== task.id.trim() || task.id.length > LIMITS.shortText || ids.has(task.id)
+        || typeof task.title !== 'string' || !task.title.trim() || task.title.length > LIMITS.shortText
+        || typeof task.dueDate !== 'string' || (task.dueDate !== '' && !validDate(task.dueDate))
+        || typeof task.completed !== 'boolean'
+        || !validTaskTimestamp(task.createdAt) || !validTaskTimestamp(task.updatedAt)
+        || (task.completed ? !validTaskTimestamp(task.completedAt) : task.completedAt !== '')) throw new Error('INVALID_TASK');
+      ids.add(task.id);
+    });
+  }
+
   function validateImportedState(data, options = {}) {
     const state = data?.state || data || {};
-    const currentSchema = Number(data?.dataVersion ?? state?.version ?? data?.version ?? 0) >= CURRENT_DATA_VERSION;
+    const sourceVersion = Number(data?.dataVersion ?? state?.version ?? data?.version ?? 0);
+    const currentSchema = sourceVersion >= FINANCIAL_DATA_VERSION;
+    if (sourceVersion >= TASKS_DATA_VERSION || Object.prototype.hasOwnProperty.call(state, 'tasks')) validateTasks(state.tasks);
+    if (sourceVersion < TASKS_DATA_VERSION && state.tasks?.length) throw new Error('INVALID_TASKS_VERSION');
     const appointments = Array.isArray(state) ? state : (Array.isArray(state.appointments) ? state.appointments : []);
     const clients = Array.isArray(state.clients) ? state.clients : [];
     const blocks = [state.blocks, state.blockedSlots, state.unavailableDays].filter(Array.isArray).flat();
@@ -442,7 +469,7 @@
     if (strict && options.migrationDate && !validDate(suppliedMigrationDate)) throw new Error('INVALID_MIGRATION_DATE');
     if (strict) validateImportedState(source, { allowFutureFinancialDates: options.allowFutureFinancialDates === true });
     if (strict && !Array.isArray(data)) {
-      for (const key of ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'expenses', 'spendings']) {
+      for (const key of ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'expenses', 'spendings', 'tasks']) {
         if (Object.prototype.hasOwnProperty.call(data, key) && !Array.isArray(data[key])) throw new Error('INVALID_STRUCTURE');
       }
       if (Object.prototype.hasOwnProperty.call(data, 'settings') && (!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings))) throw new Error('INVALID_STRUCTURE');
@@ -489,7 +516,7 @@
     if (strict && Array.isArray(rawSettings.clientBadges)) {
       const badgeIds = rawSettings.clientBadges.map(badge => String(badge?.id || '').trim()).filter(Boolean);
       const badgeNames = rawSettings.clientBadges.map(badge => normaliseName(badge?.name)).filter(Boolean);
-      const emojiRequired = Number(data.version || 0) >= CURRENT_DATA_VERSION;
+      const emojiRequired = Number(data.version || 0) >= FINANCIAL_DATA_VERSION;
       if (rawSettings.clientBadges.some(badge => !String(badge?.name || '').trim()) || new Set(badgeIds).size !== badgeIds.length || new Set(badgeNames).size !== badgeNames.length
         || (emojiRequired && rawSettings.clientBadges.some(badge => !String(badge?.id || '').trim() || !String(badge?.emoji || badge?.symbol || '').trim()))) throw new Error('INVALID_CLIENT_BADGE');
     }
@@ -535,10 +562,10 @@
       // Les anciennes versions pouvaient préremplir par erreur la date du RDV,
       // même lorsqu'elle était future. La migration ramène ce cas à la date de
       // migration et en conserve une trace dans l'historique.
-      const correctedLegacyFuturePayment = sourceVersion < CURRENT_DATA_VERSION && inferredPaymentDate > migrationDate;
+      const correctedLegacyFuturePayment = sourceVersion < FINANCIAL_DATA_VERSION && inferredPaymentDate > migrationDate;
       const paymentDate = correctedLegacyFuturePayment ? migrationDate : inferredPaymentDate;
       const refundDate = paymentStatus === 'refunded' && validDate(suppliedRefundDate) ? suppliedRefundDate : '';
-      const correctedLegacyMissingReminder = sourceVersion < CURRENT_DATA_VERSION && paymentStatus === 'pending' && !validDate(suppliedReminderDate);
+      const correctedLegacyMissingReminder = sourceVersion < FINANCIAL_DATA_VERSION && paymentStatus === 'pending' && !validDate(suppliedReminderDate);
       const paymentReminderDate = paymentStatus === 'pending' ? (validDate(suppliedReminderDate) ? suppliedReminderDate : migrationDate) : '';
       const history = normaliseHistory(raw.history, raw.createdAt);
       if (correctedLegacyFuturePayment) history.push({
@@ -607,7 +634,7 @@
    if (strict) {
      const expenseIds = rawExpenses.map(expense => String(expense?.id || '').trim()).filter(Boolean);
      if (rawExpenses.some(expense => !String(expense?.id || '').trim()) || new Set(expenseIds).size !== expenseIds.length) throw new Error('INVALID_EXPENSE');
-      if (Number(data.version || 0) >= CURRENT_DATA_VERSION) {
+      if (Number(data.version || 0) >= FINANCIAL_DATA_VERSION) {
         const categoryIds = new Set(expenseCategories.map(category => category.id));
         if (rawExpenses.some(expense => !categoryIds.has(String(expense?.categoryId || '').trim()))) throw new Error('INVALID_EXPENSE_CATEGORY_REFERENCE');
       }
@@ -630,7 +657,11 @@
     if (restoreSafetyId) settings.restoreSafetyId = restoreSafetyId;
     const validBadgeIds = new Set(settings.clientBadges.map(badge => badge.id));
     clients.forEach(client => { if (!validBadgeIds.has(client.badgeId)) client.badgeId = ''; });
-    return { version: CURRENT_DATA_VERSION, clients, appointments, blocks, expenses, settings };
+    const tasks = Array.isArray(data.tasks) ? data.tasks.map(task => ({
+      id: task.id, title: task.title.trim(), dueDate: task.dueDate, completed: task.completed,
+      createdAt: task.createdAt, updatedAt: task.updatedAt, completedAt: task.completedAt
+    })) : [];
+    return { version: CURRENT_DATA_VERSION, clients, appointments, blocks, expenses, settings, tasks };
   }
 
   function migrateStoredState(state, context = {}) {
@@ -643,7 +674,7 @@
   }
 
   function hasStoredState(state) {
-    return Boolean(state && (Array.isArray(state) || state.clients || state.appointments || state.blocks || state.expenses || state.settings));
+    return Boolean(state && (Array.isArray(state) || state.clients || state.appointments || state.blocks || state.expenses || state.tasks || state.settings));
   }
 
   function preserveBeforeMigration(state, sourceVersion, migratedState, migrationDate = todayKey()) {
@@ -680,7 +711,7 @@
         const migrationDate = todayKey();
         const migrated = migrateStoredState(current, { migrationDate });
         if (Number(current?.version) !== CURRENT_DATA_VERSION) preserveBeforeMigration(current, current?.version, migrated, migrationDate);
-        legacyLoadInfo.usable = true; legacyLoadInfo.source = 'v15'; legacyLoadInfo.key = STATE_KEY; legacyLoadInfo.rawKey = STATE_KEY; legacyLoadInfo.rawState = current;
+        legacyLoadInfo.usable = true; legacyLoadInfo.source = `v${Number(current?.version || 15)}`; legacyLoadInfo.key = STATE_KEY; legacyLoadInfo.rawKey = STATE_KEY; legacyLoadInfo.rawState = current;
         return migrated;
       } catch {
         try { localStorage.setItem(CORRUPT_STATE_KEY, rawCurrent); }
@@ -819,7 +850,7 @@
     if (document.documentElement?.dataset) document.documentElement.dataset.theme = theme;
     if (document.body?.dataset) document.body.dataset.theme = theme;
     const meta = $('#themeColorMeta');
-    if (meta) meta.setAttribute('content', theme === 'dark' ? '#181316' : '#fbf6f7');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#19171b' : '#fcfaf7');
   }
 
   function dayHourHeight() { return app.state.settings.displayDensity === 'compact' ? COMPACT_HOUR_HEIGHT : COMFORTABLE_HOUR_HEIGHT; }
@@ -964,6 +995,109 @@
     app.state = state; hideUndo(); render();
   }
 
+  const TASK_DRAFT_KEY = 'mon-agenda-task-draft-v16';
+  const PRIVACY_KEY = 'mon-agenda-discretion';
+  app.ui.privacyMode = safeJson(PRIVACY_KEY, false) === true;
+
+  // Les exports et les calculs gardent money / leurs valeurs numériques.
+  function displayMoney(value) { return app.ui.privacyMode ? '•••' : money(value); }
+
+  function renderPrivacyControl() {
+    const button = $('#privacyToggle');
+    if (!button) return;
+    button.setAttribute('aria-pressed', String(Boolean(app.ui.privacyMode)));
+    button.setAttribute('aria-label', app.ui.privacyMode ? 'Afficher les montants : quitter le mode discrétion' : 'Masquer les montants : activer le mode discrétion');
+    button.setAttribute('title', app.ui.privacyMode ? 'Montants masqués · quitter le mode discrétion' : 'Mode discrétion · masquer les montants');
+    document.body?.classList?.toggle('privacy-mode', Boolean(app.ui.privacyMode));
+  }
+
+  function setPrivacyMode(enabled) {
+    app.ui.privacyMode = Boolean(enabled);
+    try { localStorage.setItem(PRIVACY_KEY, JSON.stringify(app.ui.privacyMode)); } catch {}
+    render();
+    if ($('#tasksDialog')?.open) renderTasks();
+    if ($('#atelierDayPanel')?.open) renderAtelierDayPanel();
+    if ($('#dayReviewDialog')?.open) renderDayReview();
+    if ($('#todoDialog')?.open) openTodo(app.ui.todoType || 'payments');
+    if ($('#appointmentSearchDialog')?.open) renderAppointmentSearchResults();
+  }
+
+  function ensureFinancialVisibility() {
+    if (!app.ui.privacyMode) return true;
+    if (!window.confirm('Quitter le mode discrétion pour afficher et modifier les montants de ce formulaire ?')) return false;
+    setPrivacyMode(false); return true;
+  }
+
+  function taskDraftValues() {
+    return { id: $('#taskId')?.value || '', title: $('#taskTitle')?.value || '', dueDate: $('#taskDueDate')?.value || '' };
+  }
+
+  const taskFormDraft = () => safeJson(TASK_DRAFT_KEY, null);
+
+  function saveTaskDraft() {
+    if (!$('#taskDialog')?.open) return;
+    const values = taskDraftValues();
+    if (!values.title.trim() || JSON.stringify(values) === app.ui.taskDraftBaseline) { clearFormDraft('task'); return; }
+    try { localStorage.setItem(TASK_DRAFT_KEY, JSON.stringify({ version: 1, kind: 'task', values, savedAt: new Date().toISOString() })); renderDraftNotice(); } catch {}
+  }
+
+  function setTaskSaving(value) {
+    app.ui.taskSaving = Boolean(value);
+    const submit = $('#taskSubmitButton');
+    if (submit) { submit.disabled = Boolean(value); submit.textContent = value ? 'Enregistrement…' : 'Enregistrer la tâche'; }
+  }
+
+  function openTask(task = null) {
+    $('#taskForm').reset(); $('#taskId').value = task?.id || ''; $('#taskTitle').value = task?.title || ''; $('#taskDueDate').value = task?.dueDate || '';
+    $('#taskDialogTitle').textContent = task ? 'Modifier la tâche' : 'Nouvelle tâche'; $('#deleteTask').hidden = !task;
+    setTaskSaving(false); app.ui.taskDraftBaseline = JSON.stringify(taskDraftValues());
+    $('#taskDialog').showModal(); captureFormBaseline('taskDialog'); $('#taskTitle').focus();
+  }
+
+  async function saveTask() {
+    if (exclusiveReplacementToken || app.ui.taskSaving || !$('#taskForm').reportValidity()) return false;
+    const values = taskDraftValues(), title = boundedText(values.title, LIMITS.shortText);
+    if (!title || values.dueDate && !validDate(values.dueDate)) return false;
+    const tasks = app.state.tasks || [], index = tasks.findIndex(task => task.id === values.id), existing = tasks[index], now = new Date().toISOString();
+    if (index === -1 && tasks.length >= (LIMITS.tasks || 50000)) { showAppAlert('Le nombre maximal de tâches est atteint.'); return false; }
+    const record = { id: existing?.id || uuid(), title, dueDate: values.dueDate, completed: existing?.completed === true, createdAt: existing?.createdAt || now, updatedAt: now, completedAt: existing?.completedAt || '' };
+    setTaskSaving(true);
+    app.state.tasks = index === -1 ? [...tasks, record] : tasks.map(task => task.id === record.id ? record : task);
+    if (!(await saveState(app.state, false, { reason: index === -1 ? 'task-create' : 'task-update' }))) { setTaskSaving(false); renderTasks(); return false; }
+    setTaskSaving(false); clearFormDraft('task'); closeDialogNow('taskDialog'); render(); renderTasks(); showSuccess(index === -1 ? 'Tâche ajoutée' : 'Tâche modifiée'); return true;
+  }
+
+  async function toggleTask(id) {
+    if (exclusiveReplacementToken || app.ui.taskSaving) return false;
+    const task = (app.state.tasks || []).find(item => item.id === id); if (!task) return false;
+    const now = new Date().toISOString(), completed = !task.completed;
+    setTaskSaving(true); app.state.tasks = app.state.tasks.map(item => item.id === id ? { ...item, completed, updatedAt: now, completedAt: completed ? now : '' } : item);
+    if (!(await saveState(app.state, false, { reason: 'task-complete' }))) { setTaskSaving(false); renderTasks(); return false; }
+    setTaskSaving(false); render(); renderTasks(); showSuccess(completed ? 'Tâche terminée' : 'Tâche remise à faire'); return true;
+  }
+
+  async function deleteTask(id = $('#taskId')?.value) {
+    if (exclusiveReplacementToken || app.ui.taskSaving) return false;
+    const task = (app.state.tasks || []).find(item => item.id === id);
+    if (!task || !window.confirm(`Supprimer la tâche « ${task.title} » ?`)) return false;
+    setTaskSaving(true); app.state.tasks = app.state.tasks.filter(item => item.id !== id);
+    if (!(await saveState(app.state, false, { reason: 'task-delete' }))) { setTaskSaving(false); renderTasks(); return false; }
+    setTaskSaving(false); clearFormDraft('task'); closeDialogNow('taskDialog'); render(); renderTasks(); showSuccess('Tâche supprimée'); return true;
+  }
+
+  function renderTasks() {
+    const tasks = app.state.tasks || [], pending = tasks.filter(task => !task.completed).sort((one, two) => (one.dueDate || '9999').localeCompare(two.dueDate || '9999') || one.createdAt.localeCompare(two.createdAt));
+    const completed = tasks.filter(task => task.completed).sort((one, two) => (two.completedAt || '').localeCompare(one.completedAt || ''));
+    if ($('#taskCount')) $('#taskCount').textContent = String(pending.length);
+    if ($('#completedTaskCount')) $('#completedTaskCount').textContent = String(completed.length);
+    const row = task => {
+      const late = !task.completed && task.dueDate && task.dueDate < todayKey(), due = task.dueDate ? `${late ? 'En retard · ' : ''}${format(parseDate(task.dueDate), { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Sans date';
+      return `<article class="task-row ${task.completed ? 'completed' : ''} ${late ? 'overdue' : ''}"><button type="button" class="task-check" data-toggle-task="${escapeHtml(task.id)}" aria-pressed="${task.completed}" aria-label="${task.completed ? 'Remettre à faire' : 'Terminer'} : ${escapeHtml(task.title)}">${task.completed ? '✓' : '○'}</button><button type="button" class="task-edit" data-edit-task="${escapeHtml(task.id)}"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(due)}</small></button></article>`;
+    };
+    if ($('#taskList')) $('#taskList').innerHTML = pending.map(row).join('') || '<p class="empty-route">Aucune tâche à faire. Ajoute une idée ou une chose à ne pas oublier.</p>';
+    if ($('#completedTaskList')) $('#completedTaskList').innerHTML = completed.map(row).join('') || '<p class="small-copy">Aucune tâche terminée.</p>';
+  }
+
   const DRAFT_FIELDS = ['clientName', 'phone', 'contactVia', 'serviceSelect', 'service', 'price', 'date', 'time', 'duration', 'status', 'address', 'notes', 'paymentStatus', 'paymentDate', 'refundDate', 'paymentMethod', 'paymentReminderDate', 'repeatWeeks', 'repeatDate', 'repeatTime', 'cancellationReason'];
 
   function appointmentDraftPayload() {
@@ -990,6 +1124,7 @@
       localStorage.removeItem(CLIENT_DRAFT_KEY); localStorage.removeItem(V14_CLIENT_DRAFT_KEY); localStorage.removeItem(V13_CLIENT_DRAFT_KEY); localStorage.removeItem(V12_CLIENT_DRAFT_KEY); localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V14_BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY);
      localStorage.removeItem(EXPENSE_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_DRAFT_KEY);
       localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_CATEGORY_DRAFT_KEY);
+      localStorage.removeItem(TASK_DRAFT_KEY);
     } catch {}
     renderDraftNotice();
   }
@@ -1005,15 +1140,16 @@
   }
 
   function renderDraftNotice() {
-    const candidates = [appointmentDraft(), clientFormDraft(), blockFormDraft(), expenseFormDraft(), expenseCategoryFormDraft()].filter(draft => draft?.savedAt && draft?.values).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+    const candidates = [appointmentDraft(), clientFormDraft(), blockFormDraft(), expenseFormDraft(), expenseCategoryFormDraft(), taskFormDraft()].filter(draft => draft?.savedAt && draft?.values).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
     const draft = candidates[0], target = $('#draftNotice');
     if (!target) return;
     target.hidden = !draft;
     if (!draft) return;
     app.ui.draftNoticeKind = draft.kind || 'appointment';
+    if (app.ui.draftNoticeKind === 'task') { $('#draftNoticeTitle').textContent = 'Tâche en cours'; $('#draftNoticeText').textContent = draft.values.title || 'Tâche à terminer'; return; }
     if (app.ui.draftNoticeKind === 'client') { $('#draftNoticeTitle').textContent = 'Fiche cliente en cours'; $('#draftNoticeText').textContent = draft.values.name || 'Modifications non enregistrées'; return; }
     if (app.ui.draftNoticeKind === 'block') { $('#draftNoticeTitle').textContent = 'Événement personnel en cours'; $('#draftNoticeText').textContent = draft.values.reason || 'Événement à terminer'; return; }
-   if (app.ui.draftNoticeKind === 'expense') { $('#draftNoticeTitle').textContent = 'Dépense en cours'; $('#draftNoticeText').textContent = `${draft.values.categoryLabel || 'Catégorie à choisir'}${draft.values.amount ? ` · ${money(draft.values.amount)}` : ''}`; return; }
+   if (app.ui.draftNoticeKind === 'expense') { $('#draftNoticeTitle').textContent = 'Dépense en cours'; $('#draftNoticeText').textContent = `${draft.values.categoryLabel || 'Catégorie à choisir'}${draft.values.amount ? ` · ${displayMoney(draft.values.amount)}` : ''}`; return; }
     if (app.ui.draftNoticeKind === 'expenseCategory') { $('#draftNoticeTitle').textContent = 'Catégorie de dépense en cours'; $('#draftNoticeText').textContent = draft.values.name || 'Nom à terminer'; return; }
     $('#draftNoticeTitle').textContent = 'Rendez-vous en cours';
     const name = String(draft.values.clientName || '').trim() || 'cliente non renseignée', date = validDate(draft.values.date) ? format(parseDate(draft.values.date), { day: 'numeric', month: 'short' }) : 'date à choisir';
@@ -1022,6 +1158,7 @@
 
   function resumeAppointmentDraft() {
     const draft = appointmentDraft(); if (!draft) return;
+    if (!ensureFinancialVisibility()) return;
     const editing = draft.editingAppointmentId ? app.state.appointments.find(item => item.id === draft.editingAppointmentId) : null;
     openAppointment(editing || null);
     const serviceId = String(draft.values.serviceSelect || '');
@@ -1032,6 +1169,9 @@
     setTimePicker('time', draft.values.time || '10:00'); setDurationValue(draft.values.duration); if (validTime(draft.values.repeatTime)) setTimePicker('repeatTime', draft.values.repeatTime); renderSupplementRows(draft.supplements || []); $('#lateCancellation').checked = draft.lateCancellation === true;
     app.ui.formClientId = draft.formClientId || null; app.ui.formServiceColor = draft.formServiceColor || 'rose';
     app.ui.repeatDateEdited = validDate(draft.values.repeatDate); app.ui.repeatTimeEdited = validTime(draft.values.repeatTime);
+    const preset = serviceById($('#serviceSelect').value);
+    app.ui.manualDuration = Boolean(preset && Number($('#duration').value) !== Number(preset.duration));
+    app.ui.manualPrice = Boolean(preset && String($('#price').value) !== String(preset.price));
     const client = app.ui.formClientId ? clientById(app.ui.formClientId) : null;
     renderSelectedClientInfo(client); syncAppointmentContactSummary(client, !client); setAppointmentAdjustments($('#serviceSelect').value === 'custom'); syncStatusFields(); syncPaymentFields(); syncRepeatDate(false); updateAppointmentTotal(); updateConflictHint();
   }
@@ -1100,6 +1240,7 @@
       else if (kind === 'block') { localStorage.removeItem(BLOCK_DRAFT_KEY); localStorage.removeItem(V14_BLOCK_DRAFT_KEY); localStorage.removeItem(V13_BLOCK_DRAFT_KEY); localStorage.removeItem(V12_BLOCK_DRAFT_KEY); }
      else if (kind === 'expense') { localStorage.removeItem(EXPENSE_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_DRAFT_KEY); }
       else if (kind === 'expenseCategory') { localStorage.removeItem(EXPENSE_CATEGORY_DRAFT_KEY); localStorage.removeItem(V14_EXPENSE_CATEGORY_DRAFT_KEY); }
+      else if (kind === 'task') { localStorage.removeItem(TASK_DRAFT_KEY); }
       else { localStorage.removeItem(APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V14_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V13_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V12_APPOINTMENT_DRAFT_KEY); localStorage.removeItem(V11_APPOINTMENT_DRAFT_KEY); }
     } catch {}
     renderDraftNotice();
@@ -1107,6 +1248,11 @@
 
  function resumeLatestDraft() {
    const kind = app.ui.draftNoticeKind;
+    if (kind === 'task') {
+      const values = taskFormDraft()?.values; if (!values) { clearFormDraft('task'); return; }
+      const existing = (app.state.tasks || []).find(task => task.id === values.id);
+      openTask(existing || null); $('#taskTitle').value = values.title || ''; $('#taskDueDate').value = validDate(values.dueDate) ? values.dueDate : ''; return;
+    }
     if (kind === 'expenseCategory') {
       const draft = expenseCategoryFormDraft(), values = draft?.values;
       if (!values) { clearFormDraft('expenseCategory'); return; }
@@ -1124,6 +1270,7 @@
       const existing = app.state.blocks.find(block => block.id === values.id); openBlock(existing || null, { date: values.startDate, time: values.startTime }); app.ui.editingBlockId = existing?.id || null; $('#blockId').value = values.id || existing?.id || $('#blockId').value; $('#blockAllDay').checked = values.allDay; $('#blockAllDayDate').value = values.startDate; $('#blockAllDayEndDate').value = values.endDate && values.endDate !== values.startDate ? values.endDate : ''; $('#blockStartDate').value = values.startDate; $('#blockStartTime').value = values.startTime; $('#blockEndDate').value = values.endDate || values.startDate; $('#blockEndTime').value = values.endTime; $('#blockReason').value = values.reason; $('#blockAppointments').checked = values.blocksAppointments !== false; $('#blockAddress').value = values.address; $('#blockNotes').value = values.notes; syncBlockAllDay(); syncBlockModePreview(); return;
     }
     if (kind === 'expense') {
+      if (!ensureFinancialVisibility()) return;
       const draft = expenseFormDraft(), values = draft?.values; if (!values) { clearFormDraft('expense'); return; }
       const existing = app.state.expenses.find(expense => expense.id === values.id); openExpense(existing || null, { date: values.date });
       $('#expenseId').value = values.id || existing?.id || $('#expenseId').value; populateExpenseCategorySelect(values.categoryId); $('#expenseDetails').value = values.details || ''; $('#expenseSupplier').value = values.supplier || ''; $('#expenseDate').value = values.date || todayKey(); $('#expenseAmount').value = values.amount || ''; return;
@@ -1157,6 +1304,7 @@
     else if (dialogId === 'blockDialog') saveBlockDraft();
    else if (dialogId === 'expenseDialog') saveExpenseDraft();
     else if (dialogId === 'expenseCategoriesDialog') saveExpenseCategoryDraft();
+    else if (dialogId === 'taskDialog') saveTaskDraft();
   }
 
   function discardDraftForDialog(dialogId) {
@@ -1165,6 +1313,7 @@
     else if (dialogId === 'blockDialog') clearFormDraft('block');
    else if (dialogId === 'expenseDialog') clearFormDraft('expense');
     else if (dialogId === 'expenseCategoriesDialog') clearFormDraft('expenseCategory');
+    else if (dialogId === 'taskDialog') clearFormDraft('task');
   }
 
   function afterDialogClosed(dialogId) {
@@ -1201,7 +1350,7 @@
   }
 
   async function saveSettingsBeforeClose() {
-    const saveByPage = { agenda: saveWorkingHours, clients: saveClientSettings, data: saveReminderSettings };
+    const saveByPage = { agenda: saveWorkingHours, appearance: saveAppearance, clients: saveClientSettings, data: saveReminderSettings };
     const save = saveByPage[app.ui.settingsPage];
     if (!save) return false;
     await save();
@@ -1252,7 +1401,7 @@
  }
 
   function hasOpenUnsavedChanges() {
-    return ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog']
+    return ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'taskDialog']
       .some(dialogId => $(`#${dialogId}`)?.open && formHasChanges(dialogId));
   }
 
@@ -1529,6 +1678,7 @@
 
   function render() {
     applyColorTheme(); applyDisplayDensity(); renderFeatureCoach(); renderHeader(); renderScreen();
+    renderPrivacyControl(); renderTasks();
     if (app.ui.screen === 'agenda') renderAgenda();
     else if (app.ui.screen === 'clients') renderClients();
     else if (app.ui.screen === 'report') renderReport();
@@ -1543,7 +1693,7 @@
     } else {
       const client = clientFor(next), address = appointmentAddress(next);
       $('#nextAppointment').className = 'next-card';
-      $('#nextAppointment').innerHTML = `<button class="next-main" data-edit="${escapeHtml(next.id)}"><span class="next-title">Prochain rendez-vous</span><span class="next-time">${format(parseDate(next.date), { weekday: 'long', day: 'numeric', month: 'long' })} · ${next.time}</span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><span>${escapeHtml(next.service)} · ${Number(next.duration)} min${appointmentTotal(next) ? ` · ${money(appointmentTotal(next))}` : ''}</span>${address ? `<small>${escapeHtml(address)}</small>` : ''}</button>${address ? `<button class="route-icon" data-waze="${encodeURIComponent(address)}" aria-label="Itinéraire Waze">⌖</button>` : ''}`;
+      $('#nextAppointment').innerHTML = `<button class="next-main" data-edit="${escapeHtml(next.id)}"><span class="next-title">Prochain rendez-vous</span><span class="next-time">${format(parseDate(next.date), { weekday: 'long', day: 'numeric', month: 'long' })} · ${next.time}</span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><span>${escapeHtml(next.service)} · ${Number(next.duration)} min${appointmentTotal(next) ? ` · ${displayMoney(appointmentTotal(next))}` : ''}</span>${address ? `<small>${escapeHtml(address)}</small>` : ''}</button>${address ? `<button class="route-icon" data-waze="${encodeURIComponent(address)}" aria-label="Itinéraire Waze">⌖</button>` : ''}`;
     }
     renderPaymentReminders(); renderTodos(); renderDraftNotice(); renderUnclosedDayNotice();
     const last = app.state.settings.lastBackupAt ? new Date(app.state.settings.lastBackupAt) : null, lastTime = last?.getTime();
@@ -1551,6 +1701,25 @@
     const late = !Number.isFinite(lastTime) || Date.now() - lastTime > reminderDays * 24 * 60 * 60 * 1000;
     $('#backupNotice').hidden = !late;
     $('#backupNotice').innerHTML = `${SAVE_FILE_ICON}<span>${last ? 'Pense à sauvegarder tes données' : 'Fais une première sauvegarde de tes données'}</span>`;
+    const followUps = pendingConfirmations().length + pendingPayments().length + unclosedDays().length + (late ? 1 : 0);
+    if ($('#followUpCount')) $('#followUpCount').textContent = String(followUps);
+    if ($('#atelierDayPanel')?.open) renderAtelierDayPanel();
+    app.ui.headerClockSignature = headerClockSignature();
+  }
+
+  function headerClockSignature() {
+    const next = sortedAppointments().find(appointment => activeAppointment(appointment) && appointmentEnd(appointment) >= Date.now());
+    const backupAt = new Date(app.state.settings.lastBackupAt || '').getTime(), days = Number(app.state.settings.backupReminderDays) || 7;
+    return JSON.stringify([todayKey(), next?.id || '', pendingPayments().map(item => item.id), pendingConfirmations().map(item => item.id), unclosedDays().map(dateKey), unreviewedForDate(dateKey(app.ui.selectedDate)).map(item => item.id), !Number.isFinite(backupAt) || Date.now() - backupAt > days * 86400000]);
+  }
+
+  function refreshTimeSensitiveUI() {
+    if (app.ui.headerClockSignature !== headerClockSignature()) renderHeader();
+    if (app.ui.screen !== 'agenda') return;
+    if (app.ui.mode === 'day') { updateDayCurrentTimeLine(); renderDayClosure(); }
+    else if (app.ui.mode === 'week') updateWeekCurrentTimeLine();
+    const focusedSuggestion = $('#slotSuggestionsList')?.contains?.(document.activeElement);
+    if (app.ui.slotSuggestionsOpen && $('#appointmentDialog')?.open && !focusedSuggestion) renderSlotSuggestions();
   }
 
   function renderUnclosedDayNotice() {
@@ -1579,18 +1748,26 @@
     target.hidden = !reminders.length;
     if (!reminders.length) { target.innerHTML = ''; return; }
     const first = reminders[0], client = clientFor(first), remaining = reminders.length - 1;
-    target.innerHTML = `<button data-todo="payments"><span class="reminder-icon">!</span><span><small>Relance paiement</small><strong>Relancer « ${escapeHtml(client.name)} » pour le paiement</strong><em>${first.paymentReminderDate < todayKey() ? 'Relance en retard' : 'À relancer aujourd’hui'}${appointmentTotal(first) ? ` · ${money(appointmentTotal(first))}` : ''}${remaining ? ` · +${remaining} autre${remaining > 1 ? 's' : ''}` : ''}</em></span><b>Voir ›</b></button>`;
+    target.innerHTML = `<button data-todo="payments"><span class="reminder-icon">!</span><span><small>Relance paiement</small><strong>Relancer « ${escapeHtml(client.name)} » pour le paiement</strong><em>${first.paymentReminderDate < todayKey() ? 'Relance en retard' : 'À relancer aujourd’hui'}${appointmentTotal(first) ? ` · ${displayMoney(appointmentTotal(first))}` : ''}${remaining ? ` · +${remaining} autre${remaining > 1 ? 's' : ''}` : ''}</em></span><b>Voir ›</b></button>`;
   }
 
   function renderTodos() {
     const confirmations = pendingConfirmations(), target = $('#todoCard');
     target.hidden = !confirmations.length;
     if (target.hidden) { target.innerHTML = ''; return; }
-    target.innerHTML = `<div><p class="next-title">À faire</p><strong>${confirmations.length} rendez-vous à confirmer</strong></div><div class="todo-actions"><button data-todo="confirm"><b>${confirmations.length}</b> ouvrir</button></div>`;
+    target.innerHTML = `<div><p class="next-title">Confirmations</p><strong>${confirmations.length} rendez-vous à confirmer</strong></div><div class="todo-actions"><button data-todo="confirm"><b>${confirmations.length}</b> ouvrir</button></div>`;
+  }
+
+  function renderAtelierDayPanel() {
+    if ($('#atelierDayDate')) $('#atelierDayDate').textContent = format(app.ui.selectedDate, { weekday: 'long', day: 'numeric', month: 'long' });
+    renderDaySummary(); renderDayClosure();
+    $('#routeDay').hidden = !routeEntriesForDate(app.ui.selectedDate).length;
   }
 
   function renderAgenda() {
     const isDay = app.ui.mode === 'day', isWeek = app.ui.mode === 'week';
+    const context = $('#agendaContext'), contextTarget = $(isDay ? '#dayAgendaContext' : isWeek ? '#weekAgendaContext' : '#monthAgendaContext');
+    if (context && contextTarget && context.parentElement !== contextTarget) contextTarget.append?.(context);
     $('#dayView').hidden = !isDay; $('#fullWeekView').hidden = !isWeek; $('#monthView').hidden = app.ui.mode !== 'month';
     $$('.mode-button').forEach(button => { const active = button.dataset.mode === app.ui.mode; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
     if (isDay) renderDayView(); else if (isWeek) renderFullWeekView(); else renderMonthView();
@@ -1634,7 +1811,7 @@
     const blocks = [...new Map(weekDays.flatMap(day => day.blocks).map(block => [block.id, block])).values()];
     const minutes = appointments.reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0), planned = appointments.reduce((sum, appointment) => sum + appointmentTotal(appointment), 0);
     $('#weekPeriodLabel').textContent = weekLabel(app.ui.weekStart);
-    $('#weekSummary').innerHTML = `<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}`;
+    $('#weekSummary').innerHTML = `<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${displayMoney(planned)}</strong> prévu</span>` : ''}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}`;
     $('#weekSchedule').innerHTML = buildWeekTimeline(dates, weekDays);
   }
 
@@ -1753,8 +1930,8 @@
     const cash = financialSummary(dayStart, dayEnd);
     const first = appointments[0], last = [...appointments].sort((one, two) => appointmentEnd(two) - appointmentEnd(one))[0];
     const clientSpan = first && last ? `<span class="client-hours-summary"><strong>${first.time}</strong> début clientes</span><span class="client-hours-summary"><strong>${endTime(last)}</strong> fin clientes</span>` : '';
-    const cashSummary = cash.gross || cash.refunded ? `${cash.refunded ? `<span><strong>${money(cash.gross)}</strong> brut</span><span><strong>${money(cash.refunded)}</strong> remboursé</span>` : ''}<span><strong>${money(cash.net)}</strong> encaissé net</span>` : '';
-    $('#daySummary').innerHTML = `${clientSpan}<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${money(planned)}</strong> prévu</span>` : ''}${cashSummary}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
+    const cashSummary = cash.gross || cash.refunded ? `${cash.refunded ? `<span><strong>${displayMoney(cash.gross)}</strong> brut</span><span><strong>${displayMoney(cash.refunded)}</strong> remboursé</span>` : ''}<span><strong>${displayMoney(cash.net)}</strong> encaissé net</span>` : '';
+    $('#daySummary').innerHTML = `${clientSpan}<span><strong>${appointments.length}</strong> RDV</span><span><strong>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</strong> de prestation</span>${planned ? `<span><strong>${displayMoney(planned)}</strong> prévu</span>` : ''}${cashSummary}${blocks.length ? `<span class="block-summary">◇ ${blocks.length} événement${blocks.length > 1 ? 's' : ''}</span>` : ''}<span class="hours-summary">◷ ${workHoursLabel(hours)}</span>`;
   }
 
   function timelineLayouts(items) {
@@ -1822,11 +1999,21 @@
       const height = Math.max(30, (Number(appointment.duration || 0) / 60) * hourHeight - 4), compact = Number(appointment.duration || 0) <= 60;
       const inactive = !activeAppointment(appointment), conflicted = hasAppointmentConflict(appointment), layout = layouts.get(`a:${appointment.id}`);
       const reason = appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : '';
-      return `<article class="appointment-block ${serviceTheme(appointment)} status-${appointment.status} ${compact ? 'compact' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${inactive ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" style="top:${top}px;height:${height}px;${appointmentHorizontalStyle(layout)}"><button class="appointment-edit" data-edit="${escapeHtml(appointment.id)}"><span class="appointment-time">${appointment.time} – ${endTime(appointment)}</span><strong class="appointment-name">${badgeHtml(client, 'planning')}${escapeHtml(client.name)}</strong><span class="appointment-meta">${escapeHtml(appointment.service)} · ${Number(appointment.duration)} min${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${reason}</span></button><div class="appointment-footer"><span class="status-badge">${STATUS[appointment.status]}</span>${['paid', 'refunded'].includes(appointment.paymentStatus) ? `<span class="paid-badge ${appointment.paymentStatus === 'refunded' ? 'refunded' : ''}">${PAYMENT[appointment.paymentStatus]}</span>` : ''}</div></article>`;
+      return `<article class="appointment-block ${serviceTheme(appointment)} status-${appointment.status} ${compact ? 'compact' : ''} ${layout?.columns > 1 ? 'overlapped' : ''} ${inactive ? 'inactive' : ''} ${conflicted ? 'conflicted' : ''}" style="top:${top}px;height:${height}px;${appointmentHorizontalStyle(layout)}"><button class="appointment-edit" data-edit="${escapeHtml(appointment.id)}"><span class="appointment-time">${appointment.time} – ${endTime(appointment)}</span><strong class="appointment-name">${badgeHtml(client, 'planning')}${escapeHtml(client.name)}</strong><span class="appointment-meta">${escapeHtml(appointment.service)} · ${Number(appointment.duration)} min${appointmentTotal(appointment) ? ` · ${displayMoney(appointmentTotal(appointment))}` : ''}${reason}</span></button><div class="appointment-footer"><span class="status-badge">${STATUS[appointment.status]}</span>${['paid', 'refunded'].includes(appointment.paymentStatus) ? `<span class="paid-badge ${appointment.paymentStatus === 'refunded' ? 'refunded' : ''}">${PAYMENT[appointment.paymentStatus]}</span>` : ''}</div></article>`;
     }).join('');
     const now = new Date().getHours() * 60 + new Date().getMinutes();
     const currentLine = sameDay(date, new Date()) && now >= firstHour * 60 && now <= lastHour * 60 ? `<span id="currentTimeLine" class="current-time-line" style="top:${((now - firstHour * 60) / 60) * hourHeight}px"><b>${pad(new Date().getHours())}:${pad(new Date().getMinutes())}</b></span>` : '';
-    $('#dayTimeline').innerHTML = `<div class="timeline-inner" style="height:${totalHours * hourHeight}px">${renderWorkShading(workHoursFor(date), firstHour, lastHour)}${lines}${empty}${blockHtml}${appointmentHtml}${currentLine}</div>`;
+    $('#dayTimeline').innerHTML = `<div class="timeline-inner" data-first-hour="${firstHour}" data-last-hour="${lastHour}" style="height:${totalHours * hourHeight}px">${renderWorkShading(workHoursFor(date), firstHour, lastHour)}${lines}${empty}${blockHtml}${appointmentHtml}${currentLine}</div>`;
+  }
+
+  function updateDayCurrentTimeLine() {
+    const timeline = $('#dayTimeline .timeline-inner'); if (!timeline) return;
+    const now = new Date(), minute = now.getHours() * 60 + now.getMinutes(), firstHour = Number(timeline.dataset.firstHour), lastHour = Number(timeline.dataset.lastHour);
+    let line = $('#currentTimeLine');
+    if (!sameDay(app.ui.selectedDate, now) || !Number.isFinite(firstHour) || !Number.isFinite(lastHour) || minute < firstHour * 60 || minute > lastHour * 60) { line?.remove(); return; }
+    if (!line) { line = document.createElement('span'); line.id = 'currentTimeLine'; line.className = 'current-time-line'; timeline.append(line); }
+    line.style.top = `${((minute - firstHour * 60) / 60) * dayHourHeight()}px`;
+    line.innerHTML = `<b>${pad(now.getHours())}:${pad(now.getMinutes())}</b>`;
   }
 
   function dayOrdinal(value) {
@@ -1917,7 +2104,7 @@
 
   function monthDayAppointmentButton(appointment) {
     const client = clientFor(appointment), inactive = !activeAppointment(appointment);
-    return `<button type="button" class="month-day-entry appointment-entry ${serviceTheme(appointment)} ${inactive ? 'inactive' : ''}" data-edit="${escapeHtml(appointment.id)}"><span class="month-day-entry-time">${appointment.time}</span><span class="month-day-entry-main"><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}</small></span><span class="month-day-entry-chevron" aria-hidden="true">›</span></button>`;
+    return `<button type="button" class="month-day-entry appointment-entry ${serviceTheme(appointment)} ${inactive ? 'inactive' : ''}" data-edit="${escapeHtml(appointment.id)}"><span class="month-day-entry-time">${appointment.time}</span><span class="month-day-entry-main"><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${displayMoney(appointmentTotal(appointment))}` : ''}</small></span><span class="month-day-entry-chevron" aria-hidden="true">›</span></button>`;
   }
 
   function renderMonthDayContent(date) {
@@ -2029,7 +2216,7 @@
     counter.textContent = found.total ? `${found.total} rendez-vous trouvé${found.total > 1 ? 's' : ''}${found.truncated ? ` · ${found.results.length} affichés` : ''}` : 'Aucun rendez-vous trouvé';
     target.innerHTML = found.results.map(appointment => {
       const client = clientFor(appointment), parsed = parseDate(appointment.date), note = boundedText(appointment.notes, 80);
-      return `<button type="button" class="search-result-button" data-edit="${escapeHtml(appointment.id)}"><span class="search-result-date">${format(parsed, { day: 'numeric', month: 'short' })}<br>${appointment.time}</span><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)} · ${STATUS[appointment.status]} · ${PAYMENT[appointment.paymentStatus]}${note ? ` · ${escapeHtml(note)}` : ''}</small></span><b>${money(appointmentTotal(appointment)) || '—'} ›</b></button>`;
+      return `<button type="button" class="search-result-button" data-edit="${escapeHtml(appointment.id)}"><span class="search-result-date">${format(parsed, { day: 'numeric', month: 'short' })}<br>${appointment.time}</span><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)} · ${STATUS[appointment.status]} · ${PAYMENT[appointment.paymentStatus]}${note ? ` · ${escapeHtml(note)}` : ''}</small></span><b>${displayMoney(appointmentTotal(appointment)) || '—'} ›</b></button>`;
     }).join('') || '<p class="empty-report">Essaie un autre nom, une prestation ou une date.</p>';
   }
 
@@ -2189,11 +2376,11 @@
     const maximum = app.ui.reportSort === 'paid' ? maximumNet : maximumCount;
     const body = rows.map((row, index) => {
       const badges = rows.length > 1 ? [row.count > 0 && row.count === maximumCount ? (kind === 'service' ? 'Plus réalisée' : 'Plus utilisé') : '', row.net > 0 && row.net === Math.max(...rows.map(item => item.net)) ? 'Meilleur net encaissé' : ''].filter(Boolean).join(' · ') : '';
-      const cashDetail = row.refunded ? `${money(row.gross) || '0 €'} brut · ${money(row.refunded)} remboursé · ` : '';
-      const label = `${row.label}, ${row.count} réalisé${row.count > 1 ? 's' : ''}, ${cashDetail}${money(row.net) || '0 €'} net`;
+      const cashDetail = row.refunded ? `${displayMoney(row.gross) || '0 €'} brut · ${displayMoney(row.refunded)} remboursé · ` : '';
+      const label = `${row.label}, ${row.count} réalisé${row.count > 1 ? 's' : ''}, ${cashDetail}${displayMoney(row.net) || '0 €'} net`;
       const value = app.ui.reportSort === 'paid' ? Math.abs(row.net) : row.count, width = maximum > 0 ? Math.max(value > 0 ? 4 : 0, value / maximum * 100) : 0;
       const countLabel = kind === 'service' ? `prestation${row.count > 1 ? 's' : ''}` : `utilisation${row.count > 1 ? 's' : ''}`;
-      return `<button type="button" class="report-category-button ${row.net < 0 ? 'negative' : ''}" data-report-detail-kind="${kind}" data-report-detail-key="${escapeHtml(row.key)}" aria-label="Voir le détail : ${escapeHtml(label)}"><span class="report-category-rank" aria-hidden="true">${index + 1}</span><span class="report-category-main"><strong>${kind === 'service' ? `<span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}" aria-hidden="true"></span>` : ''}${escapeHtml(row.label)}</strong><span class="report-category-values"><span><b>${row.count}</b> ${countLabel}</span><span><b>${money(row.net) || '0 €'}</b> net${row.refunded ? ` · ${money(row.gross) || '0 €'} brut · ${money(row.refunded)} remboursé` : ''}</span></span>${badges ? `<small class="report-category-badges">${escapeHtml(badges)}</small>` : ''}<span class="report-category-bar" aria-hidden="true"><i style="--bar-width:${width.toFixed(1)}%"></i></span></span><span class="report-category-chevron" aria-hidden="true">›</span></button>`;
+      return `<button type="button" class="report-category-button ${row.net < 0 ? 'negative' : ''}" data-report-detail-kind="${kind}" data-report-detail-key="${escapeHtml(row.key)}" aria-label="Voir le détail : ${escapeHtml(label)}"><span class="report-category-rank" aria-hidden="true">${index + 1}</span><span class="report-category-main"><strong>${kind === 'service' ? `<span class="service-dot ${COLORS.includes(row.color) ? row.color : 'rose'}" aria-hidden="true"></span>` : ''}${escapeHtml(row.label)}</strong><span class="report-category-values"><span><b>${row.count}</b> ${countLabel}</span><span><b>${displayMoney(row.net) || '0 €'}</b> net${row.refunded ? ` · ${displayMoney(row.gross) || '0 €'} brut · ${displayMoney(row.refunded)} remboursé` : ''}</span></span>${badges ? `<small class="report-category-badges">${escapeHtml(badges)}</small>` : ''}<span class="report-category-bar" aria-hidden="true"><i style="--bar-width:${width.toFixed(1)}%"></i></span></span><span class="report-category-chevron" aria-hidden="true">›</span></button>`;
     }).join('');
     return `<section class="report-panel category-report-panel">${heading}<div class="category-report-list">${body}</div></section>`;
   }
@@ -2228,15 +2415,15 @@
     const expenses = expensesForRange(start, end), summary = expenseSummary(expenses), globalActive = app.ui.expenseReportView === 'global';
     const switcher = `<section class="expense-view-switch" aria-label="Présentation des dépenses"><button class="${globalActive ? 'active' : ''}" data-expense-view="global" aria-pressed="${globalActive}">Vue globale</button><button class="${globalActive ? '' : 'active'}" data-expense-view="categories" aria-pressed="${!globalActive}">Par catégorie</button></section>`;
     const note = '<p class="report-definition">Les dépenses restent séparées des revenus encaissés : aucun calcul de bénéfice n’est appliqué.</p>';
-    const highlight = `<section class="report-highlight expense"><span>Total des dépenses</span><strong>${money(summary.total) || '0 €'}</strong><small>sur la période choisie</small></section>`;
+    const highlight = `<section class="report-highlight expense"><span>Total des dépenses</span><strong>${displayMoney(summary.total) || '0 €'}</strong><small>sur la période choisie</small></section>`;
     if (globalActive) {
-      const rows = [...expenses].reverse().map(expense => `<button class="expense-row" data-edit-expense="${escapeHtml(expense.id)}"><span class="expense-row-date">${format(parseDate(expense.date), { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(expenseCategoryLabel(expense))}</strong><small>${escapeHtml([expense.details, expense.supplier].filter(Boolean).join(' · ') || 'Aucun détail')}</small></span><b>${money(expense.amount)} ›</b></button>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
-      $('#reportSummary').innerHTML = `${highlight}<section class="metrics-grid expense-metrics"><article><span>Nombre</span><strong>${summary.count}</strong><small>achat${summary.count > 1 ? 's' : ''} enregistré${summary.count > 1 ? 's' : ''}</small></article><article><span>Montant moyen</span><strong>${money(summary.average) || '0 €'}</strong><small>par dépense</small></article></section>`;
+      const rows = [...expenses].reverse().map(expense => `<button class="expense-row" data-edit-expense="${escapeHtml(expense.id)}"><span class="expense-row-date">${format(parseDate(expense.date), { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(expenseCategoryLabel(expense))}</strong><small>${escapeHtml([expense.details, expense.supplier].filter(Boolean).join(' · ') || 'Aucun détail')}</small></span><b>${displayMoney(expense.amount)} ›</b></button>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
+      $('#reportSummary').innerHTML = `${highlight}<section class="metrics-grid expense-metrics"><article><span>Nombre</span><strong>${summary.count}</strong><small>achat${summary.count > 1 ? 's' : ''} enregistré${summary.count > 1 ? 's' : ''}</small></article><article><span>Montant moyen</span><strong>${displayMoney(summary.average) || '0 €'}</strong><small>par dépense</small></article></section>`;
       $('#reportContent').innerHTML = `${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Détail</p><h2>Historique des dépenses</h2></div>${rows}</section>`;
       return;
     }
     const groups = aggregateExpensesByCategory(expenses), maximum = Math.max(1, ...groups.map(group => group.total));
-    const rows = groups.map((group, index) => `<article class="expense-category-row"><div class="expense-category-heading"><span><strong>${escapeHtml(group.label)}</strong><small>${group.count} dépense${group.count > 1 ? 's' : ''}</small></span><b>${money(group.total)}</b></div><div class="expense-category-bar"><span style="--bar-width:${Math.max(2, group.total / maximum * 100).toFixed(1)}%;--expense-bar-index:${index % 7}"></span></div></article>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
+    const rows = groups.map((group, index) => `<article class="expense-category-row"><div class="expense-category-heading"><span><strong>${escapeHtml(group.label)}</strong><small>${group.count} dépense${group.count > 1 ? 's' : ''}</small></span><b>${displayMoney(group.total)}</b></div><div class="expense-category-bar"><span style="--bar-width:${Math.max(2, group.total / maximum * 100).toFixed(1)}%;--expense-bar-index:${index % 7}"></span></div></article>`).join('') || '<p class="empty-report">Aucune dépense sur cette période.</p>';
     $('#reportSummary').innerHTML = highlight;
     $('#reportContent').innerHTML = `${switcher}${note}<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Répartition</p><h2>Dépenses par catégorie</h2><p>${summary.count} dépense${summary.count > 1 ? 's' : ''} enregistrée${summary.count > 1 ? 's' : ''}</p></div>${rows}</section>`;
   }
@@ -2249,7 +2436,7 @@
       const minutes = performed.reduce((sum, item) => sum + Number(item.duration || 0), 0);
       const cash = financialSummary(start, end);
       const pending = appointments.filter(item => item.paymentStatus === 'pending').reduce((sum, item) => sum + appointmentTotal(item), 0);
-      return `<article class="annual-row"><strong>${format(start, { month: 'long' })}</strong><span class="annual-row-values"><span><b>${performed.length}</b> réalisées</span><span><b>${clients.size}</b> clientes</span><span><b>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</b> effectuées</span><span><b>${money(cash.net) || '0 €'}</b> net encaissé${cash.refunded ? ` · ${money(cash.gross) || '0 €'} brut · ${money(cash.refunded)} remboursé` : ''}${pending ? ` · ${money(pending)} à régler` : ''}</span></span></article>`;
+      return `<article class="annual-row"><strong>${format(start, { month: 'long' })}</strong><span class="annual-row-values"><span><b>${performed.length}</b> réalisées</span><span><b>${clients.size}</b> clientes</span><span><b>${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60}` : ''}</b> effectuées</span><span><b>${displayMoney(cash.net) || '0 €'}</b> net encaissé${cash.refunded ? ` · ${displayMoney(cash.gross) || '0 €'} brut · ${displayMoney(cash.refunded)} remboursé` : ''}${pending ? ` · ${displayMoney(pending)} à régler` : ''}</span></span></article>`;
     }).join('');
     return `<section class="report-panel annual-panel"><div class="report-panel-heading"><p class="eyebrow">Année complète</p><h2>Détail mois par mois</h2><p>Prestations à leur date de réalisation, paiements et remboursements à leurs dates réelles.</p></div><div class="annual-list">${rows}</div></section>`;
   }
@@ -2311,7 +2498,7 @@
     const plannedMinutes = active.filter(appointment => appointmentEnd(appointment) > Date.now()).reduce((sum, appointment) => sum + Number(appointment.duration || 0), 0);
     const cash = financialSummary(start, end), analysis = aggregateReportCategories(start, end);
     const plannedCount = active.length - performed.length;
-    $('#reportSummary').innerHTML = `<section class="report-highlight"><span>Résumé de la période</span><div class="report-highlight-pair"><div><strong>${money(cash.net) || '0 €'}</strong><small>encaissé net</small></div><div><strong>${performed.length}</strong><small>prestation${performed.length > 1 ? 's' : ''} réalisée${performed.length > 1 ? 's' : ''}</small></div></div></section>${cash.refunded ? `<p class="report-secondary-line"><span>${money(cash.gross) || '0 €'} encaissé brut</span><span>${money(cash.refunded)} remboursé</span></p>` : ''}<section class="metrics-grid"><article><span>Temps effectué</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article><span>Clientes reçues</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>À venir</span><strong>${plannedCount}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} planifiées` : 'rien de planifié'}</small></article></section>${cancelled || noShows ? `<p class="report-secondary-line"><span>${cancelled} annulée${cancelled > 1 ? 's' : ''}</span><span>${noShows} absence${noShows > 1 ? 's' : ''}</span></p>` : ''}<p class="report-definition">Le nombre suit la date du rendez-vous réalisé. Le brut suit la date du paiement ; le remboursement intégral suit sa propre date.</p>`;
+    $('#reportSummary').innerHTML = `<section class="report-highlight"><span>Résumé de la période</span><div class="report-highlight-pair"><div><strong>${displayMoney(cash.net) || '0 €'}</strong><small>encaissé net</small></div><div><strong>${performed.length}</strong><small>prestation${performed.length > 1 ? 's' : ''} réalisée${performed.length > 1 ? 's' : ''}</small></div></div></section>${cash.refunded ? `<p class="report-secondary-line"><span>${displayMoney(cash.gross) || '0 €'} encaissé brut</span><span>${displayMoney(cash.refunded)} remboursé</span></p>` : ''}<section class="metrics-grid"><article><span>Temps effectué</span><strong>${Math.floor(workedMinutes / 60)} h${workedMinutes % 60 ? ` ${workedMinutes % 60}` : ''}</strong><small>hors annulations et absences</small></article><article><span>Clientes reçues</span><strong>${clientIds.size}</strong><small>${newClients} nouvelle${newClients > 1 ? 's' : ''}</small></article><article><span>À venir</span><strong>${plannedCount}</strong><small>${plannedMinutes ? `${Math.floor(plannedMinutes / 60)} h${plannedMinutes % 60 ? ` ${plannedMinutes % 60}` : ''} planifiées` : 'rien de planifié'}</small></article></section>${cancelled || noShows ? `<p class="report-secondary-line"><span>${cancelled} annulée${cancelled > 1 ? 's' : ''}</span><span>${noShows} absence${noShows > 1 ? 's' : ''}</span></p>` : ''}<p class="report-definition">Le nombre suit la date du rendez-vous réalisé. Le brut suit la date du paiement ; le remboursement intégral suit sa propre date.</p>`;
     $('#reportContent').innerHTML = `${categoryReportTable('Prestations', analysis.services, 'service')}${categoryReportTable('Suppléments', analysis.supplements, 'supplement')}`;
   }
 
@@ -2322,13 +2509,13 @@
     const unreviewed = active.filter(appointment => paymentNeedsReview(appointment));
     const rows = [...pending, ...unreviewed].sort((a, b) => appointmentTimestamp(a) - appointmentTimestamp(b)).map(appointment => {
       const client = clientFor(appointment), label = appointment.paymentStatus === 'pending' ? 'À régler' : 'À vérifier';
-      return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)} · ${label}</small></span><b>${money(appointmentTotal(appointment)) || 'À définir'} <i>›</i></b></button>`;
+      return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })} · ${escapeHtml(appointment.service)} · ${label}</small></span><b>${displayMoney(appointmentTotal(appointment)) || 'À définir'} <i>›</i></b></button>`;
     }).join('') || '<p class="empty-report">Aucun paiement à suivre sur cette période.</p>';
     const refundRows = app.state.appointments.filter(appointment => refundedInRange(appointment, start, end)).sort((one, two) => appointmentRefundDate(two) - appointmentRefundDate(one)).map(appointment => {
       const client = clientFor(appointment);
-      return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>Remboursé le ${format(appointmentRefundDate(appointment), { day: 'numeric', month: 'short' })} · RDV du ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })}</small></span><b>−${money(appointmentTotal(appointment)) || '0 €'} <i>›</i></b></button>`;
+      return `<button class="payment-row" data-edit="${escapeHtml(appointment.id)}"><span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>Remboursé le ${format(appointmentRefundDate(appointment), { day: 'numeric', month: 'short' })} · RDV du ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })}</small></span><b>−${displayMoney(appointmentTotal(appointment)) || '0 €'} <i>›</i></b></button>`;
     }).join('');
-    $('#reportSummary').innerHTML = `<section class="report-highlight paid"><span>Net encaissé sur la période</span><strong>${money(cash.net) || '0 €'}</strong><small>${money(cash.gross) || '0 €'} brut${cash.refunded ? ` · ${money(cash.refunded)} remboursé` : ''}</small></section><section class="metrics-grid payments"><article><span>À encaisser</span><strong>${money(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-alert"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${money(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><p class="report-definition">Un paiement reste au brut à sa date réelle. Un statut « Remboursé » enregistre un remboursement intégral à la date indiquée, même si le RDV est annulé ou noté absent.</p>`;
+    $('#reportSummary').innerHTML = `<section class="report-highlight paid"><span>Net encaissé sur la période</span><strong>${displayMoney(cash.net) || '0 €'}</strong><small>${displayMoney(cash.gross) || '0 €'} brut${cash.refunded ? ` · ${displayMoney(cash.refunded)} remboursé` : ''}</small></section><section class="metrics-grid payments"><article><span>À encaisser</span><strong>${displayMoney(pendingTotal) || '0 €'}</strong><small>${pending.length} paiement${pending.length > 1 ? 's' : ''} avec relance</small></article><article class="metric-alert"><span>À vérifier</span><strong>${unreviewed.length}</strong><small>à contrôler en fin de journée</small></article><article><span>Prévu</span><strong>${displayMoney(planned) || '0 €'}</strong><small>selon la date du RDV</small></article></section><p class="report-definition">Un paiement reste au brut à sa date réelle. Un statut « Remboursé » enregistre un remboursement intégral à la date indiquée, même si le RDV est annulé ou noté absent.</p>`;
     $('#reportContent').innerHTML = `<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">À traiter</p><h2>Paiements à suivre</h2></div>${rows}</section>${refundRows ? `<section class="report-panel"><div class="report-panel-heading"><p class="eyebrow">Sorties</p><h2>Remboursements de la période</h2></div>${refundRows}</section>` : ''}`;
   }
 
@@ -2348,7 +2535,7 @@
           ? `Payé le ${format(paidDate, { day: 'numeric', month: 'short' })} · RDV du ${format(parseDate(appointment.date), { day: 'numeric', month: 'short' })}`
         : `${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}${kind === 'supplement' && matchedSupplements.length > 1 ? ` · ${matchedSupplements.length} lignes` : ''}`;
       const prefix = mode === 'paid' ? 'Payé<br>' : mode === 'refunded' ? 'Remboursé<br>' : '';
-      return `<button type="button" class="report-detail-row ${mode === 'refunded' ? 'negative' : ''}" data-edit="${escapeHtml(appointment.id)}"><span class="report-detail-date">${prefix}${format(displayDate, { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>${mode === 'refunded' ? '−' : ''}${money(amount) || '0 €'} ›</b></button>`;
+      return `<button type="button" class="report-detail-row ${mode === 'refunded' ? 'negative' : ''}" data-edit="${escapeHtml(appointment.id)}"><span class="report-detail-date">${prefix}${format(displayDate, { day: 'numeric', month: 'short' })}</span><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>${mode === 'refunded' ? '−' : ''}${displayMoney(amount) || '0 €'} ›</b></button>`;
     }).join('');
     const overflow = appointments.length > limited.length ? `<p class="report-detail-overflow">${appointments.length - limited.length} autre${appointments.length - limited.length > 1 ? 's' : ''} résultat${appointments.length - limited.length > 1 ? 's' : ''}. Affine la période pour tout afficher.</p>` : '';
     return (rows || '<p class="empty-report">Aucun rendez-vous correspondant.</p>') + overflow;
@@ -2368,7 +2555,7 @@
     const paidTotal = paid.reduce((sum, appointment) => sum + (kind === 'service' ? numericAmount(appointment.price) : supplementsMatchingKey(appointment, key).reduce((value, item) => value + numericAmount(item.amount), 0)), 0);
     const refundedTotal = refunded.reduce((sum, appointment) => sum + (kind === 'service' ? numericAmount(appointment.price) : supplementsMatchingKey(appointment, key).reduce((value, item) => value + numericAmount(item.amount), 0)), 0);
     $('#reportDetailTitle').textContent = label;
-    $('#reportDetailSummary').textContent = `${performedCount} ${kind === 'service' ? 'prestation' : 'utilisation'}${performedCount > 1 ? 's' : ''} réalisée${performedCount > 1 ? 's' : ''} · ${money(numericAmount(paidTotal)) || '0 €'} brut · ${money(numericAmount(refundedTotal)) || '0 €'} remboursé · ${money(roundedAmount(paidTotal - refundedTotal)) || '0 €'} net`;
+    $('#reportDetailSummary').textContent = `${performedCount} ${kind === 'service' ? 'prestation' : 'utilisation'}${performedCount > 1 ? 's' : ''} réalisée${performedCount > 1 ? 's' : ''} · ${displayMoney(numericAmount(paidTotal)) || '0 €'} brut · ${displayMoney(numericAmount(refundedTotal)) || '0 €'} remboursé · ${displayMoney(roundedAmount(paidTotal - refundedTotal)) || '0 €'} net`;
     $('#reportDetailContent').innerHTML = `<section class="report-detail-section"><h3>Réalisé pendant la période</h3>${reportDetailRows(performed, kind, key, 'performed')}</section><section class="report-detail-section"><h3>Encaissé brut pendant la période</h3>${reportDetailRows(paid, kind, key, 'paid')}</section><section class="report-detail-section"><h3>Remboursé pendant la période</h3>${reportDetailRows(refunded, kind, key, 'refunded')}</section>`;
     $('#reportDetailDialog').showModal();
   }
@@ -2389,7 +2576,7 @@
 
   function populateServiceSelect(selectedId = '', fallbackName = '') {
     const selectedService = serviceById(selectedId) || serviceByName(fallbackName), active = app.state.settings.services.filter(service => service.active || service.id === selectedService?.id), selected = selectedService?.id || (fallbackName ? 'custom' : '');
-    $('#serviceSelect').innerHTML = `<option value="">Choisir…</option>${active.map(service => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)}${service.price !== '' ? ` · ${money(service.price)}` : ''}</option>`).join('')}<option value="custom">Autre prestation…</option>`;
+    $('#serviceSelect').innerHTML = `<option value="">Choisir…</option>${active.map(service => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)}${service.price !== '' ? ` · ${displayMoney(service.price)}` : ''}</option>`).join('')}<option value="custom">Autre prestation…</option>`;
     $('#serviceSelect').value = selected;
     $('#customServiceField').hidden = selected !== 'custom'; $('#service').required = selected === 'custom';
   }
@@ -2403,7 +2590,7 @@
   function updateAppointmentServiceSummary() {
     const preset = serviceById($('#serviceSelect').value), name = preset?.name || $('#service').value.trim(), selected = Boolean(name);
     $('#appointmentServiceSummary').hidden = !selected;
-    if (selected) $('#appointmentServiceSummaryText').textContent = `${name} · ${durationLabel($('#duration').value)} · ${money($('#price').value) || 'prix à définir'}`;
+    if (selected) $('#appointmentServiceSummaryText').textContent = `${name} · ${durationLabel($('#duration').value)} · ${displayMoney($('#price').value) || 'prix à définir'}`;
   }
 
   function setAppointmentAdjustments(expanded) {
@@ -2536,7 +2723,11 @@
  }
 
   function openAppointment(appointment = null, defaults = {}) {
+    if (!ensureFinancialVisibility()) return false;
     resetAppointmentForm();
+    app.ui.slotSuggestionsOpen = false; app.ui.manualDuration = false; app.ui.manualPrice = false;
+    if ($('#slotSuggestionsPanel')) $('#slotSuggestionsPanel').hidden = true;
+    $('#slotSuggestionsToggle')?.setAttribute('aria-expanded', 'false');
     $('#appointmentFormTitle').textContent = appointment ? 'Modifier le rendez-vous' : 'Nouveau rendez-vous'; $('#deleteAppointment').hidden = !appointment;
     if (appointment) {
       const client = clientFor(appointment); app.ui.editingAppointmentId = appointment.id; app.ui.formClientId = client.id; app.ui.formServiceColor = appointment.serviceColor || 'rose';
@@ -2550,6 +2741,10 @@
     updateAppointmentTotal(); updateConflictHint(); app.ui.appointmentDraftBaseline = draftSignature(appointmentDraftPayload()); $('#appointmentDialog').showModal(); captureFormBaseline('appointmentDialog'); if (!appointment) setTimeout(() => $('#clientName').focus(), 30);
     const selectedClient = app.ui.formClientId ? clientById(app.ui.formClientId) : null;
     syncAppointmentContactSummary(selectedClient, !selectedClient); setAppointmentAdjustments($('#serviceSelect').value === 'custom'); setAppointmentSaving(false);
+    const preset = serviceById($('#serviceSelect').value);
+    app.ui.manualDuration = Boolean(preset && Number($('#duration').value) !== Number(preset.duration));
+    app.ui.manualPrice = Boolean(preset && String($('#price').value) !== String(preset.price));
+    return true;
  }
 
  function renderSelectedClientInfo(client) {
@@ -2576,10 +2771,58 @@
     const id = $('#serviceSelect').value, preset = serviceById(id), custom = id === 'custom';
     $('#customServiceField').hidden = !custom; $('#service').required = custom;
     if (preset) {
-      $('#service').value = preset.name; setDurationValue(preset.duration); $('#price').value = preset.price; app.ui.formServiceColor = preset.color;
+      $('#service').value = preset.name;
+      if (!app.ui.manualDuration) setDurationValue(preset.duration);
+      if (!app.ui.manualPrice) $('#price').value = preset.price;
+      app.ui.formServiceColor = preset.color;
     } else if (!custom) { $('#service').value = ''; app.ui.formServiceColor = 'rose'; }
     if (custom) setTimeout(() => $('#service').focus(), 0);
-    setAppointmentAdjustments(custom); updateAppointmentTotal(); updateConflictHint();
+    setAppointmentAdjustments(custom || app.ui.manualDuration || app.ui.manualPrice); updateAppointmentTotal(); updateConflictHint(); renderSlotSuggestions();
+  }
+
+  // Suggestions uniquement : le formulaire garde sa date et son heure tant
+  // qu'une proposition n'est pas choisie. Les alertes usuelles restent libres.
+  function suggestedAppointmentSlots({ date, duration, excludeId = '', now = Date.now(), limit = 6, days = 7 } = {}) {
+    const requested = parseDate(date), minutes = Number(duration);
+    if (!requested || !Number.isFinite(minutes) || minutes < 15 || minutes > 1440) return [];
+    const today = startOfDay(new Date(now)), firstDay = dateKey(requested) < dateKey(today) ? today : requested;
+    const occupied = app.state.appointments.filter(item => item.id !== excludeId && activeAppointment(item)).map(item => ({ start: appointmentStart(item), end: appointmentEnd(item) }));
+    app.state.blocks.filter(block => block.blocksAppointments !== false).forEach(block => occupied.push(blockBounds(block)));
+    const slots = [], maximum = Math.max(1, Math.min(24, Number(limit) || 6));
+    for (let offset = 0; offset < Math.min(31, Math.max(1, Number(days) || 7)) && slots.length < maximum; offset += 1) {
+      const day = addDays(firstDay, offset), key = dateKey(day), hours = workHoursFor(day);
+      if (!hours.enabled || !validTime(hours.start) || !validTime(hours.end)) continue;
+      const finish = toMinutes(hours.end), pauseStart = validTime(hours.breakStart) ? toMinutes(hours.breakStart) : null, pauseEnd = validTime(hours.breakEnd) ? toMinutes(hours.breakEnd) : null;
+      for (let minute = Math.ceil(toMinutes(hours.start) / 15) * 15; minute + minutes <= Math.min(1440, finish) && slots.length < maximum; minute += 15) {
+        if (pauseStart !== null && pauseEnd !== null && minute < pauseEnd && minute + minutes > pauseStart) continue;
+        const time = timeText(minute), start = dateTimeMs(key, time), end = start + minutes * 60000;
+        if (start < now || occupied.some(range => start < range.end && end > range.start)) continue;
+        slots.push({ date: key, time, duration: minutes });
+      }
+    }
+    return slots;
+  }
+
+  function renderSlotSuggestions() {
+    const panel = $('#slotSuggestionsPanel'), target = $('#slotSuggestionsList');
+    if (!panel || !target || !app.ui.slotSuggestionsOpen) return;
+    const slots = suggestedAppointmentSlots({ date: $('#date').value, duration: $('#duration').value, excludeId: app.ui.editingAppointmentId || '' });
+    panel.hidden = false;
+    target.innerHTML = slots.length ? slots.map(slot => `<button type="button" class="slot-suggestion-button" data-slot-date="${slot.date}" data-slot-time="${slot.time}"><strong>${format(parseDate(slot.date), { weekday: 'short', day: 'numeric', month: 'short' })}</strong><span>${slot.time}–${timeText(toMinutes(slot.time) + slot.duration)} · ${durationLabel(slot.duration)}</span></button>`).join('') : '<p class="small-copy">Aucun créneau proposé sur les 7 prochains jours à partir de cette date. Tu peux choisir librement une autre date ou une autre heure.</p>';
+  }
+
+  function toggleSlotSuggestions(force) {
+    app.ui.slotSuggestionsOpen = force === undefined ? !app.ui.slotSuggestionsOpen : Boolean(force);
+    if ($('#slotSuggestionsPanel')) $('#slotSuggestionsPanel').hidden = !app.ui.slotSuggestionsOpen;
+    $('#slotSuggestionsToggle')?.setAttribute('aria-expanded', String(app.ui.slotSuggestionsOpen));
+    renderSlotSuggestions();
+  }
+
+  function chooseSuggestedSlot(date, time) {
+    if (!validDate(date) || !validTime(time)) return;
+    $('#date').value = date; setTimePicker('time', time);
+    updateConflictHint(); syncRepeatDate(false); saveAppointmentDraft(); renderSlotSuggestions();
+    $('#timeHour')?.focus();
   }
 
   function supplementsFromForm(keepEmpty = false) {
@@ -2616,7 +2859,7 @@
 
  function updateAppointmentTotal() {
    const total = numericAmount($('#price')?.value) + supplementsFromForm().reduce((sum, item) => sum + item.amount, 0);
-   if ($('#appointmentTotal')) $('#appointmentTotal').textContent = `Total : ${money(total) || '0 €'}`;
+   if ($('#appointmentTotal')) $('#appointmentTotal').textContent = `Total : ${displayMoney(total) || '0 €'}`;
     updateAppointmentServiceSummary();
  }
 
@@ -2938,13 +3181,28 @@
   }
 
   function openExpense(expense = null, defaults = {}) {
+    if (!ensureFinancialVisibility()) return false;
     resetExpenseForm(defaults);
+    if ($('#duplicateExpense')) $('#duplicateExpense').hidden = !expense;
     $('#expenseFormTitle').textContent = expense ? 'Modifier la dépense' : 'Nouvelle dépense';
     if (expense) {
       app.ui.editingExpenseId = expense.id; $('#expenseId').value = expense.id; populateExpenseCategorySelect(expense.categoryId); $('#expenseDetails').value = expense.details || ''; $('#expenseSupplier').value = expense.supplier || ''; $('#expenseDate').value = expense.date; $('#expenseAmount').value = String(numericAmount(expense.amount)); $('#deleteExpense').hidden = false;
     }
     $('#expenseSubmitButton').textContent = expense ? 'Enregistrer les modifications' : 'Ajouter la dépense';
     app.ui.expenseDraftBaseline = expenseDraftSignature(expenseDraftValues()); $('#expenseDialog').showModal(); captureFormBaseline('expenseDialog');
+    return true;
+  }
+
+  function duplicateExpense(id = app.ui.editingExpenseId || $('#expenseId')?.value) {
+    const expense = app.state.expenses.find(item => item.id === id);
+    if (!expense || !ensureFinancialVisibility()) return false;
+    if ($('#expenseDialog').open && formHasChanges('expenseDialog') && !window.confirm('Dupliquer la dépense enregistrée sans reprendre les modifications en cours ?')) return false;
+    if ($('#expenseDialog').open) closeDialogNow('expenseDialog', true);
+    openExpense(null, { date: todayKey() });
+    $('#expenseId').value = ''; populateExpenseCategorySelect(expense.categoryId);
+    $('#expenseDetails').value = expense.details || ''; $('#expenseSupplier').value = expense.supplier || ''; $('#expenseAmount').value = String(numericAmount(expense.amount));
+    $('#expenseFormTitle').textContent = 'Dupliquer la dépense · aujourd’hui';
+    saveExpenseDraft(); $('#expenseDate').focus(); return true;
   }
 
   async function saveExpense() {
@@ -3034,11 +3292,12 @@
   }
 
   function openTodo(type) {
+    app.ui.todoType = type;
     const items = type === 'confirm' ? pendingConfirmations() : pendingPayments();
     $('#todoTitle').textContent = type === 'confirm' ? 'Rendez-vous à confirmer' : 'Paiements à relancer';
     $('#todoList').innerHTML = items.length ? items.map(appointment => {
       const client = clientFor(appointment), details = `${format(parseDate(appointment.date), { weekday: 'short', day: 'numeric', month: 'short' })} · ${appointment.time} · ${escapeHtml(appointment.service)} · ${STATUS[appointment.status]}`;
-      if (type === 'payments') return `<article class="todo-payment-item"><button class="todo-item-main" data-edit="${escapeHtml(appointment.id)}"><span><strong>Relancer « ${escapeHtml(client.name)} »</strong><small>${details} · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}</small></span><b>${money(appointmentTotal(appointment)) || 'À définir'}</b></button><button class="todo-paid-button" data-reminder-paid="${escapeHtml(appointment.id)}">✓ Payé aujourd’hui</button></article>`;
+      if (type === 'payments') return `<article class="todo-payment-item"><button class="todo-item-main" data-edit="${escapeHtml(appointment.id)}"><span><strong>Relancer « ${escapeHtml(client.name)} »</strong><small>${details} · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}</small></span><b>${displayMoney(appointmentTotal(appointment)) || 'À définir'}</b></button><button class="todo-paid-button" data-reminder-paid="${escapeHtml(appointment.id)}">✓ Payé aujourd’hui</button></article>`;
       return `<button class="todo-item" data-edit="${escapeHtml(appointment.id)}"><span><strong>${escapeHtml(client.name)}</strong><small>${details}</small></span><b>›</b></button>`;
     }).join('') : '<p class="empty-route">Rien à faire pour le moment.</p>';
     if (!$('#todoDialog').open) $('#todoDialog').showModal();
@@ -3069,7 +3328,7 @@
   function updateReviewFinancialTotal() {
     const target = $('#reviewFinancialTotal'); if (!target) return;
     const total = numericAmount($('#reviewFinancialPrice')?.value) + reviewSupplementsFromForm().reduce((sum, item) => sum + item.amount, 0);
-    target.textContent = `Total : ${money(total) || '0 €'}`;
+    target.textContent = `Total : ${displayMoney(total) || '0 €'}`;
   }
 
   function addReviewSupplementRow() {
@@ -3086,6 +3345,7 @@
   }
 
   function openReviewFinancialEditor(appointmentId) {
+    if (!ensureFinancialVisibility()) return;
     const appointment = app.state.appointments.find(item => item.id === appointmentId); if (!appointment) return;
     if (hasCollectedPayment(appointment)) { showAppAlert('Le montant d’un paiement enregistré est figé afin que le bilan reste exact. Corrige d’abord son état de paiement depuis le rendez-vous si nécessaire.'); return; }
     const client = clientFor(appointment);
@@ -3133,7 +3393,7 @@
       const client = clientFor(appointment), inactive = !activeAppointment(appointment), chooseReminder = !inactive && (appointment.paymentStatus === 'pending' || app.ui.reviewPendingId === appointment.id);
       const paidLabel = appointment.paymentStatus === 'paid' ? '✓ Payé' : '✓ Payé aujourd’hui';
       const paymentControls = inactive ? `<span class="review-inactive">${STATUS[appointment.status]} · ${PAYMENT[appointment.paymentStatus]}</span>` : appointment.paymentStatus === 'refunded' ? `<span class="review-inactive">Remboursé le ${escapeHtml(appointment.refundDate)}</span>` : `${appointment.paymentStatus === 'paid' ? '' : `<button class="review-adjust-button" data-review-adjust="${escapeHtml(appointment.id)}">✎ Ajuster prix et suppléments</button>`}<div class="review-payment-actions"><button class="${appointment.paymentStatus === 'paid' ? 'active' : ''}" data-review-paid="${escapeHtml(appointment.id)}">${paidLabel}</button><button class="${appointment.paymentStatus === 'pending' ? 'active' : ''}" data-review-pending="${escapeHtml(appointment.id)}">À régler</button></div>${chooseReminder ? `<div class="review-reminder-editor"><label>Date de relance<input type="date" data-review-reminder="${escapeHtml(appointment.id)}" value="${escapeHtml(appointment.paymentReminderDate || '')}"></label><button data-review-save="${escapeHtml(appointment.id)}">Enregistrer la relance</button></div>` : ''}`;
-      return `<article class="review-appointment ${inactive ? 'inactive' : ''}"><div class="review-appointment-heading"><button data-edit="${escapeHtml(appointment.id)}"><span>${appointment.time} – ${endTime(appointment)}</span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}</small></button><span class="service-dot ${appointment.serviceColor || 'rose'}"></span></div>${paymentControls}</article>`;
+      return `<article class="review-appointment ${inactive ? 'inactive' : ''}"><div class="review-appointment-heading"><button data-edit="${escapeHtml(appointment.id)}"><span>${appointment.time} – ${endTime(appointment)}</span><strong>${badgeHtml(client, 'small')}${escapeHtml(client.name)}</strong><small>${escapeHtml(appointment.service)}${appointmentTotal(appointment) ? ` · ${displayMoney(appointmentTotal(appointment))}` : ''}</small></button><span class="service-dot ${appointment.serviceColor || 'rose'}"></span></div>${paymentControls}</article>`;
     }).join('') : '<section class="empty-message"><h2>Aucun rendez-vous</h2><p>Il n’y a rien à vérifier pour cette journée.</p></section>';
   }
 
@@ -3189,7 +3449,7 @@
    $('#profileKey').value = client.id; $('#profileName').value = client.name; $('#profilePhone').value = client.phone; $('#profileContactVia').value = client.contactVia || ''; $('#profileBadge').innerHTML = `<option value="">Aucun repère</option>${app.state.settings.clientBadges.map(badge => `<option value="${escapeHtml(badge.id)}">${escapeHtml(badge.emoji || badge.symbol)} ${escapeHtml(badge.name)}</option>`).join('')}`; $('#profileBadge').value = client.badgeId || ''; $('#profileAddress').value = client.address; $('#profileNotes').value = client.notes; $('#profileWaze').hidden = !client.address;
     syncProfileBadgeSummary(false);
     const stats = clientStats(client.id);
-    $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.late}</strong><span>tardive${stats.late > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.gross || stats.refunded ? `<article><strong>${money(stats.net)}</strong><span>encaissé net${stats.refunded ? ` · ${money(stats.gross)} brut · ${money(stats.refunded)} remboursé` : ''}</span></article>` : ''}`;
+    $('#clientStats').innerHTML = `<article><strong>${stats.visits}</strong><span>RDV</span></article><article><strong>${stats.cancelled}</strong><span>annulé${stats.cancelled > 1 ? 's' : ''}</span></article><article><strong>${stats.late}</strong><span>tardive${stats.late > 1 ? 's' : ''}</span></article><article><strong>${stats.noShows}</strong><span>absence${stats.noShows > 1 ? 's' : ''}</span></article>${stats.gross || stats.refunded ? `<article><strong>${displayMoney(stats.net)}</strong><span>encaissé net${stats.refunded ? ` · ${displayMoney(stats.gross)} brut · ${displayMoney(stats.refunded)} remboursé` : ''}</span></article>` : ''}`;
     renderClientHistory(client.id);
     app.ui.clientDraftBaseline = JSON.stringify(clientDraftValues()); $('#clientDialog').showModal(); captureFormBaseline('clientDialog');
   }
@@ -3197,7 +3457,7 @@
   function renderClientHistory(clientId, expanded = false) {
     const fullHistory = clientHistory(clientId);
     const history = expanded ? fullHistory : fullHistory.slice(0, 12);
-    $('#clientHistory').innerHTML = `<p class="history-label">Historique · ${history.length} sur ${fullHistory.length}</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short', year: 'numeric' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${money(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${clientHistoryPaymentLabel(appointment)}${paymentNeedsReview(appointment) ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}${fullHistory.length > 12 ? `<button type="button" class="secondary-button" data-client-history="${expanded ? 'recent' : 'all'}" aria-expanded="${expanded}" aria-controls="clientHistory">${expanded ? 'Voir les 12 derniers' : `Voir tout l’historique (${fullHistory.length})`}</button>` : ''}`;
+    $('#clientHistory').innerHTML = `<p class="history-label">Historique · ${history.length} sur ${fullHistory.length}</p>${history.length ? history.map(appointment => `<article class="history-item"><span><strong>${format(parseDate(appointment.date), { day: 'numeric', month: 'short', year: 'numeric' })} · ${escapeHtml(appointment.service)}</strong><small>${appointment.time} · ${STATUS[appointment.status]}${appointmentTotal(appointment) ? ` · ${displayMoney(appointmentTotal(appointment))}` : ''}${appointment.supplements?.length ? ` · ${appointment.supplements.length} supplément${appointment.supplements.length > 1 ? 's' : ''}` : ''}${clientHistoryPaymentLabel(appointment)}${paymentNeedsReview(appointment) ? ' · À vérifier' : ''}${appointment.paymentStatus === 'pending' ? ` · À régler${validDate(appointment.paymentReminderDate) ? ` · relance ${format(parseDate(appointment.paymentReminderDate), { day: 'numeric', month: 'short' })}` : ''}` : ''}${appointment.lateCancellation ? ' · Annulation tardive' : ''}${appointment.cancellationReason ? ` · ${escapeHtml(appointment.cancellationReason)}` : ''}</small></span><button type="button" class="small-reuse" data-repeat-from="${escapeHtml(appointment.id)}">↻ Reprendre</button></article>`).join('') : '<p class="small-copy">Aucun rendez-vous enregistré.</p>'}${fullHistory.length > 12 ? `<button type="button" class="secondary-button" data-client-history="${expanded ? 'recent' : 'all'}" aria-expanded="${expanded}" aria-controls="clientHistory">${expanded ? 'Voir les 12 derniers' : `Voir tout l’historique (${fullHistory.length})`}</button>` : ''}`;
   }
 
   function renderWorkingHoursEditor() {
@@ -3218,11 +3478,11 @@
 
   function renderSettingsServiceList() {
     const target = $('#settingsServiceList');
-    target.innerHTML = app.state.settings.services.length ? app.state.settings.services.map(service => `<button class="settings-service ${service.active ? '' : 'inactive'}" data-edit-service="${escapeHtml(service.id)}"><span class="service-dot ${service.color}"></span><span><strong>${escapeHtml(service.name)}</strong><small>${service.duration} min${service.price !== '' ? ` · ${money(service.price)}` : ' · prix à définir'}${service.active ? '' : ' · masquée'}</small></span><b>›</b></button>`).join('') : '<p class="small-copy">Ajoute ta première prestation.</p>';
+    target.innerHTML = app.state.settings.services.length ? app.state.settings.services.map(service => `<button class="settings-service ${service.active ? '' : 'inactive'}" data-edit-service="${escapeHtml(service.id)}"><span class="service-dot ${service.color}"></span><span><strong>${escapeHtml(service.name)}</strong><small>${service.duration} min${service.price !== '' ? ` · ${displayMoney(service.price)}` : ' · prix à définir'}${service.active ? '' : ' · masquée'}</small></span><b>›</b></button>`).join('') : '<p class="small-copy">Ajoute ta première prestation.</p>';
   }
 
   function renderSettingsSupplementList() {
-    $('#settingsSupplementList').innerHTML = app.state.settings.supplementTypes.map(type => `<button class="settings-service ${type.active ? '' : 'inactive'}" data-edit-supplement-type="${escapeHtml(type.id)}"><span class="settings-symbol">＋</span><span><strong>${escapeHtml(type.name)}</strong><small>${type.price !== '' ? money(type.price) : 'Prix à définir'}${type.active ? ' · disponible' : ' · masquée'}</small></span><b>›</b></button>`).join('') || '<p class="small-copy">Aucune nature de supplément.</p>';
+    $('#settingsSupplementList').innerHTML = app.state.settings.supplementTypes.map(type => `<button class="settings-service ${type.active ? '' : 'inactive'}" data-edit-supplement-type="${escapeHtml(type.id)}"><span class="settings-symbol">＋</span><span><strong>${escapeHtml(type.name)}</strong><small>${type.price !== '' ? displayMoney(type.price) : 'Prix à définir'}${type.active ? ' · disponible' : ' · masquée'}</small></span><b>›</b></button>`).join('') || '<p class="small-copy">Aucune nature de supplément.</p>';
   }
 
  function renderSettingsBadgeList() {
@@ -3233,7 +3493,8 @@
     const workingDays = Object.values(app.state.settings.workingHours).filter(hours => hours.enabled).length;
     const density = app.state.settings.displayDensity === 'compact' ? 'compact' : 'confortable';
     const theme = app.state.settings.colorTheme === 'dark' ? 'sombre' : 'clair';
-    $('#settingsAgendaSummary').textContent = `${workingDays} jour${workingDays > 1 ? 's' : ''} travaillé${workingDays > 1 ? 's' : ''} · thème ${theme} · affichage ${density}`;
+    $('#settingsAgendaSummary').textContent = `${workingDays} jour${workingDays > 1 ? 's' : ''} travaillé${workingDays > 1 ? 's' : ''}`;
+    if ($('#settingsAppearanceSummary')) $('#settingsAppearanceSummary').textContent = `Thème ${theme} · affichage ${density}`;
     $('#settingsServicesSummary').textContent = `${app.state.settings.services.filter(service => service.active).length} prestation(s) disponible(s)`;
     $('#settingsSupplementsSummary').textContent = `${app.state.settings.supplementTypes.filter(type => type.active).length} nature(s) disponible(s)`;
     $('#settingsClientsSummary').textContent = `${app.state.settings.clientBadges.length} repère(s) · seuil ${app.state.settings.lateCancellationThreshold}`;
@@ -3256,9 +3517,10 @@
     app.ui.settingsDirty = false; app.ui.settingsPage = page;
     $('#settingsHome').hidden = page !== 'home'; $('#settingsBack').hidden = page === 'home';
     $$('[data-settings-content]').forEach(section => { section.hidden = section.dataset.settingsContent !== page; });
-    const labels = { agenda: 'Agenda et horaires', services: 'Prestations et tarifs', supplements: 'Suppléments', clients: 'Clientes et repères', data: 'Données et sauvegardes', about: 'À propos' };
+    const labels = { agenda: 'Agenda et horaires', appearance: 'Apparence', services: 'Prestations et tarifs', supplements: 'Suppléments', clients: 'Clientes et repères', data: 'Données et sauvegardes', about: 'À propos' };
     $('#settingsTitle').textContent = page === 'home' ? 'Réglages' : labels[page] || 'Réglages';
     if (page === 'agenda') renderWorkingHoursEditor();
+    if (page === 'appearance') { $('#displayDensity').value = app.state.settings.displayDensity; $('#colorTheme').value = app.state.settings.colorTheme; }
     if (page === 'services') renderSettingsServiceList();
     if (page === 'supplements') renderSettingsSupplementList();
     if (page === 'clients') { renderSettingsBadgeList(); $('#lateCancellationThreshold').value = String(app.state.settings.lateCancellationThreshold); $('#lateCancellationPromptEnabled').checked = app.state.settings.lateCancellationPromptEnabled; }
@@ -3295,13 +3557,19 @@
       hours[day] = { enabled, start: validTime(start) ? start : '09:00', end: validTime(end) ? end : '19:00', breakStart: breakStart || '', breakEnd: breakEnd || '' };
     }
     app.state.settings.workingHours = hours;
+    if (!(await saveState(app.state, false, { reason: 'agenda-settings' }))) return;
+    app.ui.settingsDirty = false; render(); renderWorkingHoursEditor(); renderSettingsHome(); showAppAlert('Horaires enregistrés.');
+  }
+
+  async function saveAppearance() {
     app.state.settings.displayDensity = $('#displayDensity').value === 'compact' ? 'compact' : 'comfortable';
     app.state.settings.colorTheme = $('#colorTheme').value === 'dark' ? 'dark' : 'light';
-    if (!(await saveState(app.state, false, { reason: 'agenda-settings' }))) return;
-    app.ui.settingsDirty = false; render(); renderWorkingHoursEditor(); renderSettingsHome(); showAppAlert('Apparence et horaires enregistrés.');
+    if (!(await saveState(app.state, false, { reason: 'appearance-settings' }))) return false;
+    app.ui.settingsDirty = false; render(); renderSettingsHome(); showSuccess('Apparence enregistrée'); return true;
   }
 
   function openService(service = null) {
+    if (!ensureFinancialVisibility()) return;
     app.ui.serviceSaving = false; $('#serviceForm button[type="submit"]').disabled = false; $('#serviceForm').reset(); $('#serviceId').value = service?.id || ''; $('#serviceDialogTitle').textContent = service ? 'Modifier la prestation' : 'Nouvelle prestation'; $('#serviceName').value = service?.name || ''; setDurationValue(service?.duration || 60, 'serviceDuration'); $('#servicePrice').value = service?.price ?? ''; $('#serviceColor').value = service?.color || 'rose'; $('#serviceActive').checked = service?.active !== false; $('#serviceDialog').showModal(); captureFormBaseline('serviceDialog');
   }
 
@@ -3321,6 +3589,7 @@
   }
 
   function openSupplementType(type = null) {
+    if (!ensureFinancialVisibility()) return;
     app.ui.supplementSaving = false; $('#supplementTypeForm button[type="submit"]').disabled = false; $('#supplementTypeForm').reset(); $('#supplementTypeId').value = type?.id || ''; $('#supplementTypeTitle').textContent = type ? 'Modifier la nature' : 'Nouvelle nature'; $('#supplementTypeName').value = type?.name || ''; $('#supplementTypePrice').value = type?.price ?? ''; $('#supplementTypeActive').checked = type?.active !== false; $('#supplementTypeDialog').showModal(); captureFormBaseline('supplementTypeDialog');
   }
 
@@ -3444,7 +3713,7 @@
       if (!snapshots.length) { showAppAlert('Aucune copie automatique n’est encore disponible.'); return false; }
       $('#automaticSnapshotChoices').innerHTML = snapshots.map((snapshot, index) => {
         const counts = snapshot.counts || {};
-        return `<label class="check-field"><input type="radio" name="automaticSnapshotId" value="${escapeHtml(snapshot.id)}"${index === 0 ? ' checked' : ''}><span><strong>${escapeHtml(automaticSnapshotLabel(snapshot))}${index === 0 ? ' · la plus récente' : ''}</strong><small>${Number(counts.appointments || 0)} rendez-vous · ${Number(counts.clients || 0)} clientes · ${Number(counts.blocks || 0)} événements · ${Number(counts.expenses || 0)} dépenses</small></span></label>`;
+        return `<label class="check-field"><input type="radio" name="automaticSnapshotId" value="${escapeHtml(snapshot.id)}"${index === 0 ? ' checked' : ''}><span><strong>${escapeHtml(automaticSnapshotLabel(snapshot))}${index === 0 ? ' · la plus récente' : ''}</strong><small>${Number(counts.appointments || 0)} rendez-vous · ${Number(counts.clients || 0)} clientes · ${Number(counts.blocks || 0)} événements · ${Number(counts.expenses || 0)} dépenses · ${Number(counts.tasks || 0)} tâches</small></span></label>`;
       }).join('');
       $('#automaticSnapshotDialog').showModal();
       return true;
@@ -3615,7 +3884,7 @@
   }
 
   function backupCounts(state) {
-    return {
+    const result = {
       clients: Array.isArray(state?.clients) ? state.clients.length : 0,
       appointments: Array.isArray(state?.appointments) ? state.appointments.length : (Array.isArray(state) ? state.length : 0),
       blocks: Array.isArray(state?.blocks) ? state.blocks.length : 0,
@@ -3624,6 +3893,8 @@
       supplements: Array.isArray(state?.settings?.supplementTypes) ? state.settings.supplementTypes.length : 0,
       expenseCategories: Array.isArray(state?.settings?.expenseCategories) ? state.settings.expenseCategories.length : 0
     };
+    if (Number(state?.version || 0) >= TASKS_DATA_VERSION) result.tasks = Array.isArray(state?.tasks) ? state.tasks.length : 0;
+    return result;
   }
 
   function applyBackupIntegrity(payload) {
@@ -3635,7 +3906,7 @@
 
   function makeBackupPayload(state = app.state, reason = 'manual') {
     const exportedAt = new Date().toISOString();
-    return applyBackupIntegrity({ app: BACKUP_APP_ID, backupFormatVersion: BACKUP_FORMAT_VERSION, dataVersion: CURRENT_DATA_VERSION, exportedAt, reason, state: cloneState(state) });
+    return applyBackupIntegrity({ app: BACKUP_APP_ID, backupFormatVersion: BACKUP_FORMAT_VERSION, dataVersion: Number(state?.version || CURRENT_DATA_VERSION), exportedAt, reason, state: cloneState(state) });
   }
 
   function readRestoreSafetyEntry(key) {
@@ -3756,13 +4027,13 @@
     if (!data || typeof data !== 'object') return false;
     const state = data.state && typeof data.state === 'object' ? data.state : data;
     if (Array.isArray(state)) return true;
-    return ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'expenses', 'spendings', 'clientProfiles'].some(key => Object.prototype.hasOwnProperty.call(state, key));
+    return ['clients', 'appointments', 'blocks', 'blockedSlots', 'unavailableDays', 'expenses', 'spendings', 'tasks', 'clientProfiles'].some(key => Object.prototype.hasOwnProperty.call(state, key));
   }
 
   function backupPreview(data, state) {
     const exported = data?.exportedAt ? new Date(data.exportedAt) : null, when = exported && !Number.isNaN(exported.getTime()) ? format(exported, { day: 'numeric', month: 'long', year: 'numeric' }) : 'date inconnue';
     const counts = backupCounts(state);
-    return `Sauvegarde du ${when} · version ${backupVersion(data)}\n${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''} personnel${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}, ${counts.services} prestation${counts.services > 1 ? 's' : ''}.\nLes horaires, repères, catégories et autres réglages sont inclus.\n\nRemplacer les données actuelles ? Une copie de secours sera conservée sur cet appareil.`;
+    return `Sauvegarde du ${when} · version ${backupVersion(data)}\n${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''} personnel${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}, ${counts.tasks || 0} tâche${counts.tasks > 1 ? 's' : ''}, ${counts.services} prestation${counts.services > 1 ? 's' : ''}.\nLes horaires, repères, catégories et autres réglages sont inclus.\n\nRemplacer les données actuelles ? Une copie de secours sera conservée sur cet appareil.`;
   }
 
   function backupFormat(data) {
@@ -3781,8 +4052,8 @@
     const hasEnvelopeVersion = Object.prototype.hasOwnProperty.call(data || {}, 'dataVersion');
     const hasStateVersion = Object.prototype.hasOwnProperty.call(rawState || {}, 'version');
     const envelopeVersion = Number(data?.dataVersion), stateVersion = Number(rawState?.version);
-    const declaresCurrentSchema = hasEnvelopeVersion && envelopeVersion >= CURRENT_DATA_VERSION
-      || hasStateVersion && stateVersion >= CURRENT_DATA_VERSION;
+    const declaresCurrentSchema = hasEnvelopeVersion && envelopeVersion >= FINANCIAL_DATA_VERSION
+      || hasStateVersion && stateVersion >= FINANCIAL_DATA_VERSION;
     const completeCurrentEnvelope = formatVersion >= INTEGRITY_BACKUP_FORMAT_VERSION
       && data?.app === BACKUP_APP_ID
       && data?.state && typeof data.state === 'object' && !Array.isArray(data.state);
@@ -3852,7 +4123,7 @@
       const exported = data?.exportedAt ? new Date(data.exportedAt) : null;
       const when = exported && !Number.isNaN(exported.getTime()) ? format(exported, { day: 'numeric', month: 'long', year: 'numeric' }) : 'date inconnue';
       target.classList.remove('error'); target.hidden = false;
-      target.innerHTML = `<strong>✓ Sauvegarde valide</strong><span>${escapeHtml(when)} · données v${backupVersion(data)}</span><span>${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}.</span><span>Aucune donnée de l’application n’a été modifiée.</span>`;
+      target.innerHTML = `<strong>✓ Sauvegarde valide</strong><span>${escapeHtml(when)} · données v${backupVersion(data)}</span><span>${counts.clients} cliente${counts.clients > 1 ? 's' : ''}, ${counts.appointments} RDV, ${counts.blocks} événement${counts.blocks > 1 ? 's' : ''}, ${counts.expenses} dépense${counts.expenses > 1 ? 's' : ''}, ${counts.tasks || 0} tâche${counts.tasks > 1 ? 's' : ''}.</span><span>Aucune donnée de l’application n’a été modifiée.</span>`;
       return { ok: true, data, state, counts };
     } catch (error) {
       target.classList.add('error'); target.hidden = false;
@@ -4019,6 +4290,7 @@
   }
 
  function saveOpenFormDrafts() {
+   if ($('#taskDialog')?.open) saveTaskDraft();
    if ($('#appointmentDialog')?.open) saveAppointmentDraft();
    if ($('#clientDialog')?.open) saveClientDraft();
    if ($('#blockDialog')?.open) saveBlockDraft();
@@ -4208,8 +4480,34 @@
     renderAgenda();
   }
 
+  function closeAtelierNavigationPanels() {
+    ['quickAddDialog', 'followUpDialog', 'atelierDayPanel'].forEach(id => { if ($(`#${id}`)?.open) closeDialogNow(id); });
+  }
+
+  function openQuickAdd() {
+    $('#quickAddWhen').textContent = format(app.ui.selectedDate, { weekday: 'long', day: 'numeric', month: 'long' });
+    $('#quickAddDialog').showModal();
+  }
+
   document.addEventListener('click', async event => {
     const target = event.target.closest('button'); if (!target) return;
+    if (['quickAddAppointment', 'quickAddBlock', 'quickAddExpense', 'quickAddTask', 'dayReview', 'routeDay', 'unclosedDayNotice', 'backupButton'].includes(target.id) || target.dataset.edit || target.dataset.todo) closeAtelierNavigationPanels();
+    if (target.id === 'privacyToggle') { setPrivacyMode(!app.ui.privacyMode); return; }
+    if (target.id === 'openTasks') { renderTasks(); $('#tasksDialog').showModal(); return; }
+    if (target.id === 'newTask' || target.id === 'quickAddTask') { openTask(); return; }
+    if (target.id === 'deleteTask') { await deleteTask(); return; }
+    if (target.dataset.editTask) { const task = (app.state.tasks || []).find(item => item.id === target.dataset.editTask); if (task) openTask(task); return; }
+    if (target.dataset.toggleTask) { await toggleTask(target.dataset.toggleTask); return; }
+    if (target.id === 'openAtelierDayPanel') { renderAtelierDayPanel(); $('#atelierDayPanel').showModal(); return; }
+    if (target.id === 'followUpButton') { renderHeader(); $('#followUpDialog').showModal(); return; }
+    if (target.id === 'quickAddAppointment') { openAppointment(null, { date: dateKey(app.ui.selectedDate), time: '10:00' }); return; }
+    if (target.id === 'quickAddBlock') { openBlock(null, { date: dateKey(app.ui.selectedDate), time: '10:00' }); return; }
+    if (target.id === 'quickAddExpense') { openExpense(null, { date: todayKey() }); return; }
+    if (target.id === 'duplicateExpense') { duplicateExpense(); return; }
+    if (target.id === 'slotSuggestionsToggle') { toggleSlotSuggestions(); return; }
+    if (target.dataset.slotDate && target.dataset.slotTime) { chooseSuggestedSlot(target.dataset.slotDate, target.dataset.slotTime); return; }
+    if (target.id === 'findFreeSlot') { if (openAppointment(null, { date: dateKey(app.ui.selectedDate), time: '10:00' })) { toggleSlotSuggestions(true); $('#serviceSelect').focus(); } return; }
+    if (target.id === 'saveAppearance') { await saveAppearance(); return; }
     if (target.dataset.close) { requestDialogClose(target.dataset.close); return; }
     if (target.dataset.mode) { setMode(target.dataset.mode); return; }
     if (target.dataset.screen) { showScreen(target.dataset.screen); return; }
@@ -4224,7 +4522,7 @@
     if (target.dataset.reportDetailKind) { openReportDetail(target.dataset.reportDetailKind, target.dataset.reportDetailKey); return; }
     if (target.dataset.expenseView) { app.ui.expenseReportView = target.dataset.expenseView; renderReport(); return; }
     if (target.id === 'backToAgenda') { showScreen('agenda'); return; }
-    if (target.id === 'addAppointment') { openAppointment(null, { date: dateKey(app.ui.selectedDate), time: '10:00' }); return; }
+    if (target.id === 'addAppointment') { openQuickAdd(); return; }
     if (target.id === 'dismissFeatureCoach') { dismissFeatureCoach(); return; }
     if (target.id === 'appAlertClose') { closeAppAlert(); return; }
     if (target.id === 'closeMonthDay') { closeMonthDay(true); return; }
@@ -4384,6 +4682,7 @@
   });
   $('#blockForm').addEventListener('submit', event => { event.preventDefault(); saveBlock(); });
   $('#expenseForm').addEventListener('submit', event => { event.preventDefault(); saveExpense(); });
+  $('#taskForm')?.addEventListener('submit', event => { event.preventDefault(); saveTask(); });
   $('#expenseCategoryForm').addEventListener('submit', event => { event.preventDefault(); saveExpenseCategory(); });
   $('#clientForm').addEventListener('submit', async event => {
    event.preventDefault(); if (app.ui.clientSaving || !$('#clientForm').reportValidity()) return; app.ui.clientSaving = true;
@@ -4406,7 +4705,7 @@
   $('#clientName').addEventListener('blur', () => setTimeout(() => { $('#clientSuggestions').hidden = true; }, 150));
  $('#serviceSelect').addEventListener('change', applyServicePreset);
   $('#service').addEventListener('input', updateAppointmentTotal);
- $('#price').addEventListener('input', updateAppointmentTotal);
+ $('#price').addEventListener('input', () => { app.ui.manualPrice = true; updateAppointmentTotal(); });
   $('#supplementRows').addEventListener('input', updateAppointmentTotal);
   $('#supplementRows').addEventListener('change', event => { if (event.target.matches('[data-supplement-type]')) applySupplementDefaultPrice(event.target); else updateAppointmentTotal(); });
   $('#reviewFinancialPrice').addEventListener('input', updateReviewFinancialTotal);
@@ -4416,8 +4715,10 @@
   $('#paymentDate').addEventListener('change', syncPaymentFields);
   $('#duplicateClientChoice').addEventListener('change', updateDuplicateClientDetails);
   $('#status').addEventListener('change', () => { syncStatusFields(); updateConflictHint(); });
-  $('#date').addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); });
-  ['#time', '#duration'].forEach(selector => $(selector).addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); updateAppointmentServiceSummary(); }));
+  $('#date').addEventListener('input', () => { updateConflictHint(); syncRepeatDate(false); renderSlotSuggestions(); });
+  $('#date').addEventListener('change', renderSlotSuggestions);
+  $('#duration').addEventListener('change', () => { app.ui.manualDuration = true; renderSlotSuggestions(); });
+  ['#time', '#duration'].forEach(selector => $(selector).addEventListener('input', () => { if (selector === '#duration') app.ui.manualDuration = true; updateConflictHint(); syncRepeatDate(false); updateAppointmentServiceSummary(); renderSlotSuggestions(); }));
   ['timeHour', 'timeMinute'].forEach(id => $(`#${id}`).addEventListener('change', () => syncTimePicker('time')));
   ['repeatTimeHour', 'repeatTimeMinute'].forEach(id => $(`#${id}`).addEventListener('change', () => { app.ui.repeatTimeEdited = true; syncTimePicker('repeatTime'); }));
   $('#address').addEventListener('input', updateConflictHint);
@@ -4475,7 +4776,9 @@
   $('#expenseForm').addEventListener('input', () => { clearTimeout(expenseDraftTimer); expenseDraftTimer = setTimeout(saveExpenseDraft, 150); });
  $('#expenseForm').addEventListener('change', () => { clearTimeout(expenseDraftTimer); expenseDraftTimer = setTimeout(saveExpenseDraft, 80); });
   $('#expenseCategoryForm').addEventListener('input', () => { clearTimeout(expenseCategoryDraftTimer); expenseCategoryDraftTimer = setTimeout(saveExpenseCategoryDraft, 150); });
-  ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'dayReviewDialog', 'appointmentSearchDialog', 'reportDetailDialog'].forEach(dialogId => {
+  $('#taskForm')?.addEventListener('input', saveTaskDraft);
+  $('#taskForm')?.addEventListener('change', saveTaskDraft);
+  ['appointmentDialog', 'clientDialog', 'blockDialog', 'expenseDialog', 'expenseCategoriesDialog', 'serviceDialog', 'supplementTypeDialog', 'badgeDialog', 'settingsDialog', 'reviewFinancialDialog', 'dayReviewDialog', 'appointmentSearchDialog', 'reportDetailDialog', 'taskDialog', 'tasksDialog', 'atelierDayPanel', 'followUpDialog', 'quickAddDialog'].forEach(dialogId => {
     $(`#${dialogId}`).addEventListener('cancel', event => { event.preventDefault(); requestDialogClose(dialogId); });
   });
   $('#unsavedChangesDialog').addEventListener('cancel', event => { event.preventDefault(); resolveUnsavedClose('continue'); });
@@ -4489,10 +4792,7 @@
   });
 
   if (globalThis.setInterval) globalThis.setInterval(() => {
-    renderHeader();
-    if (app.ui.screen !== 'agenda') return;
-    if (app.ui.mode === 'day') renderAgenda();
-    else if (app.ui.mode === 'week') updateWeekCurrentTimeLine();
+    refreshTimeSensitiveUI();
   }, 60 * 1000);
   navigator.storage?.persist?.().catch?.(() => {});
   globalThis.addEventListener?.('error', event => storageAdapter.recordError?.(event.error || new Error('APPLICATION_ERROR'), 'window-error', app.state).catch?.(() => {}));

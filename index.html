@@ -3,17 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta id="themeColorMeta" name="theme-color" content="#fbf6f7">
+    <meta id="themeColorMeta" name="theme-color" content="#fcfaf7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Mon agenda">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-    <link rel="manifest" href="manifest.webmanifest?v=2026.15.1">
+    <link rel="manifest" href="manifest.webmanifest?v=2026.15.2">
     <link rel="apple-touch-icon" href="icon-180.png">
-    <link rel="stylesheet" href="style.css?v=2026.15.1">
+    <link rel="stylesheet" href="style.css?v=2026.15.2">
     <title>Mon agenda</title>
   </head>
-  <body data-storage-loading="true">
+  <body data-storage-loading="true" class="atelier">
+    <a class="skip-link" href="#dayTimeline">Aller au planning</a>
     <section id="storageLoading" class="storage-loading" role="status" aria-live="polite" aria-label="Ouverture de Mon agenda">
       <div class="storage-loading-card">
         <span class="storage-loading-mark" aria-hidden="true">M</span>
@@ -23,38 +24,21 @@
       </div>
     </section>
     <main class="app-shell" id="agendaScreen">
-      <header class="app-header">
-        <p class="eyebrow" id="todayLabel"></p>
+      <header class="app-header agenda-header">
         <div class="header-row">
-          <div class="app-title"><h1>Mon agenda</h1><span class="version-pill">2026.15</span></div>
+          <div class="app-title"><p class="eyebrow" id="todayLabel"></p><h1>Mon agenda</h1></div>
           <div class="header-actions">
             <button class="icon-button" id="appointmentSearchButton" aria-label="Rechercher un rendez-vous" title="Rechercher">
               <svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="5.8"></circle><path d="m15.2 15.2 4.1 4.1"></path></svg>
             </button>
-            <button class="icon-button save-file-button" id="backupButton" aria-label="Sauvegarder mes données dans Fichiers" title="Sauvegarder dans Fichiers">
-              <svg class="interface-icon file-save-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg>
+            <button class="icon-button" id="privacyToggle" type="button" aria-label="Activer la discrétion : masquer les montants" aria-pressed="false" title="Discrétion">
+              <svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"></path><circle cx="12" cy="12" r="2.7"></circle><path class="privacy-slash" d="m4 4 16 16"></path></svg>
             </button>
           </div>
         </div>
       </header>
 
       <button id="updateNotice" class="update-notice" aria-live="polite" aria-atomic="true" hidden>Nouvelle version disponible <strong>Mettre à jour</strong></button>
-      <section id="featureCoach" class="feature-coach" hidden>
-        <span class="feature-coach-icon" aria-hidden="true">
-          <svg class="interface-icon" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="3"></rect><path d="M7 3.5v4m10-4v4M3.5 10h17M8 14h3v3H8z"></path></svg>
-        </span>
-        <span><strong>Nouveau dans la vue Mois</strong><small>Touche un jour pour voir son programme et ajouter directement un élément.</small></span>
-        <button id="dismissFeatureCoach" type="button" aria-label="Masquer cette nouveauté">×</button>
-      </section>
-      <section id="draftNotice" class="draft-notice" hidden>
-        <button id="resumeDraft"><span><strong id="draftNoticeTitle">Saisie en cours</strong><small id="draftNoticeText"></small></span><b>Continuer ›</b></button>
-        <button id="discardDraft" aria-label="Supprimer le brouillon">×</button>
-      </section>
-      <button id="unclosedDayNotice" class="unclosed-day-notice" hidden></button>
-      <section class="next-card" id="nextAppointment"></section>
-      <section class="payment-reminder-card" id="paymentReminderCard" hidden></section>
-      <section class="todo-card" id="todoCard" hidden></section>
-      <button id="backupNotice" class="backup-notice" hidden></button>
 
       <section class="mode-switch" aria-label="Type de vue">
         <button class="mode-button active" data-mode="day">Jour</button>
@@ -69,14 +53,19 @@
           <button class="round-button" id="nextPeriod" aria-label="Semaine suivante">›</button>
         </div>
         <div class="day-strip" id="dayStrip" aria-label="Choisir un jour"></div>
+        <div id="dayAgendaContext"><div id="agendaContext" class="agenda-context">
+          <div class="agenda-follow-up">
+            <button id="followUpButton" type="button" class="follow-up-button" aria-haspopup="dialog"><span>À suivre</span><span id="followUpCount" class="count-badge">0</span><span class="sr-only">sur tout l’agenda</span><span aria-hidden="true">›</span></button>
+            <button id="findFreeSlot" type="button" class="free-slot-button" aria-haspopup="dialog"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4 4M10.5 7v4h3"></path></svg>Créneau libre</button>
+          </div>
+      <section id="draftNotice" class="draft-notice" hidden>
+        <button id="resumeDraft"><span><strong id="draftNoticeTitle">Saisie en cours</strong><small id="draftNoticeText"></small></span><b>Continuer ›</b></button>
+        <button id="discardDraft" aria-label="Supprimer le brouillon">×</button>
+      </section>
+        </div></div>
         <div id="holidayBanner" hidden></div>
-        <div class="selected-day-heading"><div><p class="eyebrow">Planning</p><h2 id="selectedDayTitle"></h2></div><button class="text-button" id="todayButton">Aujourd’hui</button></div>
-        <section id="daySummary" class="day-summary"></section>
-        <section class="day-tools" aria-label="Outils de la journée">
-          <button id="dayReview" class="day-tool"><span><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8"></path><circle cx="12" cy="12" r="9"></circle></svg></span><strong>Fin de journée</strong><small>Vérifier les paiements</small></button>
-          <button id="routeDay" class="day-tool"><span><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 19.5c-1.8 0-3-1.4-3-3s1.2-3 3-3h10c1.8 0 3-1.4 3-3s-1.2-3-3-3H8"></path><path d="m8 4-3 3.5L8 11"></path></svg></span><strong>Ma tournée</strong><small>Ouvrir les itinéraires</small></button>
-        </section>
-        <section id="dayClosureCard" class="day-closure-card" hidden><div><p class="eyebrow">Journée à clôturer</p><strong id="dayClosureText"></strong><small>Vérifie les paiements de cette journée.</small></div></section>
+        <div class="selected-day-heading"><div><h2 id="selectedDayTitle"></h2></div><button class="text-button" id="todayButton">Aujourd’hui</button></div>
+
         <section id="dayAllDayBlocks" class="day-all-day-blocks" hidden></section>
         <section id="dayTimeline" class="day-timeline" aria-label="Planning horaire"></section>
       </section>
@@ -84,15 +73,21 @@
       <section id="fullWeekView" class="agenda-view" hidden>
         <div class="period-nav"><button class="round-button" id="previousWeek" aria-label="Semaine précédente">‹</button><strong id="weekPeriodLabel"></strong><button class="round-button" id="nextWeek" aria-label="Semaine suivante">›</button></div>
         <div class="week-view-heading"><div><p class="eyebrow">Planning horaire</p><h2>Ma semaine</h2></div><button class="text-button" id="currentWeekButton">Cette semaine</button></div>
+        <div id="weekAgendaContext"></div>
         <section id="weekSummary" class="day-summary"></section>
         <section id="weekSchedule" class="week-schedule" aria-label="Planning horaire de toute la semaine"></section>
       </section>
 
       <section id="monthView" class="agenda-view" hidden>
         <div class="period-nav"><button class="round-button" id="previousMonth" aria-label="Mois précédent">‹</button><strong id="monthLabel"></strong><button class="round-button" id="nextMonth" aria-label="Mois suivant">›</button></div>
+        <div id="monthAgendaContext"></div>
         <p class="view-help">Touche un jour pour ouvrir son programme, modifier un élément ou en ajouter un.</p>
         <section id="monthGrid" class="month-grid" aria-label="Calendrier mensuel"></section>
       </section>
+      <div class="agenda-toolbar" aria-label="Outils de l’agenda">
+        <button id="openTasks" type="button" aria-haspopup="dialog"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 6 1.5 1.5L8 4.5M11 6h9M4 13h3m4 0h9M4 19h3m4 0h9"></path></svg>Mes tâches <span id="taskCount" class="count-badge">0</span></button>
+        <button id="openAtelierDayPanel" type="button" aria-haspopup="dialog"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"></path></svg>Journée <span aria-hidden="true">⌃</span></button>
+      </div>
     </main>
 
     <main class="client-screen" id="clientsScreen" hidden>
@@ -117,16 +112,67 @@
         </div>
       </section>
       <section id="reportContent" class="report-content"></section>
-      <footer class="report-footer-actions"><button id="exportReportCsv" class="secondary-button">Exporter le bilan</button><small>Crée un fichier CSV utilisable dans un tableur.</small></footer>
+      <footer class="report-footer-actions"><button id="exportReportCsv" class="secondary-button">Exporter le bilan</button><small>Crée un fichier CSV utilisable dans un tableur. Les exports contiennent les montants réels, même en mode discrétion.</small></footer>
     </main>
 
     <nav class="bottom-bar" aria-label="Navigation">
       <button class="nav-item active" data-screen="agenda"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="3"></rect><path d="M7 3.5v4m10-4v4M3.5 10h17M8 14h3v3H8z"></path></svg></span>Agenda</button>
       <button class="nav-item" data-screen="clients"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"></circle><path d="M5.5 20c.4-4 2.6-6 6.5-6s6.1 2 6.5 6"></path></svg></span>Clientes</button>
-      <button class="add-button" id="addAppointment" aria-label="Ajouter un rendez-vous, un événement ou une dépense"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+      <button class="add-button nav-item" id="addAppointment" aria-label="Ajouter un rendez-vous, un événement, une dépense ou une tâche" aria-haspopup="dialog"><span class="add-symbol"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span><span>Ajouter</span></button>
       <button class="nav-item" data-screen="report"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7"></path></svg></span>Bilan</button>
       <button class="nav-item" data-screen="settings"><span class="nav-icon" aria-hidden="true"><svg class="interface-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 3.5v2m0 13v2m8.5-8.5h-2m-13 0h-2m14.5-6-1.4 1.4M7.4 16.6 6 18m12 0-1.4-1.4M7.4 7.4 6 6"></path></svg></span>Réglages</button>
     </nav>
+
+    <dialog id="atelierDayPanel" class="modal atelier-day-panel" aria-labelledby="atelierDayTitle">
+      <div><div class="modal-heading"><div><p class="eyebrow">Le jour sélectionné</p><h2 id="atelierDayTitle">Journée</h2><p id="atelierDayDate" class="small-copy"></p></div><button type="button" class="close-button" data-close="atelierDayPanel" aria-label="Fermer la journée">×</button></div>
+      <section class="next-card" id="nextAppointment"></section>
+        <section aria-labelledby="daySummaryTitle"><h3 id="daySummaryTitle" class="panel-section-title">Résumé de la journée</h3>
+        <section id="daySummary" class="day-summary"></section>
+        </section>
+        <section id="dayClosureCard" class="day-closure-card" hidden><div><p class="eyebrow">Journée à clôturer</p><strong id="dayClosureText"></strong><small>Vérifie les paiements de cette journée.</small></div></section>
+        <section class="day-tools" aria-label="Outils de la journée">
+          <button id="dayReview" class="day-tool"><span><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12.5 3.5 3.5 7.5-8"></path><circle cx="12" cy="12" r="9"></circle></svg></span><strong>Fin de journée</strong><small>Vérifier les paiements</small></button>
+          <button id="routeDay" class="day-tool"><span><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 19.5c-1.8 0-3-1.4-3-3s1.2-3 3-3h10c1.8 0 3-1.4 3-3s-1.2-3-3-3H8"></path><path d="m8 4-3 3.5L8 11"></path></svg></span><strong>Ma tournée</strong><small>Adresses et itinéraires Waze</small></button>
+        </section>
+      </div>
+    </dialog>
+    <dialog id="followUpDialog" class="modal" aria-labelledby="followUpTitle">
+      <div><div class="modal-heading"><div><p class="eyebrow">Tout l’agenda</p><h2 id="followUpTitle">À suivre</h2></div><button type="button" class="close-button" data-close="followUpDialog" aria-label="Fermer le suivi">×</button></div>
+        <p class="small-copy">Les confirmations, relances et journées à clôturer restent visibles quelle que soit la date du planning.</p>
+      <section class="todo-card" id="todoCard" hidden></section>
+      <section class="payment-reminder-card" id="paymentReminderCard" hidden></section>
+      <button id="unclosedDayNotice" class="unclosed-day-notice" hidden></button>
+      <button id="backupNotice" class="backup-notice" hidden></button>
+        <div class="follow-up-backup"><div><strong>Mes données</strong><p class="small-copy">Garder une copie de l’agenda.</p></div>
+            <button class="icon-button save-file-button" id="backupButton" aria-label="Sauvegarder mes données dans Fichiers" title="Sauvegarder dans Fichiers">
+              <svg class="interface-icon file-save-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg>
+            </button>
+        </div>
+      <section id="featureCoach" class="feature-coach" hidden>
+        <span class="feature-coach-icon" aria-hidden="true">
+          <svg class="interface-icon" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="3"></rect><path d="M7 3.5v4m10-4v4M3.5 10h17M8 14h3v3H8z"></path></svg>
+        </span>
+        <span><strong>Nouveau dans la vue Mois</strong><small>Touche un jour pour voir son programme et ajouter directement un élément.</small></span>
+        <button id="dismissFeatureCoach" type="button" aria-label="Masquer cette nouveauté">×</button>
+      </section>
+      </div>
+    </dialog>
+    <dialog id="tasksDialog" class="modal" aria-labelledby="tasksTitle">
+      <div><div class="modal-heading"><div><p class="eyebrow">À mon rythme</p><h2 id="tasksTitle">Mes tâches</h2></div><button type="button" class="close-button" data-close="tasksDialog" aria-label="Fermer les tâches">×</button></div>
+        <button id="newTask" class="primary-button full-width" type="button">＋ Nouvelle tâche</button>
+        <section id="taskList" class="task-list" aria-label="Tâches à faire"></section>
+        <details id="completedTasks" class="completed-tasks"><summary>Terminées <span id="completedTaskCount" class="count-badge">0</span></summary><section id="completedTaskList" class="task-list" aria-label="Tâches terminées"></section></details>
+      </div>
+    </dialog>
+    <dialog id="taskDialog" class="modal task-dialog" aria-labelledby="taskDialogTitle">
+      <form id="taskForm" novalidate>
+        <div class="modal-heading"><div><p class="eyebrow">Mes tâches</p><h2 id="taskDialogTitle">Nouvelle tâche</h2></div><button type="button" class="close-button" data-close="taskDialog" aria-label="Fermer la tâche">×</button></div>
+        <input id="taskId" type="hidden">
+        <label class="field">À faire<input id="taskTitle" required maxlength="200" autocomplete="off" placeholder="Ex. Commander des consommables"></label>
+        <label class="field">Échéance <small>(facultatif)</small><input id="taskDueDate" type="date"></label>
+        <div class="form-actions sticky-form-actions"><button id="deleteTask" type="button" class="danger-button" hidden>Supprimer</button><button id="taskSubmitButton" class="primary-button" type="submit">Créer la tâche</button></div>
+      </form>
+    </dialog>
 
     <dialog id="monthDayDialog" class="month-day-dialog" aria-labelledby="monthDayTitle">
       <div class="month-day-card">
@@ -166,6 +212,7 @@
         <section class="form-section">
           <div class="form-section-heading"><span>3</span><div><h3>Créneau</h3><p>Date, heure et état du rendez-vous.</p></div></div>
           <div class="two-columns"><label class="field">Date<input id="date" required type="date" aria-describedby="conflictHint"></label><label class="field">Heure<div class="time-picker"><select id="timeHour" aria-label="Heure" aria-describedby="conflictHint"></select><span>:</span><select id="timeMinute" aria-label="Minutes" aria-describedby="conflictHint"></select></div><input id="time" required type="time" step="300" hidden></label></div>
+          <div class="slot-assistance"><button id="slotSuggestionsToggle" class="slot-suggestions-toggle" type="button" aria-expanded="false" aria-controls="slotSuggestionsPanel"><svg class="interface-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 4 4M10.5 7v4h3"></path></svg><span>Trouver un créneau libre<small>Aide facultative selon la durée choisie</small></span><span aria-hidden="true">⌄</span></button><div id="slotSuggestionsPanel" hidden><p class="small-copy">Choisis une proposition ou garde la date et l’heure de ton choix.</p><div id="slotSuggestionsList" class="slot-suggestions-list"></div></div></div>
           <label class="field">Statut<select id="status"><option value="confirmed">Confirmé</option><option value="to_confirm">À confirmer</option><option value="completed">Terminé</option><option value="cancelled">Annulé</option><option value="no_show">Absente</option></select></label>
         </section>
 
@@ -214,7 +261,7 @@
         <div class="form-actions sticky-form-actions"><button class="danger-button" id="deleteBlock" type="button" hidden>Supprimer</button><button id="blockSubmitButton" class="primary-button" type="submit">Ajouter l’événement</button></div>
       </form>
     </dialog>
-    <dialog id="quickAddDialog" class="modal quick-add-modal" aria-labelledby="quickAddDialogTitle"><div><div class="modal-heading"><div><p class="eyebrow">Nouvel élément</p><h2 id="quickAddDialogTitle">Que veux-tu ajouter ?</h2></div><button type="button" class="close-button" data-close="quickAddDialog" aria-label="Fermer">×</button></div><p id="quickAddWhen" class="quick-add-when"></p><div class="quick-add-actions"><button type="button" class="quick-add-choice primary" id="quickAddAppointment"><span aria-hidden="true">＋</span><span><strong>Nouveau rendez-vous</strong><small>Cliente et prestation</small></span></button><button type="button" class="quick-add-choice" id="quickAddBlock"><span aria-hidden="true">◇</span><span><strong>Événement personnel</strong><small>Rendez-vous privé, congé ou information</small></span></button><button type="button" class="quick-add-choice expense-choice" id="quickAddExpense"><span aria-hidden="true">€</span><span><strong>Ajouter une dépense</strong><small>Achat, matériel, formation ou abonnement</small></span></button></div></div></dialog>
+    <dialog id="quickAddDialog" class="modal quick-add-modal" aria-labelledby="quickAddDialogTitle"><div><div class="modal-heading"><div><p class="eyebrow">Nouvel élément</p><h2 id="quickAddDialogTitle">Que veux-tu ajouter ?</h2></div><button type="button" class="close-button" data-close="quickAddDialog" aria-label="Fermer">×</button></div><p id="quickAddWhen" class="quick-add-when"></p><div class="quick-add-actions"><button type="button" class="quick-add-choice primary" id="quickAddAppointment"><span aria-hidden="true">＋</span><span><strong>Nouveau rendez-vous</strong><small>Cliente et prestation</small></span></button><button type="button" class="quick-add-choice" id="quickAddBlock"><span aria-hidden="true">◇</span><span><strong>Événement personnel</strong><small>Rendez-vous privé, congé ou information</small></span></button><button type="button" class="quick-add-choice expense-choice" id="quickAddExpense"><span aria-hidden="true">€</span><span><strong>Ajouter une dépense</strong><small>Achat, matériel, formation ou abonnement</small></span></button><button type="button" class="quick-add-choice" id="quickAddTask"><span aria-hidden="true">✓</span><span><strong>Nouvelle tâche</strong><small>Une chose à faire, avec ou sans échéance</small></span></button></div></div></dialog>
     <dialog id="appointmentSearchDialog" class="modal search-modal" aria-labelledby="appointmentSearchTitle"><div><div class="modal-heading"><div><p class="eyebrow">Agenda complet</p><h2 id="appointmentSearchTitle">Rechercher un rendez-vous</h2></div><button type="button" class="close-button" data-close="appointmentSearchDialog" aria-label="Fermer la recherche">×</button></div><label class="search-field dialog-search-field"><span aria-hidden="true">⌕</span><input id="appointmentSearchInput" type="search" maxlength="200" autocomplete="off" placeholder="Cliente, prestation, date ou note" aria-label="Rechercher un rendez-vous" aria-describedby="appointmentSearchHelp"></label><p id="appointmentSearchHelp" class="small-copy">Saisis au moins deux caractères. Les anciens et futurs rendez-vous restent accessibles.</p><p id="appointmentSearchCount" class="search-result-count" role="status" aria-live="polite"></p><section id="appointmentSearchResults" class="appointment-search-results" aria-label="Résultats de la recherche"></section></div></dialog>
     <dialog id="reportDetailDialog" class="modal report-detail-modal" aria-labelledby="reportDetailTitle"><div><div class="modal-heading"><div><p class="eyebrow">Détail du bilan</p><h2 id="reportDetailTitle">Prestations</h2></div><button type="button" class="close-button" data-close="reportDetailDialog" aria-label="Fermer le détail">×</button></div><p id="reportDetailSummary" class="small-copy"></p><section id="reportDetailContent" class="report-detail-content"></section></div></dialog>
     <dialog id="expenseDialog" class="modal" aria-labelledby="expenseFormTitle">
@@ -234,7 +281,7 @@
           <p class="information-note"><span aria-hidden="true">i</span> Les revenus et les dépenses restent toujours présentés séparément dans le bilan.</p>
         </section>
         <div id="expenseValidation" class="conflict-hint" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
-        <div class="form-actions sticky-form-actions"><button id="deleteExpense" class="danger-button" type="button" hidden>Supprimer</button><button id="expenseSubmitButton" class="primary-button" type="submit">Ajouter la dépense</button></div>
+        <div class="form-actions sticky-form-actions"><button id="deleteExpense" class="danger-button" type="button" hidden>Supprimer</button><button id="duplicateExpense" class="secondary-button" type="button" hidden>Dupliquer</button><button id="expenseSubmitButton" class="primary-button" type="submit">Ajouter la dépense</button></div>
       </form>
     </dialog>
     <dialog id="expenseCategoriesDialog" class="modal" aria-labelledby="expenseCategoriesDialogTitle">
@@ -258,6 +305,7 @@
 
     <dialog id="settingsDialog" class="modal settings-modal" aria-labelledby="settingsTitle"><div><div class="modal-heading"><button type="button" class="settings-back" id="settingsBack" hidden>‹ Retour</button><div><h2 id="settingsTitle">Réglages</h2><p class="app-version" id="appVersionLabel"></p></div><button type="button" class="close-button" data-close="settingsDialog" aria-label="Fermer">×</button></div>
       <section id="settingsHome" class="settings-home">
+        <button data-settings-page="appearance"><span aria-hidden="true">◐</span><span><strong>Apparence</strong><small id="settingsAppearanceSummary">Clair ou sombre · confortable ou compact</small></span><b>›</b></button>
         <button data-settings-page="agenda"><span aria-hidden="true">◷</span><span><strong>Agenda et horaires</strong><small id="settingsAgendaSummary"></small></span><b>›</b></button>
         <button data-settings-page="services"><span aria-hidden="true">✦</span><span><strong>Prestations et tarifs</strong><small id="settingsServicesSummary"></small></span><b>›</b></button>
         <button data-settings-page="supplements"><span aria-hidden="true">＋</span><span><strong>Suppléments</strong><small id="settingsSupplementsSummary"></small></span><b>›</b></button>
@@ -265,7 +313,8 @@
         <button data-settings-page="data"><span aria-hidden="true"><svg class="interface-icon file-save-icon" viewBox="0 0 24 24" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg></span><span><strong>Données et sauvegardes</strong><small id="settingsDataSummary"></small></span><b>›</b></button>
         <button data-settings-page="about"><span aria-hidden="true">i</span><span><strong>À propos</strong><small>Version et confidentialité</small></span><b>›</b></button>
       </section>
-      <section class="settings-page" data-settings-content="agenda" hidden><div class="settings-card density-settings"><h3>Apparence du planning</h3><p>Le thème est choisi ici et ne dépend plus du réglage de l’iPhone.</p><label class="field">Thème<select id="colorTheme"><option value="light">Clair</option><option value="dark">Sombre</option></select></label><label class="field">Affichage<select id="displayDensity"><option value="comfortable">Confortable</option><option value="compact">Compact</option></select></label></div><div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires sont signalés mais restent possibles.</p></div><button class="small-action" id="applyWeekdayHours" type="button">9 h–19 h</button></div><div id="workingHoursEditor" class="working-hours-editor"></div><button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer l’apparence et les horaires</button></section>
+      <section class="settings-page" data-settings-content="appearance" hidden><div class="settings-card density-settings"><h3>À ton image</h3><p>Choisis ton thème et la densité du planning. Le thème reste celui que tu choisis.</p><label class="field">Thème<select id="colorTheme"><option value="light">Clair</option><option value="dark">Sombre</option></select></label><label class="field">Affichage<select id="displayDensity"><option value="comfortable">Confortable</option><option value="compact">Compact</option></select></label></div><p class="small-copy">Le mode discrétion masque les montants à l’écran. Les exports contiennent les montants réels.</p><button id="saveAppearance" type="button" class="primary-button full-width">Enregistrer l’apparence</button></section>
+      <section class="settings-page" data-settings-content="agenda" hidden><div class="settings-heading"><div><h3>Horaires de travail</h3><p>Les créneaux hors horaires sont signalés mais restent possibles.</p></div><button class="small-action" id="applyWeekdayHours" type="button">9 h–19 h</button></div><div id="workingHoursEditor" class="working-hours-editor"></div><button id="saveWorkingHours" type="button" class="primary-button full-width">Enregistrer les horaires</button></section>
       <section class="settings-page" data-settings-content="services" hidden><div class="settings-heading"><div><h3>Prestations</h3><p>Les anciens rendez-vous conservent leur tarif.</p></div><button class="small-action" id="addService" type="button">+ Ajouter</button></div><div id="settingsServiceList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="supplements" hidden><div class="settings-heading"><div><h3>Natures de supplément</h3><p>Définis un prix proposé automatiquement. Il restera modifiable dans chaque rendez-vous.</p></div><button class="small-action" id="addSupplementType" type="button">+ Ajouter</button></div><div id="settingsSupplementList" class="settings-service-list"></div></section>
       <section class="settings-page" data-settings-content="clients" hidden><div class="settings-heading"><div><h3>Repères clientes</h3><p>Un nom et un emoji choisi depuis le clavier de l’iPhone.</p></div><button class="small-action" id="addBadge" type="button">+ Ajouter</button></div><div id="settingsBadgeList" class="settings-service-list"></div><div class="settings-card"><h3>Annulations tardives</h3><label class="field">Proposer un repère après<input id="lateCancellationThreshold" type="number" min="1" max="20" inputmode="numeric"></label><label class="check-field"><input id="lateCancellationPromptEnabled" type="checkbox"><span><strong>Afficher la proposition</strong><small>Le repère ne sera jamais appliqué automatiquement.</small></span></label><button id="saveClientSettings" class="primary-button full-width" type="button">Enregistrer les réglages clientes</button></div></section>
@@ -282,7 +331,7 @@
           <div class="storage-status" id="storageStatus"></div>
         </div>
         <div class="settings-card"><h3>Rappel de sauvegarde</h3><label class="field">Me le rappeler après<select id="backupReminderDays"><option value="3">3 jours</option><option value="7">7 jours</option><option value="14">14 jours</option><option value="30">30 jours</option></select></label><button id="saveReminderSettings" class="primary-button full-width" type="button">Enregistrer le rappel</button></div>
-        <div class="settings-card"><h3>Sauvegarde dans Fichiers</h3><p class="backup-status" id="backupStatus"></p><p class="small-copy">Tout est inclus : clientes, rendez-vous, paiements, suppléments, repères, événements personnels, dépenses et réglages. Sur iPhone, choisis ensuite « Enregistrer dans Fichiers » et le dossier souhaité. Ne place jamais ce fichier dans ton dépôt GitHub public.</p><button type="button" class="primary-button full-width save-action-button" id="exportData"><svg class="interface-icon file-save-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg> Sauvegarder dans Fichiers</button><label class="file-button verify-file-button"><span>✓ Vérifier une sauvegarde</span><input id="verifyData" type="file" accept="application/json,.json"></label><div id="backupVerificationResult" class="backup-verification-result" role="status" aria-live="polite" hidden></div><label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json,.json"></label><button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button><button type="button" class="secondary-button full-width" id="undoMigration" hidden>Récupérer les données d’avant la mise à jour</button></div>
+        <div class="settings-card"><h3>Sauvegarde dans Fichiers</h3><p class="backup-status" id="backupStatus"></p><p class="small-copy">Tout est inclus : clientes, rendez-vous, paiements, suppléments, repères, événements personnels, dépenses, tâches et réglages. Sur iPhone, choisis ensuite « Enregistrer dans Fichiers » et le dossier souhaité. Ne place jamais ce fichier dans ton dépôt GitHub public.</p><button type="button" class="primary-button full-width save-action-button" id="exportData"><svg class="interface-icon file-save-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 3.5h6.8l3.7 3.7v13.3H7z"></path><path d="M13.8 3.5v3.7h3.7M12.2 9.5v6.2m-2.5-2.4 2.5 2.4 2.5-2.4"></path></svg> Sauvegarder dans Fichiers</button><label class="file-button verify-file-button"><span>✓ Vérifier une sauvegarde</span><input id="verifyData" type="file" accept="application/json,.json"></label><div id="backupVerificationResult" class="backup-verification-result" role="status" aria-live="polite" hidden></div><label class="file-button">Restaurer une sauvegarde<input id="importData" type="file" accept="application/json,.json"></label><button type="button" class="secondary-button full-width" id="undoRestore" hidden>Revenir aux données d’avant la restauration</button><button type="button" class="secondary-button full-width" id="undoMigration" hidden>Récupérer les données d’avant la mise à jour</button></div>
       </section>
       <section class="settings-page" data-settings-content="about" hidden><div class="settings-card"><h3>Mon agenda</h3><p id="aboutVersion"></p><p>Application personnelle hors ligne. Les données sont enregistrées dans une base locale contrôlée avant chaque ouverture et ne sont pas envoyées à GitHub.</p><p class="small-copy">Le verrouillage de l’iPhone protège l’accès. Aucun mot de passe supplémentaire n’est ajouté dans l’application.</p></div></section>
     </div></dialog>
@@ -318,7 +367,7 @@
 
     <section id="successToast" class="success-toast" role="status" aria-live="polite" hidden><span aria-hidden="true">✓</span><strong id="successMessage">Enregistré</strong></section>
     <section id="undoToast" class="undo-toast" role="status" aria-live="polite" hidden><span id="undoMessage"></span><button type="button" id="undoLastAction">Annuler</button></section>
-    <script src="storage.js?v=2026.15.1"></script>
-    <script src="app.js?v=2026.15.1"></script>
+    <script src="storage.js?v=2026.15.2"></script>
+    <script src="app.js?v=2026.15.2"></script>
   </body>
 </html>
